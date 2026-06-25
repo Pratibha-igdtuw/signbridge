@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+{% block content %}
+
+<!-- Feature 5: Audit search & date filter -->
+<form method="get" class="bg-white border border-slate-200 rounded-lg p-4 mb-4 flex flex-wrap gap-3 items-end">
+  <div>
+    <label class="block text-xs font-medium text-steel mb-1">Search</label>
+    <input name="q" value="{{ q }}" placeholder="Username, action, IP…"
+           class="rounded-md border border-slate-300 px-3 py-2 text-sm w-56
+                  focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+  </div>
+  <div>
+    <label class="block text-xs font-medium text-steel mb-1">From date</label>
+    <input name="from" type="date" value="{{ date_from }}"
+           class="rounded-md border border-slate-300 px-3 py-2 text-sm
+                  focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+  </div>
+  <div>
+    <label class="block text-xs font-medium text-steel mb-1">To date</label>
+    <input name="to" type="date" value="{{ date_to }}"
+           class="rounded-md border border-slate-300 px-3 py-2 text-sm
+                  focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+  </div>
+  <button class="bg-ink hover:bg-steel text-white rounded-md px-4 py-2 text-sm transition">Filter</button>
+  {% if q or date_from or date_to %}
+  <a href="{{ request.path }}" class="px-3 py-2 text-sm text-slate-500 hover:text-steel">Clear</a>
+  {% endif %}
+</form>
+
+<div class="flex items-center justify-between mb-3">
+  <p class="text-sm text-slate-500">{{ rows|length }} record(s) shown · newest first.</p>
+  <a href="{{ url_for('audit_export', kind=kind) }}"
+     class="bg-ink hover:bg-steel text-white rounded-md px-4 py-2 text-sm font-medium transition">
+    ⬇ Export evidence (CSV)
+  </a>
+</div>
+
+<div class="bg-white rounded-lg border border-slate-200 overflow-x-auto">
+  <table class="w-full text-sm evidence">
+    <thead class="bg-slate-50 text-left text-xs uppercase eyebrow text-slate-400">
+      <tr>
+        {% for c in cols %}<th class="px-4 py-3 font-semibold whitespace-nowrap">{{ c.replace('_',' ') }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for r in rows %}
+        <tr class="hover:bg-slate-50 align-top">
+          {% for c in cols %}
+            <td class="px-4 py-2.5
+                       {% if c in ['timestamp','alert_time','ip_address'] %}font-mono text-xs text-slate-500 whitespace-nowrap{% endif %}
+                       {% if c == 'payload' or c == 'user_agent' %}font-mono text-xs text-slate-500 max-w-xs truncate{% endif %}">
+              {% if c == 'status' %}
+                <span class="px-2 py-0.5 rounded text-xs
+                             {{ 'bg-teal-50 text-teal-700' if r[c]=='success'
+                                else 'bg-amber-50 text-amber-700' if r[c]=='locked'
+                                else 'bg-red-50 text-red-700' }}">{{ r[c] }}</span>
+              {% elif c == 'action' %}
+                <span class="px-2 py-0.5 rounded bg-slate-100 text-xs">{{ r[c] }}</span>
+              {% else %}
+                {{ r[c] if r[c] is not none else '—' }}
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+      {% else %}
+        <tr><td colspan="{{ cols|length }}" class="px-4 py-8 text-center text-slate-400">No records.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

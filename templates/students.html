@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Students{% endblock %}
+{% block heading %}Student Records{% endblock %}
+{% block content %}
+
+{% if user.role == 'faculty' and my_courses %}
+<!-- Faculty: course filter -->
+<div class="mb-4 flex flex-wrap gap-2 items-center">
+  <span class="text-xs font-semibold text-slate-500 eyebrow uppercase">Filter by course:</span>
+  <a href="{{ url_for('students') }}"
+     class="px-3 py-1.5 rounded-md text-xs font-medium transition
+            {{ 'bg-signal text-white' if not course_filter else 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
+    All My Students
+  </a>
+  {% for c in my_courses %}
+  <a href="{{ url_for('students', course_id=c.id) }}"
+     class="px-3 py-1.5 rounded-md text-xs font-medium transition
+            {{ 'bg-signal text-white' if course_filter == c.id else 'bg-white border border-slate-200 text-slate-600 hover:border-signal' }}">
+    {{ c.name }} <span class="opacity-60">· Sem{{ c.semester }} {{ c.section }}</span>
+  </a>
+  {% endfor %}
+  <a href="{{ url_for('courses') }}" class="ml-auto text-xs text-signal hover:underline">Manage courses →</a>
+</div>
+{% endif %}
+
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+  <form method="get" class="flex gap-2">
+    <input name="q" value="{{ q }}" placeholder="Search roll / name / email"
+           class="rounded-md border border-slate-300 px-3 py-2 text-sm w-72
+                  focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <input type="hidden" name="dir" value="{{ dir }}">
+    {% if course_filter %}<input type="hidden" name="course_id" value="{{ course_filter }}">{% endif %}
+    <button class="bg-ink text-white rounded-md px-4 py-2 text-sm hover:bg-steel transition">Search</button>
+    {% if q %}<a href="{{ url_for('students', course_id=course_filter) }}" class="px-3 py-2 text-sm text-slate-500 hover:text-steel">Clear</a>{% endif %}
+  </form>
+  {% if user.role in ['admin','faculty'] %}
+    <a href="{{ url_for('student_new') }}"
+       class="bg-signal hover:bg-teal-700 text-white rounded-md px-4 py-2 text-sm font-medium transition">
+      + Add student
+    </a>
+  {% endif %}
+</div>
+
+<div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+  <table class="w-full text-sm evidence">
+    <thead class="bg-slate-50 text-left text-xs uppercase eyebrow text-slate-400">
+      <tr>
+        {% macro th(col, label) %}
+          {% set nd = 'ASC' if (sort==col and dir=='DESC') else 'DESC' %}
+          <th class="px-4 py-3 font-semibold">
+            <a href="{{ url_for('students', q=q, sort=col, dir=nd) }}" class="hover:text-steel">
+              {{ label }}{% if sort==col %} {{ '↓' if dir=='DESC' else '↑' }}{% endif %}
+            </a>
+          </th>
+        {% endmacro %}
+        {{ th('roll_number','Roll No') }}
+        {{ th('full_name','Name') }}
+        {{ th('department','Dept') }}
+        {{ th('year','Year') }}
+        {{ th('cgpa','CGPA') }}
+        <th class="px-4 py-3 font-semibold text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for s in students %}
+        <tr class="hover:bg-slate-50">
+          <td class="px-4 py-3 font-mono text-xs text-steel">{{ s.roll_number }}</td>
+          <td class="px-4 py-3 font-medium text-ink">{{ s.full_name }}<div class="text-xs text-slate-400 font-normal">{{ s.email }}</div></td>
+          <td class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-slate-100 text-xs">{{ s.department }}</span></td>
+          <td class="px-4 py-3">{{ s.year }}</td>
+          <td class="px-4 py-3 font-mono">{{ '%.2f'|format(s.cgpa) if s.cgpa is not none else '—' }}</td>
+          <td class="px-4 py-3 text-right">
+            {% if user.role in ['admin','faculty'] %}
+              <a href="{{ url_for('student_edit', sid=s.id) }}" class="text-signal hover:underline text-xs">Edit</a>
+            {% endif %}
+            {% if user.role == 'admin' %}
+              <form method="post" action="{{ url_for('student_delete', sid=s.id) }}" class="inline"
+                    onsubmit="return confirm('Delete {{ s.roll_number }}? This is logged.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="text-red-600 hover:underline text-xs ml-2">Delete</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">
+          {% if q %}No students match “{{ q }}”.{% else %}No students yet. Add the first one.{% endif %}
+        </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="text-xs text-slate-400 mt-3">Showing {{ students|length }} record(s). Searches and sorts use parameterized queries with column whitelisting.</p>
+{% endblock %}

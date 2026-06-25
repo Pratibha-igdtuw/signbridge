@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Submissions — {{ assignment.title }}{% endblock %}
+{% block heading %}Homework Submissions{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <a href="{{ url_for('assignments') }}" class="text-sm text-signal hover:underline">← Back to assignments</a>
+</div>
+
+<div class="bg-white rounded-lg border border-slate-200 p-5 mb-5">
+  <h2 class="font-semibold text-ink">{{ assignment.title }}</h2>
+  <p class="text-xs text-slate-400 mt-1">{{ assignment.subject }} · Due: {{ assignment.due_date or 'No deadline' }}</p>
+</div>
+
+<div class="bg-white rounded-lg border border-slate-200">
+  <div class="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+    <h3 class="text-sm font-semibold text-ink">{{ subs | length }} submission(s)</h3>
+  </div>
+  {% if subs %}
+  <table class="w-full text-sm evidence">
+    <thead>
+      <tr class="border-b border-slate-200">
+        <th class="text-left px-5 py-2 font-medium text-slate-500 text-xs">Student</th>
+        <th class="text-left px-5 py-2 font-medium text-slate-500 text-xs">Roll No.</th>
+        <th class="text-left px-5 py-2 font-medium text-slate-500 text-xs">File</th>
+        <th class="text-left px-5 py-2 font-medium text-slate-500 text-xs">Submitted</th>
+        <th class="px-5 py-2"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for s in subs %}
+      <tr>
+        <td class="px-5 py-3 font-medium text-steel">{{ s.student_name }}</td>
+        <td class="px-5 py-3 font-mono text-xs">{{ s.roll_number }}</td>
+        <td class="px-5 py-3 text-slate-500 text-xs">{{ s.original_name }}</td>
+        <td class="px-5 py-3 font-mono text-xs text-slate-400">{{ s.submitted_at }}</td>
+        <td class="px-5 py-3">
+          <a href="{{ url_for('homework_download', hid=s.id) }}"
+             class="text-xs text-signal hover:underline">⬇ Download</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="px-5 py-8 text-center text-sm text-slate-400">No submissions yet.</div>
+  {% endif %}
+</div>
+{% endblock %}

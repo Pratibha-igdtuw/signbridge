@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Grievances{% endblock %}
+{% block heading %}Grievances & Queries{% endblock %}
+{% block content %}
+
+{% if user.role == 'student' %}
+<!-- Student: Submit new grievance -->
+<div class="bg-white rounded-lg border border-slate-200 p-5 mb-6">
+  <h2 class="text-sm font-semibold text-ink mb-4">Submit a Grievance / Query</h2>
+  <form method="post" action="{{ url_for('grievance_submit') }}" class="space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Subject <span class="text-red-500">*</span></label>
+        <input name="subject" required placeholder="e.g. Attendance correction request"
+               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Category</label>
+        <select name="category" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none">
+          <option value="academic">Academic</option>
+          <option value="attendance">Attendance</option>
+          <option value="result">Result / Marks</option>
+          <option value="fee">Fee</option>
+          <option value="facility">Facility</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Description <span class="text-red-500">*</span></label>
+      <textarea name="description" rows="3" required
+                placeholder="Describe your issue clearly…"
+                class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-signal focus:ring-1 focus:ring-signal outline-none"></textarea>
+    </div>
+    <div class="flex justify-end">
+      <button class="bg-signal hover:bg-teal-700 text-white text-sm font-medium px-5 py-2 rounded-md transition">
+        📨 Submit Grievance
+      </button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+<!-- Grievance list -->
+{% if grievances %}
+<div class="space-y-4">
+  {% for g in grievances %}
+  {% set status_colors = {
+    'open':     'bg-yellow-50 text-yellow-700 border-yellow-200',
+    'in_review':'bg-blue-50 text-blue-700 border-blue-200',
+    'resolved': 'bg-teal-50 text-teal-700 border-teal-200',
+    'closed':   'bg-slate-100 text-slate-500 border-slate-200'
+  } %}
+  {% set cat_icons = {'academic':'📚','attendance':'📅','result':'📊','fee':'💰','facility':'🏫','other':'📌'} %}
+  <div class="bg-white rounded-lg border {{ status_colors.get(g.status, 'border-slate-200').split(' ')[2] }} border p-5">
+    <div class="flex items-start justify-between gap-4">
+      <div class="flex-1">
+        <div class="flex items-center gap-2 flex-wrap mb-1">
+          <span class="text-base">{{ cat_icons.get(g.category, '📌') }}</span>
+          <h3 class="font-semibold text-ink">{{ g.subject }}</h3>
+          <span class="text-[10px] eyebrow font-semibold px-2 py-0.5 rounded-full border
+                       {{ status_colors.get(g.status, 'bg-slate-100 text-slate-500 border-slate-200') }}">
+            {{ g.status | upper | replace('_',' ') }}
+          </span>
+          <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full capitalize">
+            {{ g.category }}
+          </span>
+        </div>
+        {% if user.role in ('admin','faculty') %}
+          <p class="text-xs text-slate-500 mb-1">From: <span class="font-medium text-steel">{{ g.student_name }}</span></p>
+        {% endif %}
+        <p class="text-sm text-slate-600 leading-relaxed">{{ g.description }}</p>
+        <p class="text-xs text-slate-400 mt-2">Submitted: {{ g.created_at[:16] }}</p>
+
+        {% if g.response %}
+        <div class="mt-3 pl-4 border-l-2 border-signal bg-teal-50/50 rounded-r-md p-3">
+          <p class="text-xs font-semibold text-signal mb-1">
+            Response from {{ g.responder_name or 'Admin' }}
+            {% if g.responded_at %} · {{ g.responded_at[:16] }}{% endif %}
+          </p>
+          <p class="text-sm text-slate-700">{{ g.response }}</p>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Admin/Faculty actions -->
+      {% if user.role in ('admin','faculty') and g.status not in ('closed',) %}
+      <div class="shrink-0">
+        <button onclick="toggleRespond({{ g.id }})"
+                class="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-steel rounded-md transition">
+          {{ '✏ Update' if g.response else '💬 Respond' }}
+        </button>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Respond form (hidden by default) -->
+    {% if user.role in ('admin','faculty') and g.status not in ('closed',) %}
+    <div id="respond-{{ g.id }}" class="hidden mt-4 border-t border-slate-100 pt-4">
+      <form method="post" action="{{ url_for('grievance_respond', gid=g.id) }}" class="space-y-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <textarea name="response" rows="3" required
+                  placeholder="Write your response…"
+                  class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-signal focus:ring-1 focus:ring-signal outline-none">{{ g.response or '' }}</textarea>
+        <div class="flex items-center gap-3">
+          <select name="status" class="rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-signal outline-none">
+            <option value="in_review" {{ 'selected' if g.status=='in_review' }}>In Review</option>
+            <option value="resolved"  {{ 'selected' if g.status=='resolved' }}>Resolved</option>
+          </select>
+          <button class="bg-signal hover:bg-teal-700 text-white text-sm font-medium px-4 py-1.5 rounded-md transition">
+            Submit Response
+          </button>
+          {% if user.role == 'admin' %}
+          <form method="post" action="{{ url_for('grievance_close', gid=g.id) }}"
+                onsubmit="return confirm('Close this grievance permanently?')" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="text-slate-400 hover:text-slate-600 text-sm px-3 py-1.5 rounded-md hover:bg-slate-100 transition">
+              Close
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-lg border border-slate-200 p-10 text-center text-slate-400">
+  <p class="text-3xl mb-2">📭</p>
+  <p class="text-sm">
+    {% if user.role == 'student' %}No grievances submitted yet.{% else %}No grievances to review.{% endif %}
+  </p>
+</div>
+{% endif %}
+
+<script>
+function toggleRespond(id) {
+  const el = document.getElementById('respond-' + id);
+  el.classList.toggle('hidden');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block auth %}
+<div class="min-h-screen grid lg:grid-cols-2">
+  <div class="hidden lg:flex flex-col justify-between bg-ink text-slate-300 p-12">
+    <div>
+      <div class="eyebrow text-[11px] uppercase text-signal font-semibold">IDon Portal</div>
+      <h1 class="text-3xl font-semibold text-white mt-2 leading-tight">
+        Secure Student<br>Management System
+      </h1>
+    </div>
+    <div class="space-y-4 text-sm">
+      <p class="text-slate-400 max-w-sm">
+        Every action is recorded to a tamper-evident audit trail. Login history
+        includes entry hash, username, and role for forensic accountability.
+      </p>
+      <div class="font-mono text-xs text-slate-500 border-l-2 border-signal pl-3 space-y-1">
+        <div>parameterized queries · csrf · rbac</div>
+        <div>password hashing · session hardening</div>
+        <div>attendance tracking · sgpa calculator</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex items-center justify-center bg-slate-100 p-8">
+    <div class="w-full max-w-sm">
+      <h2 class="text-2xl font-semibold text-ink">Sign in</h2>
+      <p class="text-sm text-slate-500 mt-1">Access the IDon portal.</p>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, msg in messages %}
+          <div class="mt-4 px-4 py-2.5 rounded-md text-sm border
+                      {{ 'bg-teal-50 border-teal-200 text-teal-800' if category=='success'
+                         else 'bg-red-50 border-red-200 text-red-800' }}">{{ msg }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <form method="post" class="mt-6 space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div>
+          <label class="block text-sm font-medium text-steel mb-1">Username</label>
+          <input name="username" autocomplete="username" required
+                 class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                        focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-steel mb-1">Password</label>
+          <div class="relative">
+            <input id="pw-login" name="password" type="password" autocomplete="current-password" required
+                   class="w-full rounded-md border border-slate-300 px-3 py-2 pr-10 text-sm
+                          focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+            <button type="button" onclick="toggleEye('pw-login','eye-login')"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
+              <span id="eye-login">👁️</span>
+            </button>
+          </div>
+        </div>
+        <button class="w-full bg-signal hover:bg-teal-700 text-white font-medium
+                       rounded-md py-2.5 text-sm transition">Sign in</button>
+      </form>
+
+      <p class="text-sm text-slate-500 mt-4">
+        No account? <a href="{{ url_for('register') }}" class="text-signal hover:underline">Register</a>
+      </p>
+
+      <div class="mt-8 rounded-md bg-white border border-slate-200 p-4 text-xs text-slate-600">
+        <div class="eyebrow uppercase text-[10px] text-slate-400 font-semibold mb-2">Demo accounts</div>
+        <div class="font-mono space-y-1">
+          <div>admin&nbsp;&nbsp;&nbsp;/ Admin@123</div>
+          <div>faculty / Faculty@123</div>
+          <div>student / Student@123</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleEye(inputId, iconId) {
+  const inp = document.getElementById(inputId);
+  const ico = document.getElementById(iconId);
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    ico.textContent = '🙈';
+  } else {
+    inp.type = 'password';
+    ico.textContent = '👁️';
+  }
+}
+</script>
+{% endblock %}

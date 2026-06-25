@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block heading %}Dashboard{% endblock %}
+{% block content %}
+
+<!-- Stat cards — shown to both admin & faculty but injection alerts only for admin -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+  {% macro stat(label, value, accent) %}
+    <div class="bg-white rounded-lg border border-slate-200 p-5">
+      <div class="eyebrow uppercase text-[10px] text-slate-400 font-semibold">{{ label }}</div>
+      <div class="text-3xl font-semibold mt-2 {{ accent }}">{{ value }}</div>
+    </div>
+  {% endmacro %}
+  {{ stat('Students', stats.students, 'text-ink') }}
+  {{ stat('Logins Today', stats.logins_today, 'text-signal') }}
+  {% if user.role == 'admin' %}
+    {{ stat('System Users', stats.users, 'text-ink') }}
+    {{ stat('Injection Alerts', stats.alerts, 'text-alert' if stats.alerts else 'text-ink') }}
+  {% else %}
+    {# Faculty sees subject/assignment counts instead of internal security stats #}
+    {{ stat('Assignments', stats.assignments, 'text-ink') }}
+    {{ stat('Subjects Tracked', stats.subjects, 'text-ink') }}
+  {% endif %}
+</div>
+
+<!-- Locked accounts — ADMIN ONLY -->
+{% if user.role == 'admin' and locked_count > 0 %}
+<div class="mt-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 flex items-center justify-between">
+  <span>⚠ <strong>{{ locked_count }}</strong> account{{ 's are' if locked_count != 1 else ' is' }} locked.</span>
+  <a href="{{ url_for('users_list') }}" class="underline hover:text-amber-900">Manage →</a>
+</div>
+{% endif %}
+
+<!-- Low attendance summary — shown to both admin & faculty -->
+{% if low_att %}
+<div class="mt-4 px-4 py-3 bg-red-50 border border-red-200 rounded-md">
+  <div class="flex items-center justify-between mb-2">
+    <p class="text-sm font-semibold text-red-700">📉 Students Below 75% Attendance (top 10)</p>
+    <a href="{{ url_for('low_attendance_report') }}" class="text-xs text-red-600 underline hover:text-red-800">View full report →</a>
+  </div>
+  <table class="w-full text-xs text-red-800">
+    <thead><tr class="border-b border-red-200">
+      <th class="text-left py-1">Student</th>
+      <th class="text-left py-1">Roll No.</th>
+      <th class="text-left py-1">Subject</th>
+      <th class="text-right py-1">Attendance %</th>
+    </tr></thead>
+    <tbody>
+      {% for r in low_att %}
+      <tr class="border-b border-red-100">
+        <td class="py-1">{{ r.full_name }}</td>
+        <td class="py-1 font-mono">{{ r.roll_number }}</td>
+        <td class="py-1">{{ r.subject }}</td>
+        <td class="py-1 text-right font-bold">{{ r.pct }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- Quick-links row -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
+  {% if user.role in ('admin','faculty') %}
+    <a href="{{ url_for('notices') }}"      class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
+      <span class="text-2xl">📢</span><div><div class="text-xs text-slate-400">Notices</div><div class="font-semibold text-ink text-sm">Post / View</div></div>
+    </a>
+    <a href="{{ url_for('exam_schedule') }}" class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
+      <span class="text-2xl">🗓️</span><div><div class="text-xs text-slate-400">Exams</div><div class="font-semibold text-ink text-sm">Manage Schedule</div></div>
+    </a>
+    <a href="{{ url_for('grievances') }}"   class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition {{ 'ring-1 ring-amber-300 border-amber-200' if open_grievances > 0 else '' }}">
+      <span class="text-2xl">📨</span><div><div class="text-xs text-slate-400">Grievances</div>
+      <div class="font-semibold text-ink text-sm">
+        {% if open_grievances > 0 %}<span class="text-amber-600">{{ open_grievances }} open</span>{% else %}All clear{% endif %}
+      </div></div>
+    </a>
+    <a href="{{ url_for('results') }}"      class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
+      <span class="text-2xl">📊</span><div><div class="text-xs text-slate-400">Results</div><div class="font-semibold text-ink text-sm">Post Marks</div></div>
+    </a>
+  {% else %}
+    <a href="{{ url_for('results') }}"      class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
+      <span class="text-2xl">📊</span><div><div class="text-xs text-slate-400">Results</div><div class="font-semibold text-ink text-sm">My Marksheet</div></div>
+    </a>
+    <a href="{{ url_for('fee_status') }}"   class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
+      <span class="text-2xl">💰</span><div><div class="text-xs text-slate-400">Fees</div><div class="font-semibold text-ink text-sm">My Fee Status</div></div>
+    </a>
+    <a href="{{ url_for('exam_schedule') }}" class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
+      <span class="text-2xl">🗓️</span><div><div class="text-xs text-slate-400">Exams</div><div class="font-semibold text-ink text-sm">Upcoming</div></div>
+    </a>
+    <a href="{{ url_for('grievances') }}"   class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
+      <span class="text-2xl">📨</span><div><div class="text-xs text-slate-400">Grievances</div><div class="font-semibold text-ink text-sm">Raise Query</div></div>
+    </a>
+  {% endif %}
+</div>
+
+<!-- Pinned notices + upcoming exams -->
+{% if pinned_notices or upcoming_exams %}
+<div class="grid lg:grid-cols-2 gap-4 mt-4">
+  {% if pinned_notices %}
+  <div class="bg-white rounded-lg border border-signal/30 p-4">
+    <h3 class="text-xs font-semibold text-signal eyebrow uppercase mb-3">📌 Pinned Notices</h3>
+    <div class="space-y-2">
+      {% for n in pinned_notices %}
+      <a href="{{ url_for('notices') }}" class="block hover:bg-slate-50 rounded px-2 py-1.5 -mx-2 transition">
+        <p class="text-sm font-medium text-ink">{{ n.title }}</p>
+        <p class="text-xs text-slate-400">{{ n.category | capitalize }} · {{ n.created_at[:10] }}</p>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% if upcoming_exams %}
+  <div class="bg-white rounded-lg border border-purple-200 p-4">
+    <h3 class="text-xs font-semibold text-purple-600 eyebrow uppercase mb-3">🗓 Upcoming Exams</h3>
+    <div class="space-y-2">
+      {% for e in upcoming_exams %}
+      <div class="flex items-center justify-between text-sm">
+        <span class="font-medium text-ink">{{ e.subject }}</span>
+        <span class="text-xs text-slate-500 font-mono">{{ e.exam_date }} · {{ e.exam_time }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <a href="{{ url_for('exam_schedule') }}" class="text-xs text-purple-600 hover:underline mt-2 block">View full schedule →</a>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="grid lg:grid-cols-2 gap-5 mt-6">
+  <!-- Chart -->
+  <div class="bg-white rounded-lg border border-slate-200 p-5">
+    <h2 class="text-sm font-semibold text-ink mb-4">Students by Department</h2>
+    {% if by_dept %}
+    <canvas id="deptChart" height="180"></canvas>
+    {% else %}
+    <p class="text-sm text-slate-400">No students yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Recent activity — ADMIN ONLY (full system log); FACULTY sees their own actions -->
+  <div class="bg-white rounded-lg border border-slate-200 p-5">
+    <h2 class="text-sm font-semibold text-ink mb-4">
+      {% if user.role == 'admin' %}Recent system activity{% else %}My recent activity{% endif %}
+    </h2>
+    <table class="w-full text-sm evidence">
+      <tbody class="divide-y divide-slate-100">
+        {% for r in recent %}
+          <tr>
+            <td class="py-2 font-mono text-xs text-slate-400 whitespace-nowrap pr-3">{{ r.timestamp }}</td>
+            <td class="py-2 pr-3 font-medium text-steel">{{ r.username }}</td>
+            <td class="py-2 pr-3"><span class="px-2 py-0.5 rounded bg-slate-100 text-xs">{{ r.action }}</span></td>
+            <td class="py-2 text-slate-500 text-xs">{{ r.module }}</td>
+          </tr>
+        {% else %}
+          <tr><td class="py-3 text-slate-400">No activity recorded.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Failed logins — ADMIN ONLY -->
+{% if user.role == 'admin' and failed %}
+<div class="bg-white rounded-lg border border-alert/30 p-5 mt-5">
+  <h2 class="text-sm font-semibold text-alert mb-3">Recent failed sign-ins</h2>
+  <table class="w-full text-sm evidence">
+    <tbody class="divide-y divide-slate-100">
+      {% for f in failed %}
+        <tr>
+          <td class="py-2 font-mono text-xs text-slate-400 pr-3">{{ f.timestamp }}</td>
+          <td class="py-2 pr-3 font-medium text-steel">{{ f.username }}</td>
+          <td class="py-2 font-mono text-xs text-slate-500">{{ f.ip_address }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if by_dept %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  const ctx = document.getElementById('deptChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: {{ by_dept | map(attribute='department') | list | tojson }},
+      datasets: [{
+        label: 'Students',
+        data: {{ by_dept | map(attribute='c') | list | tojson }},
+        backgroundColor: '#0d9488cc',
+        borderColor: '#0d9488',
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: '#f1f5f9' } },
+        x: { ticks: { font: { size: 11 } }, grid: { display: false } }
+      }
+    }
+  });
+</script>
+{% endif %}
+
+{% endblock %}

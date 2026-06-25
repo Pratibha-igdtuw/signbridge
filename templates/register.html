@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+{% block auth %}
+<div class="min-h-screen flex items-center justify-center bg-slate-100 p-8">
+  <div class="w-full max-w-md">
+    <div class="eyebrow text-[11px] uppercase text-signal font-semibold">IDon Portal</div>
+    <h2 class="text-2xl font-semibold text-ink mt-1">Student Registration</h2>
+    <p class="text-sm text-slate-500 mt-1">Faculty and admin accounts are created by the system administrator.</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, msg in messages %}
+        <div class="mt-4 px-4 py-2.5 rounded-md text-sm border
+                    {{ 'bg-teal-50 border-teal-200 text-teal-800' if category=='success'
+                       else 'bg-red-50 border-red-200 text-red-800' }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="post" class="mt-6 space-y-4 bg-white border border-slate-200 rounded-lg p-6">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="role" value="student">
+      <div>
+        <label class="block text-sm font-medium text-steel mb-1">Full name</label>
+        <input name="full_name" value="{{ form.full_name or '' }}" required
+               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                      focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-steel mb-1">Username</label>
+        <input name="username" value="{{ form.username or '' }}" required
+               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                      focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-steel mb-1">Email</label>
+        <input name="email" type="email" value="{{ form.email or '' }}" required
+               placeholder="yourname@igdtuw.ac.in"
+               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                      focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+        <p class="text-xs text-slate-400 mt-1">Must be your IGDTUW college email (@igdtuw.ac.in)</p>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-steel mb-1">Password</label>
+        <div class="relative">
+          <input id="pw" name="password" type="password" required
+                 class="w-full rounded-md border border-slate-300 px-3 py-2 pr-10 text-sm
+                        focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+          <button type="button" onclick="toggleEye('pw','eye-reg')"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
+            <span id="eye-reg">👁️</span>
+          </button>
+        </div>
+        <div class="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+          <div id="pw-bar" class="h-full rounded-full transition-all duration-300 w-0"></div>
+        </div>
+        <p id="pw-label" class="text-xs text-slate-400 mt-1">Min 8 chars · uppercase · lowercase · digit</p>
+      </div>
+      <button class="w-full bg-signal hover:bg-teal-700 text-white font-medium
+                     rounded-md py-2.5 text-sm transition">Create student account</button>
+    </form>
+
+    <p class="text-sm text-slate-500 mt-4 text-center">
+      Already registered? <a href="{{ url_for('login') }}" class="text-signal hover:underline">Sign in</a>
+    </p>
+  </div>
+</div>
+
+<script>
+function toggleEye(inputId, iconId) {
+  const inp = document.getElementById(inputId);
+  const ico = document.getElementById(iconId);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  ico.textContent = inp.type === 'password' ? '👁️' : '🙈';
+}
+const pw = document.getElementById('pw');
+const bar = document.getElementById('pw-bar');
+const label = document.getElementById('pw-label');
+function score(v) {
+  let s = 0;
+  if (v.length >= 8) s++;
+  if (v.length >= 12) s++;
+  if (/[A-Z]/.test(v)) s++;
+  if (/[a-z]/.test(v)) s++;
+  if (/\d/.test(v)) s++;
+  if (/[^A-Za-z0-9]/.test(v)) s++;
+  return s;
+}
+const levels = [
+  { w:'0%',   bg:'bg-slate-200', text:'Enter a password' },
+  { w:'20%',  bg:'bg-red-400',   text:'Very weak' },
+  { w:'40%',  bg:'bg-orange-400',text:'Weak' },
+  { w:'60%',  bg:'bg-yellow-400',text:'Fair' },
+  { w:'80%',  bg:'bg-teal-400',  text:'Strong' },
+  { w:'100%', bg:'bg-teal-600',  text:'Very strong ✓' },
+];
+pw.addEventListener('input', () => {
+  const s = Math.min(score(pw.value), 5);
+  const l = pw.value ? levels[s] : levels[0];
+  bar.style.width = l.w;
+  bar.className = `h-full rounded-full transition-all duration-300 ${l.bg}`;
+  label.textContent = l.text;
+  label.className = `text-xs mt-1 ${s < 3 ? 'text-red-500' : s < 4 ? 'text-yellow-600' : 'text-teal-600'}`;
+});
+</script>
+{% endblock %}

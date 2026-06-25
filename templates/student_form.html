@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if mode=='edit' else 'New' }} student{% endblock %}
+{% block heading %}{{ 'Edit student' if mode=='edit' else 'Add student' }}{% endblock %}
+{% block content %}
+<div class="max-w-2xl">
+  <form method="post"
+        action="{{ url_for('student_edit', sid=sid) if mode=='edit' else url_for('student_new') }}"
+        class="bg-white border border-slate-200 rounded-lg p-6 space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-steel mb-1">Roll number</label>
+        <input name="roll_number" value="{{ form.roll_number or '' }}" required
+               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono
+                      focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-steel mb-1">Full name</label>
+        <input name="full_name" value="{{ form.full_name or '' }}" required
+               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                      focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-steel mb-1">Email</label>
+      <input name="email" type="email" value="{{ form.email or '' }}" required
+             class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                    focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+    </div>
+
+    <div class="grid grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-steel mb-1">Department</label>
+        <select name="department"
+                class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                       focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+          {% for d in ['CSE','ME','ECE','CE','EE','IT','AIML'] %}
+            <option value="{{ d }}" {{ 'selected' if form.department==d else '' }}>{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-steel mb-1">Year</label>
+        <input name="year" type="number" min="1" max="5" value="{{ form.year or '' }}" required
+               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                      focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-steel mb-1">CGPA</label>
+        <input name="cgpa" type="number" step="0.01" min="0" max="10" value="{{ form.cgpa or '' }}"
+               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                      focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-steel mb-1">Phone</label>
+      <input name="phone" value="{{ form.phone or '' }}" placeholder="10 digits"
+             class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                    focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+    </div>
+
+    <div class="flex gap-3 pt-2">
+      <button class="bg-signal hover:bg-teal-700 text-white font-medium rounded-md px-5 py-2.5 text-sm transition">
+        {{ 'Save changes' if mode=='edit' else 'Add student' }}
+      </button>
+      <a href="{{ url_for('students') }}" class="px-5 py-2.5 text-sm text-slate-500 hover:text-steel">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
