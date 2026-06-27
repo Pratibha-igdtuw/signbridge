@@ -25,8 +25,36 @@
     @keyframes pulse-badge { 0%,100%{opacity:1} 50%{opacity:.6} }
     .badge-pulse { animation: pulse-badge 2s ease-in-out infinite; }
     .nav-active { background: rgba(255,255,255,0.1); color: #fff; }
-    /* Session countdown */
     #session-warn { display:none; }
+
+    /* ── Collapsible nav sections ── */
+    .nav-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      padding: 0 12px;
+      margin-bottom: 2px;
+    }
+    .nav-section-header:hover .nav-section-label { color: #94a3b8; }
+    .nav-chevron {
+      font-size: 10px;
+      color: #475569;
+      transition: transform 0.25s ease;
+      display: inline-block;
+    }
+    .nav-chevron.open { transform: rotate(180deg); }
+    .nav-section-items {
+      overflow: hidden;
+      max-height: 600px;
+      opacity: 1;
+      transition: max-height 0.3s ease, opacity 0.25s ease;
+    }
+    .nav-section-items.collapsed {
+      max-height: 0;
+      opacity: 0;
+    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen">
@@ -47,7 +75,8 @@
         {% endif %}
       </div>
     </div>
-    <nav class="flex-1 px-3 py-4 space-y-1 text-sm">
+
+    <nav class="flex-1 px-3 py-4 space-y-1 text-sm overflow-y-auto">
       {% macro nav(endpoint, label, icon='') %}
         <a href="{{ url_for(endpoint) }}"
            class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
@@ -56,81 +85,145 @@
         </a>
       {% endmacro %}
 
-      {# ============================================================
-         ADMIN NAVIGATION — Full system access
-         ============================================================ #}
+      {# ── ADMIN ── #}
       {% if user.role == 'admin' %}
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pb-1">Overview</div>
-        {{ nav('dashboard', 'Dashboard', '📊') }}
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Academics</div>
-        {{ nav('students', 'Student Records', '👥') }}
-        {{ nav('attendance', 'Attendance', '📅') }}
-        {{ nav('assignments', 'Assignments', '📝') }}
-        {{ nav('results', 'Results', '📊') }}
-        {{ nav('sgpa', 'SGPA Calculator', '🎓') }}
+        <!-- OVERVIEW -->
+        <div class="nav-section-header" onclick="toggleNav('admin-overview')">
+          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Overview</span>
+          <span class="nav-chevron" id="chev-admin-overview">▼</span>
+        </div>
+        <div class="nav-section-items collapsed" id="nav-admin-overview">
+          {{ nav('dashboard', 'Dashboard', '📊') }}
+        </div>
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Communication</div>
-        {{ nav('notices', 'Notices', '📢') }}
-        {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
-        {{ nav('grievances', 'Grievances', '📨') }}
+        <!-- ACADEMICS -->
+        <div class="nav-section-header mt-2" onclick="toggleNav('admin-academics')">
+          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Academics</span>
+          <span class="nav-chevron" id="chev-admin-academics">▼</span>
+        </div>
+        <div class="nav-section-items collapsed" id="nav-admin-academics">
+          {{ nav('students', 'Student Records', '👥') }}
+          {{ nav('attendance', 'Attendance', '📅') }}
+          {{ nav('assignments', 'Assignments', '📝') }}
+          {{ nav('results', 'Results', '📊') }}
+          {{ nav('sgpa', 'SGPA Calculator', '🎓') }}
+        </div>
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Finance & Users</div>
-        {{ nav('fee_status', 'Fee Status', '💰') }}
-        {{ nav('courses', 'Courses & Enrollment', '📚') }}
-        {{ nav('bulk_upload_students', 'Bulk Student Upload', '📥') }}
-        {{ nav('files', 'File Manager', '📁') }}
-        {{ nav('users_list', 'User Accounts', '🛡️') }}
+        <!-- COMMUNICATION -->
+        <div class="nav-section-header mt-2" onclick="toggleNav('admin-communication')">
+          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Communication</span>
+          <span class="nav-chevron" id="chev-admin-communication">▼</span>
+        </div>
+        <div class="nav-section-items collapsed" id="nav-admin-communication">
+          {{ nav('notices', 'Notices', '📢') }}
+          {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
+          {{ nav('grievances', 'Grievances', '📨') }}
+        </div>
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Forensics</div>
-        {{ nav('audit_activity', 'Activity Logs', '📋') }}
-        {{ nav('audit_logins', 'Login History', '🔐') }}
-        {{ nav('audit_files', 'File Access', '🗂️') }}
-        <a href="{{ url_for('audit_alerts') }}"
-           class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
-                  {{ 'nav-active' if request.endpoint == 'audit_alerts' else '' }}">
-          <span class="flex items-center gap-2">⚠️ Injection Alerts</span>
-          <span id="alert-badge" class="hidden badge-pulse bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center"></span>
-        </a>
-        {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
+        <!-- FINANCE & USERS -->
+        <div class="nav-section-header mt-2" onclick="toggleNav('admin-finance')">
+          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Finance &amp; Users</span>
+          <span class="nav-chevron" id="chev-admin-finance">▼</span>
+        </div>
+        <div class="nav-section-items collapsed" id="nav-admin-finance">
+          {{ nav('fee_status', 'Fee Status', '💰') }}
+          {{ nav('courses', 'Courses & Enrollment', '📚') }}
+          {{ nav('bulk_upload_students', 'Bulk Student Upload', '📥') }}
+          {{ nav('files', 'File Manager', '📁') }}
+          {{ nav('users_list', 'User Accounts', '🛡️') }}
+        </div>
 
-      {# ============================================================
-         FACULTY NAVIGATION — Teaching & academic management only
-         ============================================================ #}
+        <!-- FORENSICS -->
+        <div class="nav-section-header mt-2" onclick="toggleNav('admin-forensics')">
+          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Forensics</span>
+          <span class="nav-chevron" id="chev-admin-forensics">▼</span>
+        </div>
+        <div class="nav-section-items collapsed" id="nav-admin-forensics">
+          {{ nav('audit_activity', 'Activity Logs', '📋') }}
+          {{ nav('audit_logins', 'Login History', '🔐') }}
+          {{ nav('audit_files', 'File Access', '🗂️') }}
+          <a href="{{ url_for('audit_alerts') }}"
+             class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
+                    {{ 'nav-active' if request.endpoint == 'audit_alerts' else '' }}">
+            <span class="flex items-center gap-2">⚠️ Injection Alerts</span>
+            <span id="alert-badge" class="hidden badge-pulse bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center"></span>
+          </a>
+          {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
+        </div>
+
+      {# ── FACULTY ── #}
       {% elif user.role == 'faculty' %}
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pb-1">Overview</div>
-        {{ nav('dashboard', 'Dashboard', '📊') }}
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Academics</div>
-        {{ nav('courses', 'My Courses', '📚') }}
-        {{ nav('students', 'My Students', '👥') }}
-        {{ nav('attendance', 'Attendance', '📅') }}
-        {{ nav('assignments', 'Assignments', '📝') }}
-        {{ nav('results', 'Results', '📊') }}
-        {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
+        <!-- OVERVIEW -->
+        <div class="nav-section-header" onclick="toggleNav('fac-overview')">
+          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Overview</span>
+          <span class="nav-chevron" id="chev-fac-overview">▼</span>
+        </div>
+        <div class="nav-section-items collapsed" id="nav-fac-overview">
+          {{ nav('dashboard', 'Dashboard', '📊') }}
+        </div>
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Communication</div>
-        {{ nav('notices', 'Notices', '📢') }}
-        {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
-        {{ nav('grievances', 'Grievances', '📨') }}
+        <!-- ACADEMICS -->
+        <div class="nav-section-header mt-2" onclick="toggleNav('fac-academics')">
+          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Academics</span>
+          <span class="nav-chevron" id="chev-fac-academics">▼</span>
+        </div>
+        <div class="nav-section-items collapsed" id="nav-fac-academics">
+          {{ nav('courses', 'My Courses', '📚') }}
+          {{ nav('students', 'My Students', '👥') }}
+          {{ nav('attendance', 'Attendance', '📅') }}
+          {{ nav('assignments', 'Assignments', '📝') }}
+          {{ nav('results', 'Results', '📊') }}
+          {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
+        </div>
 
-      {# ============================================================
-         STUDENT NAVIGATION — Personal academic view only
-         ============================================================ #}
+        <!-- COMMUNICATION -->
+        <div class="nav-section-header mt-2" onclick="toggleNav('fac-communication')">
+          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Communication</span>
+          <span class="nav-chevron" id="chev-fac-communication">▼</span>
+        </div>
+        <div class="nav-section-items collapsed" id="nav-fac-communication">
+          {{ nav('notices', 'Notices', '📢') }}
+          {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
+          {{ nav('grievances', 'Grievances', '📨') }}
+        </div>
+
+      {# ── STUDENT ── #}
       {% elif user.role == 'student' %}
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pb-1">My Academics</div>
-        {{ nav('attendance', 'My Attendance', '📅') }}
-        {{ nav('assignments', 'Assignments', '📝') }}
-        {{ nav('results', 'My Results', '📊') }}
-        {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Information</div>
-        {{ nav('notices', 'Notices', '📢') }}
-        {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
-        {{ nav('fee_status', 'Fee Status', '💰') }}
+        <!-- MY ACADEMICS -->
+        <div class="nav-section-header" onclick="toggleNav('stu-academics')">
+          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">My Academics</span>
+          <span class="nav-chevron" id="chev-stu-academics">▼</span>
+        </div>
+        <div class="nav-section-items collapsed" id="nav-stu-academics">
+          {{ nav('attendance', 'My Attendance', '📅') }}
+          {{ nav('assignments', 'Assignments', '📝') }}
+          {{ nav('results', 'My Results', '📊') }}
+          {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
+        </div>
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Support</div>
-        {{ nav('grievances', 'Grievances', '📨') }}
+        <!-- INFORMATION -->
+        <div class="nav-section-header mt-2" onclick="toggleNav('stu-information')">
+          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Information</span>
+          <span class="nav-chevron" id="chev-stu-information">▼</span>
+        </div>
+        <div class="nav-section-items collapsed" id="nav-stu-information">
+          {{ nav('notices', 'Notices', '📢') }}
+          {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
+          {{ nav('fee_status', 'Fee Status', '💰') }}
+        </div>
+
+        <!-- SUPPORT -->
+        <div class="nav-section-header mt-2" onclick="toggleNav('stu-support')">
+          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Support</span>
+          <span class="nav-chevron" id="chev-stu-support">▼</span>
+        </div>
+        <div class="nav-section-items collapsed" id="nav-stu-support">
+          {{ nav('grievances', 'Grievances', '📨') }}
+        </div>
+
       {% endif %}
     </nav>
 
@@ -189,7 +282,7 @@
 </script>
 {% endif %}
 
-<!-- Session idle countdown (warn at 3 min remaining of 20 min) -->
+<!-- Session idle countdown -->
 <script>
   (function() {
     const TIMEOUT_MS = {{ config.SESSION_TIMEOUT_SECONDS }} * 1000;
@@ -197,15 +290,12 @@
     let lastActivity = Date.now();
     let warnEl = document.getElementById('session-warn');
     let countEl = document.getElementById('session-countdown');
-
     function resetTimer() { lastActivity = Date.now(); }
     ['click','keydown','mousemove','touchstart'].forEach(e => document.addEventListener(e, resetTimer, {passive:true}));
-
     function fmt(ms) {
       let s = Math.floor(ms/1000);
       return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
     }
-
     setInterval(function() {
       let elapsed = Date.now() - lastActivity;
       let remaining = TIMEOUT_MS - elapsed;
@@ -219,6 +309,31 @@
       }
     }, 1000);
   })();
+</script>
+
+<!-- Collapsible nav toggle -->
+<script>
+  function toggleNav(id) {
+    var items = document.getElementById('nav-' + id);
+    var chev  = document.getElementById('chev-' + id);
+    if (!items || !chev) return;
+    items.classList.toggle('collapsed');
+    chev.classList.toggle('open');
+  }
+
+  // Auto-expand the section containing the active link on page load
+  document.addEventListener('DOMContentLoaded', function () {
+    var activeLink = document.querySelector('.nav-active');
+    if (activeLink) {
+      var section = activeLink.closest('.nav-section-items');
+      if (section) {
+        section.classList.remove('collapsed');
+        var sectionId = section.id.replace('nav-', '');
+        var chev = document.getElementById('chev-' + sectionId);
+        if (chev) chev.classList.add('open');
+      }
+    }
+  });
 </script>
 
 {% else %}

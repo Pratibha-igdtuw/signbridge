@@ -39,17 +39,53 @@
     {% if user.role in ('admin','faculty') %}
     <div class="bg-white rounded-lg border border-slate-200 p-4">
       <h3 class="text-sm font-semibold text-ink mb-3">Select Student</h3>
-      <form method="get">
-        <select name="student_id" onchange="this.form.submit()"
-                class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
-                       focus:border-signal focus:ring-1 focus:ring-signal outline-none">
-          <option value="">— Choose student —</option>
-          {% for s in students %}
-            <option value="{{ s.id }}" {{ 'selected' if sid == s.id else '' }}>
-              {{ s.roll_number }} · {{ s.full_name }}
-            </option>
-          {% endfor %}
-        </select>
+
+      <!-- Searchable dropdown -->
+      <div class="relative" id="student-picker">
+        <!-- Search input shown as the trigger -->
+        <div class="relative">
+          <input
+            type="text"
+            id="student-search"
+            placeholder="🔍 Search by name or roll no…"
+            autocomplete="off"
+            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                   focus:border-signal focus:ring-1 focus:ring-signal outline-none"
+            oninput="filterStudents()"
+            onfocus="openDropdown()"
+          >
+          <span id="search-clear"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer hidden text-xs"
+            onclick="clearSearch()">✕</span>
+        </div>
+
+        <!-- Dropdown list -->
+        <div id="student-dropdown"
+             class="hidden absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+          <div id="student-list">
+            <!-- "no selection" option -->
+            <div class="student-option px-3 py-2 text-sm text-slate-400 cursor-pointer hover:bg-slate-50"
+                 data-value="" data-label="— Choose student —"
+                 onclick="selectStudent('', '— Choose student —')">
+              — Choose student —
+            </div>
+            {% for s in students %}
+            <div class="student-option px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-teal-50 hover:text-teal-700"
+                 data-value="{{ s.id }}"
+                 data-label="{{ s.roll_number }} · {{ s.full_name }}"
+                 onclick="selectStudent('{{ s.id }}', '{{ s.roll_number }} · {{ s.full_name }}')">
+              <span class="font-medium text-slate-500 text-xs">{{ s.roll_number }}</span>
+              <span class="ml-1">{{ s.full_name }}</span>
+            </div>
+            {% endfor %}
+          </div>
+          <div id="no-results" class="hidden px-3 py-2 text-sm text-slate-400 italic">No students found</div>
+        </div>
+      </div>
+
+      <!-- Hidden form that actually submits -->
+      <form id="student-form" method="get">
+        <input type="hidden" name="student_id" id="student-id-input" value="{{ sid if sid else '' }}">
       </form>
     </div>
     {% endif %}
@@ -131,7 +167,6 @@
               {{ row.pct }}%
             </td>
             <td class="py-2.5">
-              <!-- Progress bar -->
               <div class="flex items-center gap-2">
                 <div class="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div class="h-full rounded-full {{ 'bg-teal-400' if row.pct >= 75 else 'bg-red-400' }}"
@@ -163,4 +198,80 @@
     {% endif %}
   </div>
 </div>
+
+<script>
+  var dropdown   = document.getElementById('student-dropdown');
+  var searchInput = document.getElementById('student-search');
+  var clearBtn   = document.getElementById('search-clear');
+  var hiddenInput = document.getElementById('student-id-input');
+  var options    = document.querySelectorAll('.student-option');
+  var noResults  = document.getElementById('no-results');
+
+  // Pre-fill search box if a student is already selected (page reload)
+  (function(){
+    var preselected = hiddenInput ? hiddenInput.value : '';
+    if (preselected) {
+      options.forEach(function(opt) {
+        if (opt.dataset.value === preselected) {
+          searchInput.value = opt.dataset.label;
+          clearBtn.classList.remove('hidden');
+        }
+      });
+    }
+  })();
+
+  function openDropdown() {
+    dropdown.classList.remove('hidden');
+  }
+
+  function filterStudents() {
+    var q = searchInput.value.toLowerCase().trim();
+    clearBtn.classList.toggle('hidden', q === '');
+    var visible = 0;
+    options.forEach(function(opt) {
+      var label = opt.dataset.label.toLowerCase();
+      var match = label.includes(q);
+      opt.style.display = match ? '' : 'none';
+      if (match && opt.dataset.value !== '') visible++;
+    });
+    noResults.classList.toggle('hidden', visible > 0);
+    openDropdown();
+  }
+
+  function selectStudent(val, label) {
+    hiddenInput.value = val;
+    searchInput.value = val ? label : '';
+    clearBtn.classList.toggle('hidden', !val);
+    dropdown.classList.add('hidden');
+    // Reset filter so all options show next time
+    options.forEach(function(opt){ opt.style.display = ''; });
+    noResults.classList.add('hidden');
+    if (val) {
+      document.getElementById('student-form').submit();
+    }
+  }
+
+  function clearSearch() {
+    searchInput.value = '';
+    hiddenInput.value = '';
+    clearBtn.classList.add('hidden');
+    options.forEach(function(opt){ opt.style.display = ''; });
+    noResults.classList.add('hidden');
+    openDropdown();
+    searchInput.focus();
+  }
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', function(e) {
+    var picker = document.getElementById('student-picker');
+    if (picker && !picker.contains(e.target)) {
+      dropdown.classList.add('hidden');
+    }
+  });
+
+  // Keyboard: Escape closes
+  searchInput && searchInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') dropdown.classList.add('hidden');
+  });
+</script>
 {% endblock %}

@@ -3,24 +3,121 @@
 {% block heading %}Fee Status{% endblock %}
 {% block content %}
 
+{# ================================================================
+   FEE DUE ALERT BANNER — shows only when there are fees due soon
+   This reads from `due_soon` list passed by your fee_status() route
+   ================================================================ #}
+{% if due_soon %}
+<div class="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4">
+  <div class="flex items-start gap-3">
+    <span class="text-xl mt-0.5">⏰</span>
+    <div class="flex-1">
+      <p class="text-sm font-semibold text-amber-800 mb-2">
+        Fee Payment Reminder — Action Required
+      </p>
+      <ul class="space-y-1">
+        {% for item in due_soon %}
+        <li class="text-sm text-amber-700 flex items-center gap-2">
+          {% if item.days_left == 0 %}
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">DUE TODAY</span>
+          {% elif item.days_left == 1 %}
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700">DUE TOMORROW</span>
+          {% else %}
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">{{ item.days_left }} DAYS LEFT</span>
+          {% endif %}
+          <span>
+            <strong>{{ item.fee_type | title }}</strong> — Sem {{ item.semester }} —
+            Balance: <strong>₹{{ '{:,.0f}'.format(item.balance) }}</strong>
+            · Due: {{ item.due_date }}
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+      <p class="text-xs text-amber-600 mt-2">
+        💡 Students have been notified automatically. You can also
+        <form method="post" action="{{ url_for('send_fee_reminders') }}" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="underline font-medium hover:text-amber-900 transition">
+            send reminders now →
+          </button>
+        </form>
+      </p>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="grid lg:grid-cols-3 gap-6">
   <!-- Left: controls -->
   <div class="space-y-5">
     {% if user.role in ('admin','faculty') %}
     <div class="bg-white rounded-lg border border-slate-200 p-4">
       <h3 class="text-sm font-semibold text-ink mb-3">Select Student</h3>
-      <form method="get">
-        <select name="student_id" onchange="this.form.submit()"
-                class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none">
-          <option value="">— Choose student —</option>
-          {% for s in students %}
-            <option value="{{ s.id }}" {{ 'selected' if sid == s.id else '' }}>
-              {{ s.roll_number }} · {{ s.full_name }}
-            </option>
-          {% endfor %}
-        </select>
+
+      <!-- Searchable dropdown -->
+      <div class="relative" id="student-picker">
+        <div class="relative">
+          <input
+            type="text"
+            id="student-search"
+            placeholder="🔍 Search by name or roll no…"
+            autocomplete="off"
+            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                   focus:border-signal focus:ring-1 focus:ring-signal outline-none"
+            oninput="filterStudents()"
+            onfocus="openDropdown()"
+          >
+          <span id="search-clear"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer hidden text-xs"
+            onclick="clearSearch()">✕</span>
+        </div>
+        <div id="student-dropdown"
+             class="hidden absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+          <div id="student-list">
+            <div class="student-option px-3 py-2 text-sm text-slate-400 cursor-pointer hover:bg-slate-50"
+                 data-value="" data-label="— Choose student —"
+                 onclick="selectStudent('', '— Choose student —')">
+              — Choose student —
+            </div>
+            {% for s in students %}
+            <div class="student-option px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-teal-50 hover:text-teal-700"
+                 data-value="{{ s.id }}"
+                 data-label="{{ s.roll_number }} · {{ s.full_name }}"
+                 onclick="selectStudent('{{ s.id }}', '{{ s.roll_number }} · {{ s.full_name }}')">
+              <span class="font-medium text-slate-500 text-xs">{{ s.roll_number }}</span>
+              <span class="ml-1">{{ s.full_name }}</span>
+            </div>
+            {% endfor %}
+          </div>
+          <div id="no-results" class="hidden px-3 py-2 text-sm text-slate-400 italic">No students found</div>
+        </div>
+      </div>
+      <form id="student-form" method="get">
+        <input type="hidden" name="student_id" id="student-id-input" value="{{ sid if sid else '' }}">
       </form>
     </div>
+
+    {# Admin: manual reminder button when a student is selected #}
+    {% if user.role == 'admin' and selected_student and student_due_soon %}
+    <div class="bg-white rounded-lg border border-amber-200 p-4">
+      <h3 class="text-sm font-semibold text-amber-700 mb-2">⚠️ Upcoming Dues</h3>
+      <ul class="text-xs text-slate-600 space-y-1 mb-3">
+        {% for item in student_due_soon %}
+        <li class="flex justify-between">
+          <span>{{ item.fee_type | title }} · Sem {{ item.semester }}</span>
+          <span class="font-semibold text-red-500">₹{{ '{:,.0f}'.format(item.balance) }} · {{ item.due_date }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      <form method="post" action="{{ url_for('send_fee_reminders') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="student_id" value="{{ selected_student.id }}">
+        <button class="w-full text-xs bg-amber-500 hover:bg-amber-600 text-white font-medium py-1.5 rounded-md transition">
+          📨 Send Reminder to Student
+        </button>
+      </form>
+    </div>
+    {% endif %}
     {% endif %}
 
     <!-- Update fee form — admin only -->
@@ -76,10 +173,9 @@
     {% endif %}
 
     {% if fee_rows %}
-    <!-- Summary card -->
-    {% set total_due = fee_rows | sum(attribute='amount') %}
+    {% set total_due  = fee_rows | sum(attribute='amount') %}
     {% set total_paid = fee_rows | sum(attribute='paid_amount') %}
-    {% set balance = total_due - total_paid %}
+    {% set balance    = total_due - total_paid %}
     <div class="bg-white rounded-lg border border-slate-200 p-4">
       <h3 class="text-sm font-semibold text-ink mb-3">Summary</h3>
       <div class="space-y-2 text-sm">
@@ -122,16 +218,29 @@
         </thead>
         <tbody class="divide-y divide-slate-100">
           {% for f in fee_rows %}
-          {% set bal = f.amount - f.paid_amount %}
-          <tr class="hover:bg-slate-50">
-            <td class="px-4 py-3 font-medium">Sem {{ f.semester }}</td>
+          {% set bal      = f.amount - f.paid_amount %}
+          {% set is_soon  = f.due_date and f.status in ('pending','partial') and (f.due_date - today).days <= 2 and (f.due_date - today).days >= 0 %}
+          <tr class="hover:bg-slate-50 {{ 'bg-amber-50/40' if is_soon else '' }}">
+            <td class="px-4 py-3 font-medium">
+              Sem {{ f.semester }}
+              {% if is_soon %}
+              <span class="ml-1 text-[9px] font-bold bg-amber-100 text-amber-700 px-1 py-0.5 rounded">DUE SOON</span>
+              {% endif %}
+            </td>
             <td class="px-4 py-3 capitalize">{{ f.fee_type }}</td>
             <td class="px-4 py-3 text-right font-mono">₹{{ '{:,.0f}'.format(f.amount) }}</td>
             <td class="px-4 py-3 text-right font-mono text-teal-600">₹{{ '{:,.0f}'.format(f.paid_amount) }}</td>
             <td class="px-4 py-3 text-right font-mono {{ 'text-red-500 font-semibold' if bal > 0 else 'text-slate-400' }}">
               ₹{{ '{:,.0f}'.format(bal) }}
             </td>
-            <td class="px-4 py-3 text-xs text-slate-500">{{ f.due_date or '—' }}</td>
+            <td class="px-4 py-3 text-xs {{ 'text-amber-600 font-semibold' if is_soon else 'text-slate-500' }}">
+              {{ f.due_date or '—' }}
+              {% if is_soon and (f.due_date - today).days == 0 %}
+                <span class="block text-red-500 font-bold">TODAY!</span>
+              {% elif is_soon and (f.due_date - today).days == 1 %}
+                <span class="block text-orange-500">Tomorrow</span>
+              {% endif %}
+            </td>
             <td class="px-4 py-3 text-center">
               {% if f.status == 'paid' %}
                 <span class="px-2 py-0.5 bg-teal-50 text-teal-700 rounded text-xs font-medium">✓ Paid</span>
@@ -162,4 +271,69 @@
     {% endif %}
   </div>
 </div>
+
+<script>
+  var dropdown    = document.getElementById('student-dropdown');
+  var searchInput = document.getElementById('student-search');
+  var clearBtn    = document.getElementById('search-clear');
+  var hiddenInput = document.getElementById('student-id-input');
+  var options     = document.querySelectorAll('.student-option');
+  var noResults   = document.getElementById('no-results');
+
+  (function(){
+    var pre = hiddenInput ? hiddenInput.value : '';
+    if (pre) {
+      options.forEach(function(opt) {
+        if (opt.dataset.value === pre) {
+          searchInput.value = opt.dataset.label;
+          clearBtn.classList.remove('hidden');
+        }
+      });
+    }
+  })();
+
+  function openDropdown() { dropdown.classList.remove('hidden'); }
+
+  function filterStudents() {
+    var q = searchInput.value.toLowerCase().trim();
+    clearBtn.classList.toggle('hidden', q === '');
+    var visible = 0;
+    options.forEach(function(opt) {
+      var match = opt.dataset.label.toLowerCase().includes(q);
+      opt.style.display = match ? '' : 'none';
+      if (match && opt.dataset.value !== '') visible++;
+    });
+    noResults.classList.toggle('hidden', visible > 0);
+    openDropdown();
+  }
+
+  function selectStudent(val, label) {
+    hiddenInput.value = val;
+    searchInput.value = val ? label : '';
+    clearBtn.classList.toggle('hidden', !val);
+    dropdown.classList.add('hidden');
+    options.forEach(function(opt){ opt.style.display = ''; });
+    noResults.classList.add('hidden');
+    if (val) document.getElementById('student-form').submit();
+  }
+
+  function clearSearch() {
+    searchInput.value = '';
+    hiddenInput.value = '';
+    clearBtn.classList.add('hidden');
+    options.forEach(function(opt){ opt.style.display = ''; });
+    noResults.classList.add('hidden');
+    openDropdown();
+    searchInput.focus();
+  }
+
+  document.addEventListener('click', function(e) {
+    var picker = document.getElementById('student-picker');
+    if (picker && !picker.contains(e.target)) dropdown.classList.add('hidden');
+  });
+
+  searchInput && searchInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') dropdown.classList.add('hidden');
+  });
+</script>
 {% endblock %}
