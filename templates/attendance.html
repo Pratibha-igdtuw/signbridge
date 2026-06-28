@@ -2,6 +2,11 @@
 {% block title %}Attendance{% endblock %}
 {% block heading %}Attendance Tracker{% endblock %}
 {% block content %}
+
+<style>
+.sms-bar { width: 0; transition: width 1s ease; }
+</style>
+
 {% if user.role == 'faculty' and my_courses %}
 <div class="mb-4 flex flex-wrap gap-2 items-center">
   <span class="text-xs font-semibold text-slate-500 eyebrow uppercase">Course:</span>
@@ -20,9 +25,8 @@
 </div>
 {% endif %}
 
-{# Low attendance alert banner #}
 {% if low_subjects %}
-<div class="mb-5 px-4 py-3 bg-red-50 border border-red-200 rounded-md">
+<div class="mb-5 px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
   <p class="text-sm font-semibold text-red-700 mb-1">⚠️ Below 75% Attendance Alert</p>
   <ul class="text-sm text-red-600 space-y-0.5">
     {% for s in low_subjects %}
@@ -33,37 +37,27 @@
 {% endif %}
 
 <div class="grid lg:grid-cols-3 gap-6">
+
   <!-- Left: controls -->
   <div class="space-y-5">
-    {# Student selector (admin/faculty only) #}
-    {% if user.role in ('admin','faculty') %}
-    <div class="bg-white rounded-lg border border-slate-200 p-4">
-      <h3 class="text-sm font-semibold text-ink mb-3">Select Student</h3>
 
-      <!-- Searchable dropdown -->
+    {% if user.role in ('admin','faculty') %}
+    <div class="bg-white rounded-xl border border-slate-200 p-4">
+      <h3 class="text-sm font-semibold text-ink mb-3">Select Student</h3>
       <div class="relative" id="student-picker">
-        <!-- Search input shown as the trigger -->
         <div class="relative">
-          <input
-            type="text"
-            id="student-search"
-            placeholder="🔍 Search by name or roll no…"
+          <input type="text" id="student-search" placeholder="🔍 Search by name or roll no…"
             autocomplete="off"
-            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+            class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm
                    focus:border-signal focus:ring-1 focus:ring-signal outline-none"
-            oninput="filterStudents()"
-            onfocus="openDropdown()"
-          >
+            oninput="filterStudents()" onfocus="openDropdown()">
           <span id="search-clear"
             class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer hidden text-xs"
             onclick="clearSearch()">✕</span>
         </div>
-
-        <!-- Dropdown list -->
         <div id="student-dropdown"
-             class="hidden absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+             class="hidden absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
           <div id="student-list">
-            <!-- "no selection" option -->
             <div class="student-option px-3 py-2 text-sm text-slate-400 cursor-pointer hover:bg-slate-50"
                  data-value="" data-label="— Choose student —"
                  onclick="selectStudent('', '— Choose student —')">
@@ -71,8 +65,7 @@
             </div>
             {% for s in students %}
             <div class="student-option px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-teal-50 hover:text-teal-700"
-                 data-value="{{ s.id }}"
-                 data-label="{{ s.roll_number }} · {{ s.full_name }}"
+                 data-value="{{ s.id }}" data-label="{{ s.roll_number }} · {{ s.full_name }}"
                  onclick="selectStudent('{{ s.id }}', '{{ s.roll_number }} · {{ s.full_name }}')">
               <span class="font-medium text-slate-500 text-xs">{{ s.roll_number }}</span>
               <span class="ml-1">{{ s.full_name }}</span>
@@ -82,17 +75,14 @@
           <div id="no-results" class="hidden px-3 py-2 text-sm text-slate-400 italic">No students found</div>
         </div>
       </div>
-
-      <!-- Hidden form that actually submits -->
       <form id="student-form" method="get">
         <input type="hidden" name="student_id" id="student-id-input" value="{{ sid if sid else '' }}">
       </form>
     </div>
     {% endif %}
 
-    {# Mark attendance form (admin/faculty) #}
     {% if user.role in ('admin','faculty') and selected_student %}
-    <div class="bg-white rounded-lg border border-slate-200 p-4">
+    <div class="bg-white rounded-xl border border-slate-200 p-4">
       <h3 class="text-sm font-semibold text-ink mb-3">Mark Attendance</h3>
       <form method="post" action="{{ url_for('attendance_mark') }}" class="space-y-3">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -100,118 +90,164 @@
         <div>
           <label class="block text-xs font-medium text-slate-500 mb-1">Subject</label>
           <input name="subject" required placeholder="e.g. Mathematics"
-                 class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                 class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm
                         focus:border-signal focus:ring-1 focus:ring-signal outline-none">
         </div>
         <div>
           <label class="block text-xs font-medium text-slate-500 mb-1">Date</label>
-          <input name="date" type="date" required
-                 value="{{ now_date if now_date else '' }}"
-                 class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+          <input name="date" type="date" required value="{{ now_date if now_date else '' }}"
+                 class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm
                         focus:border-signal focus:ring-1 focus:ring-signal outline-none">
         </div>
         <div>
           <label class="block text-xs font-medium text-slate-500 mb-1">Status</label>
-          <select name="status" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+          <select name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm
                                        focus:border-signal focus:ring-1 focus:ring-signal outline-none">
             <option value="present">✅ Present</option>
             <option value="absent">❌ Absent</option>
           </select>
         </div>
-        <button class="w-full bg-signal hover:bg-teal-700 text-white text-sm font-medium py-2 rounded-md transition">
+        <button class="w-full bg-signal hover:bg-teal-700 text-white text-sm font-medium py-2 rounded-lg transition">
           Mark Attendance
         </button>
       </form>
     </div>
     {% endif %}
+
   </div>
 
-  <!-- Right: attendance table -->
+  <!-- Right: attendance display -->
   <div class="lg:col-span-2">
+
     {% if selected_student %}
-    <div class="bg-white rounded-lg border border-slate-200 p-5">
-      <div class="flex items-center justify-between mb-4">
+    <div class="bg-white rounded-xl border border-slate-200 p-5">
+
+      <div class="flex items-center justify-between mb-5">
         <div>
           <h2 class="text-sm font-semibold text-ink">{{ selected_student.full_name }}</h2>
           <p class="text-xs text-slate-400">{{ selected_student.roll_number }} · {{ selected_student.department }} Yr{{ selected_student.year }}</p>
         </div>
         {% if att_data %}
-          {% set overall_pct = ((att_data | sum(attribute='present')) / (att_data | sum(attribute='total')) * 100) | round(1) %}
+          {% set total_present = att_data | sum(attribute='present') %}
+          {% set total_classes = att_data | sum(attribute='total') %}
+          {% set overall_pct = ((total_present / total_classes) * 100) | round(1) if total_classes > 0 else 0 %}
           <div class="text-right">
-            <div class="text-2xl font-semibold {{ 'text-teal-600' if overall_pct >= 75 else 'text-red-500' }}">
+            <div class="text-2xl font-bold {{ 'text-teal-600' if overall_pct >= 75 else 'text-red-500' }}">
               {{ overall_pct }}%
             </div>
-            <div class="text-xs text-slate-400">Overall</div>
+            <div class="text-xs text-slate-400">{{ total_present }}/{{ total_classes }} classes</div>
           </div>
         {% endif %}
       </div>
 
       {% if att_data %}
-      <table class="w-full text-sm evidence">
-        <thead>
-          <tr class="border-b border-slate-200">
-            <th class="text-left py-2 font-medium text-slate-500 text-xs">Subject</th>
-            <th class="text-center py-2 font-medium text-slate-500 text-xs">Present</th>
-            <th class="text-center py-2 font-medium text-slate-500 text-xs">Total</th>
-            <th class="text-center py-2 font-medium text-slate-500 text-xs">%</th>
-            <th class="text-left py-2 font-medium text-slate-500 text-xs">Status</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for row in att_data %}
-          <tr>
-            <td class="py-2.5 font-medium text-steel">{{ row.subject }}</td>
-            <td class="py-2.5 text-center">{{ row.present }}</td>
-            <td class="py-2.5 text-center">{{ row.total }}</td>
-            <td class="py-2.5 text-center font-semibold {{ 'text-teal-600' if row.pct >= 75 else 'text-red-500' }}">
-              {{ row.pct }}%
-            </td>
-            <td class="py-2.5">
-              <div class="flex items-center gap-2">
-                <div class="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div class="h-full rounded-full {{ 'bg-teal-400' if row.pct >= 75 else 'bg-red-400' }}"
-                       style="width:{{ [row.pct, 100] | min }}%"></div>
+        {% set total_present = att_data | sum(attribute='present') %}
+        {% set total_classes = att_data | sum(attribute='total') %}
+        {% set overall_pct = ((total_present / total_classes) * 100) | round(1) if total_classes > 0 else 0 %}
+
+        <div class="mb-5 p-4 bg-slate-50 rounded-xl">
+          <div class="flex items-center justify-between mb-2 text-xs font-medium text-slate-600">
+            <span>Overall Attendance</span>
+            <span class="{{ 'text-teal-600' if overall_pct >= 75 else 'text-red-500' }}">{{ overall_pct }}%</span>
+          </div>
+          <div class="h-3 bg-slate-200 rounded-full overflow-hidden">
+            <div class="sms-bar h-full rounded-full {{ 'bg-teal-500' if overall_pct >= 75 else 'bg-red-400' }}"
+                 data-w="{{ overall_pct }}"></div>
+          </div>
+          {% if overall_pct < 75 %}
+          <div class="text-xs text-red-500 mt-1">
+            ⚠️ You need {{ ((0.75 * total_classes) - total_present) | int }} more classes to reach 75%
+          </div>
+          {% endif %}
+        </div>
+
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-200">
+              <th class="text-left py-2 font-medium text-slate-500 text-xs">Subject</th>
+              <th class="text-center py-2 font-medium text-slate-500 text-xs">Attended</th>
+              <th class="text-center py-2 font-medium text-slate-500 text-xs">Total</th>
+              <th class="text-left py-2 font-medium text-slate-500 text-xs pl-4">Progress</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for row in att_data %}
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-3 font-medium text-slate-700">{{ row.subject }}</td>
+              <td class="py-3 text-center font-semibold {{ 'text-teal-600' if row.pct >= 75 else 'text-red-500' }}">{{ row.present }}</td>
+              <td class="py-3 text-center text-slate-500">{{ row.total }}</td>
+              <td class="py-3 pl-4">
+                <div class="flex items-center gap-2">
+                  <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden" style="min-width:60px">
+                    <div class="sms-bar h-full rounded-full {{ 'bg-teal-400' if row.pct >= 75 else 'bg-red-400' }}"
+                         data-w="{{ [row.pct, 100] | min }}"></div>
+                  </div>
+                  <span class="text-xs font-semibold {{ 'text-teal-600' if row.pct >= 75 else 'text-red-500' }}"
+                        style="min-width:36px;text-align:right">{{ row.pct }}%</span>
+                  {% if row.pct < 75 %}
+                    <span class="text-xs text-red-400">⚠</span>
+                  {% else %}
+                    <span class="text-xs text-teal-500">✓</span>
+                  {% endif %}
                 </div>
-                {% if row.pct < 75 %}
-                  <span class="text-xs text-red-500 whitespace-nowrap">⚠ Low</span>
-                {% else %}
-                  <span class="text-xs text-teal-600">✓ OK</span>
-                {% endif %}
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
       {% else %}
-      <p class="text-sm text-slate-400">No attendance records found for this student.</p>
+      <div class="py-12 text-center">
+        <div class="text-5xl mb-4">📅</div>
+        <div class="text-base font-semibold text-slate-700 mb-1">No attendance records yet</div>
+        <div class="text-sm text-slate-400 mb-4">Attendance will appear here once faculty uploads it</div>
+        <a href="{{ url_for('attendance') }}"
+           class="inline-flex items-center gap-2 bg-signal hover:bg-teal-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+          🔄 Refresh
+        </a>
+      </div>
       {% endif %}
+
     </div>
+
     {% else %}
-    <div class="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-400">
-      {% if user.role in ('admin','faculty') %}
-        <p class="text-sm">Select a student to view attendance.</p>
+
+      {% if user.role == 'student' %}
+      <div class="bg-white rounded-xl border border-slate-200 px-6 py-16 text-center">
+        <div class="text-5xl mb-4">📅</div>
+        <div class="text-base font-semibold text-slate-700 mb-1">No attendance records available yet</div>
+        <div class="text-sm text-slate-400 mb-4">
+          Your attendance will appear here once faculty uploads it for your enrolled subjects.
+        </div>
+        <a href="{{ url_for('attendance') }}"
+           class="inline-flex items-center gap-2 bg-signal hover:bg-teal-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+          🔄 Refresh
+        </a>
+      </div>
       {% else %}
-        <p class="text-sm">Your attendance record was not found. Contact your administrator.</p>
+      <div class="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
+        <div class="text-3xl mb-3">👥</div>
+        <p class="text-sm">Select a student to view their attendance records.</p>
+      </div>
       {% endif %}
-    </div>
+
     {% endif %}
+
   </div>
 </div>
 
 <script>
-  var dropdown   = document.getElementById('student-dropdown');
+  var dropdown    = document.getElementById('student-dropdown');
   var searchInput = document.getElementById('student-search');
-  var clearBtn   = document.getElementById('search-clear');
+  var clearBtn    = document.getElementById('search-clear');
   var hiddenInput = document.getElementById('student-id-input');
-  var options    = document.querySelectorAll('.student-option');
-  var noResults  = document.getElementById('no-results');
+  var options     = document.querySelectorAll('.student-option');
+  var noResults   = document.getElementById('no-results');
 
-  // Pre-fill search box if a student is already selected (page reload)
-  (function(){
+  (function () {
     var preselected = hiddenInput ? hiddenInput.value : '';
     if (preselected) {
-      options.forEach(function(opt) {
+      options.forEach(function (opt) {
         if (opt.dataset.value === preselected) {
           searchInput.value = opt.dataset.label;
           clearBtn.classList.remove('hidden');
@@ -220,17 +256,14 @@
     }
   })();
 
-  function openDropdown() {
-    dropdown.classList.remove('hidden');
-  }
+  function openDropdown() { dropdown.classList.remove('hidden'); }
 
   function filterStudents() {
     var q = searchInput.value.toLowerCase().trim();
     clearBtn.classList.toggle('hidden', q === '');
     var visible = 0;
-    options.forEach(function(opt) {
-      var label = opt.dataset.label.toLowerCase();
-      var match = label.includes(q);
+    options.forEach(function (opt) {
+      var match = opt.dataset.label.toLowerCase().includes(q);
       opt.style.display = match ? '' : 'none';
       if (match && opt.dataset.value !== '') visible++;
     });
@@ -243,35 +276,37 @@
     searchInput.value = val ? label : '';
     clearBtn.classList.toggle('hidden', !val);
     dropdown.classList.add('hidden');
-    // Reset filter so all options show next time
-    options.forEach(function(opt){ opt.style.display = ''; });
+    options.forEach(function (opt) { opt.style.display = ''; });
     noResults.classList.add('hidden');
-    if (val) {
-      document.getElementById('student-form').submit();
-    }
+    if (val) { document.getElementById('student-form').submit(); }
   }
 
   function clearSearch() {
     searchInput.value = '';
     hiddenInput.value = '';
     clearBtn.classList.add('hidden');
-    options.forEach(function(opt){ opt.style.display = ''; });
+    options.forEach(function (opt) { opt.style.display = ''; });
     noResults.classList.add('hidden');
     openDropdown();
     searchInput.focus();
   }
 
-  // Close dropdown when clicking outside
-  document.addEventListener('click', function(e) {
+  document.addEventListener('click', function (e) {
     var picker = document.getElementById('student-picker');
-    if (picker && !picker.contains(e.target)) {
-      dropdown.classList.add('hidden');
-    }
+    if (picker && !picker.contains(e.target)) { dropdown.classList.add('hidden'); }
   });
 
-  // Keyboard: Escape closes
-  searchInput && searchInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') dropdown.classList.add('hidden');
+  if (searchInput) {
+    searchInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') dropdown.classList.add('hidden');
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.sms-bar[data-w]').forEach(function (el) {
+      el.style.width = el.dataset.w + '%';
+    });
   });
 </script>
+
 {% endblock %}

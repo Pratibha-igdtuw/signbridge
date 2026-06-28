@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Downloads{% endblock %}
+{% block heading %}Downloads{% endblock %}
+{% block content %}
+<div class="max-w-3xl space-y-6">
+
+  {% if not student %}
+  <div class="bg-white rounded-xl border border-slate-200 px-6 py-16 text-center">
+    <div class="text-5xl mb-4">📁</div>
+    <div class="text-base font-semibold text-slate-700 mb-1">Student record not found</div>
+    <div class="text-sm text-slate-400 mb-4">Your downloads will appear here once your profile is set up.</div>
+    <a href="{{ url_for('profile') }}" class="inline-flex items-center gap-2 bg-signal text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-teal-700 transition">Complete Profile</a>
+  </div>
+  {% else %}
+
+  <!-- Results PDF -->
+  <div class="bg-white rounded-xl border border-slate-200 p-5 slide-up card-hover" style="animation-delay:0.05s">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-teal-50 rounded-xl flex items-center justify-center text-2xl">📊</div>
+        <div>
+          <div class="font-semibold text-ink text-sm">Result / Marksheet</div>
+          <div class="text-xs text-slate-400 mt-0.5">PDF report of all semesters</div>
+        </div>
+      </div>
+      <a href="{{ url_for('download_result') }}" class="bg-signal hover:bg-teal-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition flex items-center gap-1.5">
+        ⬇ Download
+      </a>
+    </div>
+  </div>
+
+  <!-- Attendance Report -->
+  <div class="bg-white rounded-xl border border-slate-200 p-5 slide-up card-hover" style="animation-delay:0.1s">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-2xl">📅</div>
+        <div>
+          <div class="font-semibold text-ink text-sm">Attendance Report</div>
+          <div class="text-xs text-slate-400 mt-0.5">Subject-wise attendance summary</div>
+        </div>
+      </div>
+      <a href="{{ url_for('download_attendance') }}" class="bg-signal hover:bg-teal-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition flex items-center gap-1.5">
+        ⬇ Download
+      </a>
+    </div>
+  </div>
+
+  <!-- Fee Receipt -->
+  <div class="bg-white rounded-xl border border-slate-200 p-5 slide-up card-hover" style="animation-delay:0.15s">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center text-2xl">💰</div>
+        <div>
+          <div class="font-semibold text-ink text-sm">Fee Receipt</div>
+          <div class="text-xs text-slate-400 mt-0.5">Payment confirmation for current semester</div>
+        </div>
+      </div>
+      <a href="{{ url_for('download_fee_receipt') }}" class="bg-signal hover:bg-teal-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition flex items-center gap-1.5">
+        ⬇ Download
+      </a>
+    </div>
+  </div>
+
+  <!-- General files uploaded for this student -->
+  {% if files %}
+  <div class="bg-white rounded-xl border border-slate-200 overflow-hidden slide-up" style="animation-delay:0.2s">
+    <div class="px-5 py-4 border-b border-slate-100">
+      <h2 class="font-semibold text-ink text-sm">📁 Other Files</h2>
+    </div>
+    <div class="divide-y divide-slate-100">
+      {% for f in files %}
+      <div class="flex items-center justify-between px-5 py-3">
+        <div class="flex items-center gap-3">
+          <span class="text-xl">📄</span>
+          <div>
+            <div class="text-sm font-medium text-ink">{{ f.original_name }}</div>
+            <div class="text-xs text-slate-400">
+              {{ (f.file_size / 1024) | round(1) }} KB · {{ f.uploaded_at[:10] if f.uploaded_at else '' }}
+            </div>
+          </div>
+        </div>
+        <a href="{{ url_for('file_download', fid=f.id) }}" class="text-signal hover:underline text-xs font-medium">Download</a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% endif %}
+</div>
+{% endblock %}

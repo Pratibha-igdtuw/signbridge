@@ -261,7 +261,11 @@
         </tbody>
       </table>
       {% else %}
-      <p class="text-sm text-slate-400 py-6 text-center">No fee records found for this student.</p>
+      <div class="py-12 text-center">
+        <div class="text-5xl mb-4">💳</div>
+        <div class="text-base font-semibold text-slate-700 mb-1">No fee records yet</div>
+        <div class="text-sm text-slate-400">Fee details will appear once the admin updates them</div>
+      </div>
       {% endif %}
     </div>
     {% else %}
@@ -271,7 +275,12 @@
         <p class="text-sm">Select a student to view fee status.</p>
       {% else %}
         <p class="text-3xl mb-2">💰</p>
-        <p class="text-sm">Your fee record was not found. Contact the administrator.</p>
+        <div class="py-12 text-center">
+          <div class="text-5xl mb-4">💰</div>
+          <div class="text-base font-semibold text-slate-700 mb-1">Fee record not found</div>
+          <div class="text-sm text-slate-400 mb-4">Contact the administrator to update your fee status</div>
+          <a href="{{ url_for('profile') }}" class="inline-flex items-center gap-2 bg-signal text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-teal-700 transition">Go to Profile</a>
+        </div>
       {% endif %}
     </div>
     {% endif %}
