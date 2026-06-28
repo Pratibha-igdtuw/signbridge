@@ -116,7 +116,19 @@
           <span class="nav-chevron" id="chev-admin-communication">▼</span>
         </div>
         <div class="nav-section-items collapsed" id="nav-admin-communication">
-          {{ nav('notices', 'Notices', '📢') }}
+          <!-- CHANGED: Notices link with fee reminder badge for admin -->
+          <a href="{{ url_for('notices') }}"
+             class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
+                    {{ 'nav-active' if request.endpoint == 'notices' else '' }}">
+            <span>📢</span>
+            Notices
+            {% if unread_notices and unread_notices > 0 %}
+            <span class="ml-auto text-[9px] font-bold bg-red-500 text-white
+                         px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+              {{ unread_notices }}
+            </span>
+            {% endif %}
+          </a>
           {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
           {{ nav('grievances', 'Grievances', '📨') }}
         </div>
@@ -184,7 +196,19 @@
           <span class="nav-chevron" id="chev-fac-communication">▼</span>
         </div>
         <div class="nav-section-items collapsed" id="nav-fac-communication">
-          {{ nav('notices', 'Notices', '📢') }}
+          <!-- CHANGED: Notices with badge for faculty too -->
+          <a href="{{ url_for('notices') }}"
+             class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
+                    {{ 'nav-active' if request.endpoint == 'notices' else '' }}">
+            <span>📢</span>
+            Notices
+            {% if unread_notices and unread_notices > 0 %}
+            <span class="ml-auto text-[9px] font-bold bg-red-500 text-white
+                         px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+              {{ unread_notices }}
+            </span>
+            {% endif %}
+          </a>
           {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
           {{ nav('grievances', 'Grievances', '📨') }}
         </div>
@@ -210,9 +234,34 @@
           <span class="nav-chevron" id="chev-stu-information">▼</span>
         </div>
         <div class="nav-section-items collapsed" id="nav-stu-information">
-          {{ nav('notices', 'Notices', '📢') }}
+          <!-- CHANGED: Notices with red badge showing unread fee notices count -->
+          <a href="{{ url_for('notices') }}"
+             class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
+                    {{ 'nav-active' if request.endpoint == 'notices' else '' }}">
+            <span>📢</span>
+            Notices
+            {% if unread_notices and unread_notices > 0 %}
+            <span class="ml-auto text-[9px] font-bold bg-red-500 text-white
+                         px-1.5 py-0.5 rounded-full min-w-[18px] text-center
+                         badge-pulse">
+              {{ unread_notices }}
+            </span>
+            {% endif %}
+          </a>
           {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
-          {{ nav('fee_status', 'Fee Status', '💰') }}
+          <!-- CHANGED: Fee Status with warning indicator when dues exist -->
+          <a href="{{ url_for('fee_status') }}"
+             class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
+                    {{ 'nav-active' if request.endpoint == 'fee_status' else '' }}">
+            <span>💰</span>
+            Fee Status
+            {% if unread_notices and unread_notices > 0 %}
+            <span class="ml-auto text-[9px] font-bold bg-amber-500 text-white
+                         px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+              !
+            </span>
+            {% endif %}
+          </a>
         </div>
 
         <!-- SUPPORT -->

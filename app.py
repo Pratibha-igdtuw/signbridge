@@ -28,7 +28,8 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
-
+from datetime import date, timedelta
+from fee_due_notification import check_fee_due_dates 
 from config import Config
 import database as db
 from database import query_all, query_one, execute
@@ -58,7 +59,18 @@ db.seed_courses()
 
 @app.context_processor
 def inject_user():
-    return {"user": current_user(), "config": Config}
+    u = current_user()
+    unread_notices = 0
+    try:
+        if u and u.get("role") == "student":
+            row = query_one(
+                "SELECT COUNT(*) c FROM notices "
+                "WHERE category='fee' AND target_role IN ('all','student')"
+            )
+            unread_notices = row["c"] if row else 0
+    except Exception:
+        unread_notices = 0
+    return {"user": u, "config": Config, "unread_notices": unread_notices}
 
 
 # ============================================================================
@@ -1204,6 +1216,10 @@ def fee_status():
         sid = request.args.get("student_id") or None
         if sid:
             selected_student = query_one("SELECT * FROM students WHERE id = ?", (sid,))
+    today            = date.today()          
+    due_soon         = []                    
+    student_due_soon = []                    
+
 
     if sid:
         fee_rows = query_all(
@@ -1213,11 +1229,37 @@ def fee_status():
             (sid,)
         )
 
+    for f in fee_rows:                                              
+        if f["due_date"] and f["status"] in ("pending","partial"):  
+            from datetime import datetime                            
+            d = datetime.strptime(str(f["due_date"]),"%Y-%m-%d").date() 
+            days_left = (d - today).days                            
+            bal = f["amount"] - f["paid_amount"]                    
+            if 0 <= days_left <= 2 and bal > 0:                     
+                    student_due_soon.append({                            
+                        "fee_type" : f["fee_type"],                     
+                        "semester" : f["semester"],                     
+                        "balance"  : bal,                               
+                        "due_date" : f["due_date"],                     
+                        "days_left": days_left,                         
+                    })                                                   
+        if u["role"] == "admin":                                        
+            check_fee_due_dates(db, None, None, None, None)            
+            due_soon = student_due_soon                                  
     fz.log_activity(request, u, "view", "fees")
     return render_template("fee_status.html", selected_student=selected_student,
                            fee_rows=fee_rows, students=students,
-                           sid=int(sid) if sid else None)
-
+                           sid=int(sid) if sid else None,
+                           due_soon=due_soon,                
+                           student_due_soon=student_due_soon,
+                           today=today,                      
+                           )
+@app.route("/fees/send-reminders", methods=["POST"])
+@role_required("admin")
+def send_fee_reminders():
+    count = check_fee_due_dates(db, None, None, None, None)
+    flash(f"{count} fee reminder notification(s) sent.", "success")
+    return redirect(url_for("fee_status"))
 
 @app.route("/fees/update", methods=["POST"])
 @role_required("admin")
