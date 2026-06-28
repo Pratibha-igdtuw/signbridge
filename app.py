@@ -1133,7 +1133,31 @@ def results():
             (user_db["email"], user_db["full_name"])
         )
         sid = selected_student["id"] if selected_student else None
+    elif u["role"] == "faculty":
+        # Only show students enrolled in this faculty's courses
+        students = query_all("""
+            SELECT DISTINCT s.id, s.roll_number, s.full_name
+            FROM students s
+            JOIN enrollments e ON e.student_id = s.id
+            JOIN course_faculty cf ON cf.course_id = e.course_id
+            WHERE cf.faculty_id = ?
+            ORDER BY s.roll_number
+        """, (u["id"],))
+        sid = request.args.get("student_id") or None
+        if sid:
+            # Verify this student actually belongs to the faculty before allowing access
+            allowed = query_one("""
+                SELECT s.id FROM students s
+                JOIN enrollments e ON e.student_id = s.id
+                JOIN course_faculty cf ON cf.course_id = e.course_id
+                WHERE cf.faculty_id = ? AND s.id = ?
+            """, (u["id"], sid))
+            if allowed:
+                selected_student = query_one("SELECT * FROM students WHERE id = ?", (sid,))
+            else:
+                sid = None
     else:
+        # Admin sees all students
         students = query_all("SELECT id, roll_number, full_name FROM students ORDER BY roll_number")
         sid = request.args.get("student_id") or None
         if sid:
@@ -1676,18 +1700,36 @@ def course_bulk_enroll(cid):
 @app.route("/low-attendance")
 @role_required("admin", "faculty")
 def low_attendance_report():
-    low_att = query_all("""
-        SELECT s.full_name, s.roll_number, s.email, s.department, s.year, att.subject,
-               SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
-               COUNT(*) AS total,
-               ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
-        FROM attendance att
-        JOIN students s ON s.id = att.student_id
-        GROUP BY att.student_id, att.subject
-        HAVING pct < 75
-        ORDER BY pct ASC
-    """)
-    fz.log_activity(request, current_user(), "view_low_attendance", "attendance")
+    u = current_user()
+    if u["role"] == "faculty":
+        low_att = query_all("""
+            SELECT s.full_name, s.roll_number, s.email, s.department, s.year, att.subject,
+                   SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
+                   COUNT(*) AS total,
+                   ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+            FROM attendance att
+            JOIN students s ON s.id = att.student_id
+            JOIN enrollments e ON e.student_id = s.id
+            JOIN course_faculty cf ON cf.course_id = e.course_id
+            WHERE cf.faculty_id = ?
+            GROUP BY att.student_id, att.subject
+            HAVING pct < 75
+            ORDER BY pct ASC
+        """, (u["id"],))
+    else:
+        # Admin sees all students
+        low_att = query_all("""
+            SELECT s.full_name, s.roll_number, s.email, s.department, s.year, att.subject,
+                   SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
+                   COUNT(*) AS total,
+                   ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+            FROM attendance att
+            JOIN students s ON s.id = att.student_id
+            GROUP BY att.student_id, att.subject
+            HAVING pct < 75
+            ORDER BY pct ASC
+        """)
+    fz.log_activity(request, u, "view_low_attendance", "attendance")
     return render_template("low_attendance.html", low_att=low_att)
 
 
@@ -1695,17 +1737,34 @@ def low_attendance_report():
 @role_required("admin", "faculty")
 def low_attendance_export():
     import csv, io
-    low_att = query_all("""
-        SELECT s.full_name, s.roll_number, s.department, s.year, att.subject,
-               SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
-               COUNT(*) AS total,
-               ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
-        FROM attendance att
-        JOIN students s ON s.id = att.student_id
-        GROUP BY att.student_id, att.subject
-        HAVING pct < 75
-        ORDER BY pct ASC
-    """)
+    u = current_user()
+    if u["role"] == "faculty":
+        low_att = query_all("""
+            SELECT s.full_name, s.roll_number, s.department, s.year, att.subject,
+                   SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
+                   COUNT(*) AS total,
+                   ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+            FROM attendance att
+            JOIN students s ON s.id = att.student_id
+            JOIN enrollments e ON e.student_id = s.id
+            JOIN course_faculty cf ON cf.course_id = e.course_id
+            WHERE cf.faculty_id = ?
+            GROUP BY att.student_id, att.subject
+            HAVING pct < 75
+            ORDER BY pct ASC
+        """, (u["id"],))
+    else:
+        low_att = query_all("""
+            SELECT s.full_name, s.roll_number, s.department, s.year, att.subject,
+                   SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
+                   COUNT(*) AS total,
+                   ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+            FROM attendance att
+            JOIN students s ON s.id = att.student_id
+            GROUP BY att.student_id, att.subject
+            HAVING pct < 75
+            ORDER BY pct ASC
+        """)
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["Student Name", "Roll No", "Department", "Year", "Subject", "Present", "Total", "Attendance %"])
@@ -1732,15 +1791,30 @@ def low_attendance_email():
     body_template = (data.get("body") or "").strip()
     roll_numbers  = data.get("roll_numbers")
 
-    low_att = query_all("""
-        SELECT s.full_name, s.roll_number, s.email, s.department, s.year, att.subject,
-               ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
-        FROM attendance att
-        JOIN students s ON s.id = att.student_id
-        GROUP BY att.student_id, att.subject
-        HAVING pct < 75
-        ORDER BY pct ASC
-    """)
+    u = current_user()
+    if u["role"] == "faculty":
+        low_att = query_all("""
+            SELECT s.full_name, s.roll_number, s.email, s.department, s.year, att.subject,
+                   ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+            FROM attendance att
+            JOIN students s ON s.id = att.student_id
+            JOIN enrollments e ON e.student_id = s.id
+            JOIN course_faculty cf ON cf.course_id = e.course_id
+            WHERE cf.faculty_id = ?
+            GROUP BY att.student_id, att.subject
+            HAVING pct < 75
+            ORDER BY pct ASC
+        """, (u["id"],))
+    else:
+        low_att = query_all("""
+            SELECT s.full_name, s.roll_number, s.email, s.department, s.year, att.subject,
+                   ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+            FROM attendance att
+            JOIN students s ON s.id = att.student_id
+            GROUP BY att.student_id, att.subject
+            HAVING pct < 75
+            ORDER BY pct ASC
+        """)
 
     from collections import defaultdict
     students_map = defaultdict(lambda: {"subjects": [], "email": "", "name": "", "dept": "", "year": ""})
