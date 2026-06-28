@@ -160,7 +160,15 @@
   </div>
   {% else %}
   <div class="px-5 py-8 text-center text-sm text-slate-400">
-    {% if user.role in ('admin','faculty') %}No assignments uploaded yet.{% else %}No assignments available yet.{% endif %}
+    <div class="py-12 text-center">
+        <div class="text-5xl mb-4">📝</div>
+        <div class="text-base font-semibold text-slate-700 mb-1">
+          {% if user.role in ('admin','faculty') %}No assignments uploaded yet{% else %}No assignments available yet{% endif %}
+        </div>
+        <div class="text-sm text-slate-400">
+          {% if user.role in ('admin','faculty') %}Upload an assignment using the form to get started{% else %}Assignments uploaded by your faculty will appear here{% endif %}
+        </div>
+      </div>
   </div>
   {% endif %}
 </div>

@@ -124,7 +124,11 @@
 {% else %}
 <div class="bg-white rounded-lg border border-slate-200 p-10 text-center text-slate-400">
   <p class="text-3xl mb-2">📅</p>
-  <p class="text-sm">No exams scheduled yet.</p>
+  <div class="py-16 text-center bg-white rounded-xl border border-slate-200">
+    <div class="text-5xl mb-4">🗓️</div>
+    <div class="text-base font-semibold text-slate-700 mb-1">No exams scheduled yet</div>
+    <div class="text-sm text-slate-400">Upcoming exams will appear here once added</div>
+  </div>
 </div>
 {% endif %}
 {% endblock %}

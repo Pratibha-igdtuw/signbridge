@@ -2,41 +2,107 @@
 {% block title %}My Profile{% endblock %}
 {% block heading %}My Profile{% endblock %}
 {% block content %}
-<div class="max-w-2xl space-y-6">
+<div class="max-w-3xl space-y-6">
 
-  <!-- Profile info card -->
-  <div class="bg-white rounded-lg border border-slate-200 p-6">
-    <h2 class="text-sm font-semibold text-ink mb-4">Personal Information</h2>
+  <!-- Profile Header Card -->
+  <div class="bg-gradient-to-r from-ink to-steel rounded-xl p-6 slide-up">
+    <div class="flex items-center gap-6">
+      <!-- Avatar -->
+      <div class="relative">
+        <div class="avatar-initials" style="width:80px;height:80px;font-size:28px;font-weight:800;background:linear-gradient(135deg,#0d9488,#1e40af)">
+          {{ (user_db.full_name or 'U')[:2] }}
+        </div>
+        <label for="avatar-upload" class="absolute bottom-0 right-0 w-6 h-6 bg-signal rounded-full flex items-center justify-center cursor-pointer hover:bg-teal-600 transition" title="Change photo">
+          <span class="text-white text-xs">✏️</span>
+        </label>
+        <input id="avatar-upload" type="file" accept="image/*" class="hidden" onchange="previewAvatar(this)">
+      </div>
+      <div>
+        <div class="text-white text-xl font-bold">{{ user_db.full_name }}</div>
+        <div class="text-slate-400 text-sm mt-0.5">{{ user_db.username }} · <span class="capitalize">{{ user_db.role }}</span></div>
+        {% if student %}
+        <div class="flex flex-wrap gap-3 mt-2">
+          <span class="text-xs bg-white/10 text-slate-200 px-2 py-0.5 rounded-full">🏫 {{ student.roll_number }}</span>
+          <span class="text-xs bg-white/10 text-slate-200 px-2 py-0.5 rounded-full">📚 {{ student.department }}</span>
+          <span class="text-xs bg-white/10 text-slate-200 px-2 py-0.5 rounded-full">📅 Year {{ student.year }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Academic Info (read-only for students) -->
+  {% if student %}
+  <div class="bg-white rounded-xl border border-slate-200 p-6 slide-up" style="animation-delay:0.05s">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-sm font-semibold text-ink">🎓 Academic Information</h2>
+      <span class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Read-only · Contact admin to update</span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+      {% macro info_field(label, value) %}
+      <div>
+        <div class="text-xs text-slate-400 mb-0.5 font-medium eyebrow uppercase">{{ label }}</div>
+        <div class="text-sm text-slate-700 font-medium">{{ value or '—' }}</div>
+      </div>
+      {% endmacro %}
+      {{ info_field('Roll Number', student.roll_number) }}
+      {{ info_field('Department', student.department) }}
+      {{ info_field('Year', 'Year ' ~ student.year if student.year else None) }}
+      {{ info_field('CGPA', student.cgpa if student.cgpa else None) }}
+      {{ info_field('Email', student.email) }}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Editable Profile Info -->
+  <div class="bg-white rounded-xl border border-slate-200 p-6 slide-up" style="animation-delay:0.1s">
+    <h2 class="text-sm font-semibold text-ink mb-4">👤 Personal Information</h2>
     <form method="post" class="space-y-4">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="action" value="update_info">
 
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label class="block text-xs font-medium text-slate-500 mb-1">Full Name</label>
+          <label class="block text-xs font-medium text-slate-500 mb-1">Full Name *</label>
           <input name="full_name" value="{{ user_db.full_name or '' }}" required
-                 class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
-                        focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+                 class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm
+                        focus:border-signal focus:ring-1 focus:ring-signal outline-none transition">
         </div>
         <div>
           <label class="block text-xs font-medium text-slate-500 mb-1">Email</label>
           <input type="email" value="{{ user_db.email or '' }}" disabled
-                 class="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 cursor-not-allowed">
+                 class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400 cursor-not-allowed">
           <p class="text-xs text-slate-400 mt-1">Contact admin to change email.</p>
         </div>
       </div>
 
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label class="block text-xs font-medium text-slate-500 mb-1">Contact Number</label>
+          <label class="block text-xs font-medium text-slate-500 mb-1">Phone Number</label>
           <input name="contact_no" value="{{ user_db.contact_no or '' }}" type="tel"
-                 class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
-                        focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+                 placeholder="+91 XXXXX XXXXX"
+                 class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm
+                        focus:border-signal focus:ring-1 focus:ring-signal outline-none transition">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-500 mb-1">University / College</label>
+          <input name="university" value="{{ user_db.university or '' }}"
+                 class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm
+                        focus:border-signal focus:ring-1 focus:ring-signal outline-none transition">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-500 mb-1">Branch / Department</label>
+          <input name="branch" value="{{ user_db.branch or '' }}"
+                 class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm
+                        focus:border-signal focus:ring-1 focus:ring-signal outline-none transition">
         </div>
         <div>
           <label class="block text-xs font-medium text-slate-500 mb-1">Year</label>
-          <select name="year" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
-                                     focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+          <select name="year" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm
+                                     focus:border-signal focus:ring-1 focus:ring-signal outline-none transition">
             <option value="">—</option>
             {% for y in [1,2,3,4] %}
               <option value="{{ y }}" {{ 'selected' if user_db.year == y else '' }}>Year {{ y }}</option>
@@ -45,33 +111,48 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Address</label>
+        <textarea name="address" rows="2" placeholder="Your current address"
+                  class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm
+                         focus:border-signal focus:ring-1 focus:ring-signal outline-none transition resize-none">{{ user_db.address or '' }}</textarea>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label class="block text-xs font-medium text-slate-500 mb-1">Branch / Department</label>
-          <input name="branch" value="{{ user_db.branch or '' }}"
-                 class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
-                        focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+          <label class="block text-xs font-medium text-slate-500 mb-1">Date of Birth</label>
+          <input name="dob" type="date" value="{{ user_db.dob or '' }}"
+                 class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm
+                        focus:border-signal focus:ring-1 focus:ring-signal outline-none transition">
         </div>
         <div>
-          <label class="block text-xs font-medium text-slate-500 mb-1">University / College</label>
-          <input name="university" value="{{ user_db.university or '' }}"
-                 class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
-                        focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+          <label class="block text-xs font-medium text-slate-500 mb-1">Parent / Guardian Name</label>
+          <input name="guardian_name" value="{{ user_db.guardian_name or '' }}"
+                 class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm
+                        focus:border-signal focus:ring-1 focus:ring-signal outline-none transition">
         </div>
       </div>
 
-      <div class="flex items-center gap-3 pt-2 border-t border-slate-100">
-        <button class="bg-signal hover:bg-teal-700 text-white text-sm font-medium px-4 py-2 rounded-md transition">
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Emergency Contact</label>
+        <input name="emergency_contact" value="{{ user_db.emergency_contact or '' }}" type="tel"
+               placeholder="Emergency contact number"
+               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm
+                      focus:border-signal focus:ring-1 focus:ring-signal outline-none transition">
+      </div>
+
+      <div class="flex items-center gap-3 pt-3 border-t border-slate-100">
+        <button class="bg-signal hover:bg-teal-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition">
           Save Changes
         </button>
-        <span class="text-xs text-slate-400">Role: <strong>{{ user_db.role }}</strong> · Username: <strong>{{ user_db.username }}</strong></span>
+        <span class="text-xs text-slate-400">Username: <strong>{{ user_db.username }}</strong></span>
       </div>
     </form>
   </div>
 
   <!-- Change password card -->
-  <div class="bg-white rounded-lg border border-slate-200 p-6">
-    <h2 class="text-sm font-semibold text-ink mb-4">Change Password</h2>
+  <div class="bg-white rounded-xl border border-slate-200 p-6 slide-up" style="animation-delay:0.15s">
+    <h2 class="text-sm font-semibold text-ink mb-4">🔐 Change Password</h2>
     <form method="post" class="space-y-4">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="action" value="change_password">
@@ -80,8 +161,8 @@
         <label class="block text-xs font-medium text-slate-500 mb-1">Current Password</label>
         <div class="relative">
           <input id="pw-cur" name="current_password" type="password" required
-                 class="w-full rounded-md border border-slate-300 px-3 py-2 pr-10 text-sm
-                        focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+                 class="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm
+                        focus:border-signal focus:ring-1 focus:ring-signal outline-none transition">
           <button type="button" onclick="toggleEye('pw-cur','eye-cur')"
                   class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
             <span id="eye-cur">👁️</span>
@@ -89,13 +170,13 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="block text-xs font-medium text-slate-500 mb-1">New Password</label>
           <div class="relative">
             <input id="pw-new" name="new_password" type="password" required
-                   class="w-full rounded-md border border-slate-300 px-3 py-2 pr-10 text-sm
-                          focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+                   class="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm
+                          focus:border-signal focus:ring-1 focus:ring-signal outline-none transition">
             <button type="button" onclick="toggleEye('pw-new','eye-new')"
                     class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
               <span id="eye-new">👁️</span>
@@ -109,8 +190,8 @@
           <label class="block text-xs font-medium text-slate-500 mb-1">Confirm New Password</label>
           <div class="relative">
             <input id="pw-conf" name="confirm_password" type="password" required
-                   class="w-full rounded-md border border-slate-300 px-3 py-2 pr-10 text-sm
-                          focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+                   class="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm
+                          focus:border-signal focus:ring-1 focus:ring-signal outline-none transition">
             <button type="button" onclick="toggleEye('pw-conf','eye-conf')"
                     class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
               <span id="eye-conf">👁️</span>
@@ -119,7 +200,7 @@
         </div>
       </div>
 
-      <button class="bg-ink hover:bg-steel text-white text-sm font-medium px-4 py-2 rounded-md transition">
+      <button class="bg-ink hover:bg-steel text-white text-sm font-medium px-5 py-2 rounded-lg transition">
         Change Password
       </button>
     </form>
@@ -153,5 +234,10 @@ pwNew.addEventListener('input', () => {
   bar.style.width = pwNew.value ? ws[s] : '0%';
   bar.className = `h-full rounded-full transition-all duration-300 ${bgs[pwNew.value ? s : 0]}`;
 });
+function previewAvatar(input) {
+  if (input.files && input.files[0]) {
+    alert('Profile picture upload will be saved on the next profile update. (Feature requires backend storage setup.)');
+  }
+}
 </script>
 {% endblock %}

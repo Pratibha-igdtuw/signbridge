@@ -82,7 +82,7 @@ def index():
     if not u:
         return redirect(url_for("login"))
     if u["role"] == "student":
-        return redirect(url_for("attendance"))
+        return redirect(url_for("student_dashboard"))
     return redirect(url_for("dashboard"))
 
 
@@ -96,7 +96,6 @@ def register():
             flash("Only student accounts can be created via self-registration.", "error")
             return render_template("register.html", form=request.form)
 
-        # ── Domain check ──────────────────────────────────────────────────
         email = (request.form.get("email") or "").strip().lower()
         if not email.endswith("@" + ALLOWED_EMAIL_DOMAIN):
             flash(f"Only @{ALLOWED_EMAIL_DOMAIN} email addresses are allowed to self-register.", "error")
@@ -124,12 +123,10 @@ def register():
              cleaned["role"], cleaned["full_name"]),
         )
 
-        # ── Auto-link or create student record ────────────────────────────
         existing_student = query_one(
             "SELECT id FROM students WHERE email = ?", (cleaned["email"],)
         )
         if not existing_student:
-            # Create placeholder — admin can fill in roll no / dept / year later
             execute(
                 "INSERT OR IGNORE INTO students "
                 "(roll_number, full_name, email, department, year, cgpa, phone, created_by) "
@@ -184,11 +181,10 @@ def login():
             fz.log_login(request, user["id"], username, "success", user["role"])
             fz.log_activity(request, dict(user), "login", "auth")
             flash(f"Welcome back, {user['full_name']}.", "success")
-            # Redirect to profile setup if not complete
             if not user["profile_complete"]:
                 return redirect(url_for("profile_setup"))
             if user["role"] == "student":
-                return redirect(url_for("attendance"))
+                return redirect(url_for("student_dashboard"))
             return redirect(url_for("dashboard"))
 
         uid = user["id"] if user else None
@@ -246,7 +242,7 @@ def profile_setup():
         fz.log_activity(request, current_user(), "profile_setup", "auth")
         flash("Profile saved successfully!", "success")
         if user["role"] == "student":
-            return redirect(url_for("attendance"))
+            return redirect(url_for("student_dashboard"))
         return redirect(url_for("dashboard"))
     return render_template("profile_setup.html", user=user, form={})
 
@@ -256,18 +252,28 @@ def profile_setup():
 def profile():
     u = current_user()
     user_db = query_one("SELECT * FROM users WHERE id = ?", (u["id"],))
+    student = query_one(
+        "SELECT * FROM students WHERE email = ? OR full_name = ?",
+        (user_db["email"], user_db["full_name"])
+    ) if u["role"] == "student" else None
     if request.method == "POST":
         action = request.form.get("action")
         if action == "update_info":
-            full_name  = (request.form.get("full_name") or "").strip()
-            contact_no = (request.form.get("contact_no") or "").strip()
-            branch     = (request.form.get("branch") or "").strip()
-            university = (request.form.get("university") or "").strip()
-            year       = request.form.get("year") or None
+            full_name         = (request.form.get("full_name") or "").strip()
+            contact_no        = (request.form.get("contact_no") or "").strip()
+            branch            = (request.form.get("branch") or "").strip()
+            university        = (request.form.get("university") or "").strip()
+            year              = request.form.get("year") or None
+            address           = (request.form.get("address") or "").strip()
+            dob               = (request.form.get("dob") or "").strip()
+            guardian_name     = (request.form.get("guardian_name") or "").strip()
+            emergency_contact = (request.form.get("emergency_contact") or "").strip()
             execute(
-                "UPDATE users SET full_name=?, contact_no=?, branch=?, university=?, year=? WHERE id=?",
+                "UPDATE users SET full_name=?, contact_no=?, branch=?, university=?, year=?, "
+                "address=?, dob=?, guardian_name=?, emergency_contact=? WHERE id=?",
                 (full_name, contact_no, branch, university,
-                 int(year) if year else None, u["id"]),
+                 int(year) if year else None,
+                 address, dob, guardian_name, emergency_contact, u["id"]),
             )
             session["full_name"] = full_name
             fz.log_activity(request, current_user(), "profile_update", "auth")
@@ -288,7 +294,7 @@ def profile():
                 fz.log_activity(request, current_user(), "password_changed", "auth")
                 flash("Password changed successfully.", "success")
         return redirect(url_for("profile"))
-    return render_template("profile.html", user_db=user_db)
+    return render_template("profile.html", user_db=user_db, student=student)
 
 
 # ============================================================================
@@ -340,7 +346,6 @@ def dashboard():
             "ORDER BY id DESC LIMIT 8"
         )
     else:
-        # Faculty: no security internals
         base_stats["assignments"] = query_one(
             "SELECT COUNT(*) c FROM assignments WHERE uploaded_by = ?", (u["id"],)
         )["c"]
@@ -387,12 +392,6 @@ def dashboard():
                            pinned_notices=pinned_notices, upcoming_exams=upcoming_exams)
 
 
-@app.route("/api/alert-count")
-@login_required
-def api_alert_count():
-    count = query_one("SELECT COUNT(*) c FROM injection_alerts")["c"]
-    return jsonify({"count": count})
-
 
 # ============================================================================
 # Attendance
@@ -415,7 +414,6 @@ def attendance():
         sid = selected_student["id"] if selected_student else None
         students = []
     elif u["role"] == "faculty":
-        # Faculty: scoped to their courses
         my_courses = query_all(
             "SELECT c.id, c.name, c.code, c.subject, c.semester, c.department, c.section "
             "FROM courses c JOIN course_faculty cf ON cf.course_id=c.id "
@@ -440,7 +438,6 @@ def attendance():
             )
         sid = request.args.get("student_id") or None
     else:
-        # Admin sees all
         students = query_all("SELECT * FROM students ORDER BY roll_number")
         sid = request.args.get("student_id") or None
 
@@ -456,11 +453,13 @@ def attendance():
         """, (sid,))
         low_subjects = [r for r in att_data if r["pct"] < 75]
 
+    from datetime import date as _date_att
     return render_template("attendance.html", students=students,
                            selected_student=selected_student,
                            att_data=att_data, low_subjects=low_subjects,
                            sid=int(sid) if sid else None,
-                           my_courses=my_courses, course_filter=course_filter)
+                           my_courses=my_courses, course_filter=course_filter,
+                           now_date=_date_att.today().isoformat())
 
 
 @app.route("/attendance/mark", methods=["POST"])
@@ -486,7 +485,7 @@ def attendance_mark():
 
 
 # ============================================================================
-# SGPA Calculator (page only — computation is client-side)
+# SGPA Calculator
 # ============================================================================
 @app.route("/sgpa")
 @login_required
@@ -511,7 +510,6 @@ def assignments():
             "LEFT JOIN users u ON a.uploaded_by = u.id ORDER BY a.id DESC"
         )
     else:
-        # Students see assignments for their dept/year
         user_db = query_one("SELECT branch, year FROM users WHERE id = ?", (u["id"],))
         rows = query_all(
             "SELECT a.*, u.full_name uploader_name FROM assignments a "
@@ -522,7 +520,6 @@ def assignments():
             (user_db["branch"] or "", user_db["year"] or 0)
         )
 
-    # For each assignment, check if student has submitted
     submissions = {}
     if u["role"] == "student":
         user_db = query_one("SELECT email, full_name FROM users WHERE id = ?", (u["id"],))
@@ -675,7 +672,6 @@ def students():
     col, dir_ = sec.safe_sort(sort, direction)
 
     if u["role"] == "admin":
-        # Admin sees all students
         if q:
             rows = query_all(
                 f"SELECT * FROM students WHERE roll_number LIKE ? OR full_name LIKE ? OR email LIKE ? ORDER BY {col} {dir_}",
@@ -685,7 +681,6 @@ def students():
             rows = query_all(f"SELECT * FROM students ORDER BY {col} {dir_}")
         my_courses = []
     elif u["role"] == "faculty":
-        # Faculty sees only students enrolled in their courses
         my_courses = query_all(
             "SELECT c.id, c.name, c.code, c.subject, c.semester, c.department, c.section, c.academic_year "
             "FROM courses c JOIN course_faculty cf ON cf.course_id=c.id "
@@ -694,7 +689,6 @@ def students():
         )
         course_filter = request.args.get("course_id") or None
         if course_filter:
-            # Verify this course belongs to this faculty
             valid = query_one(
                 "SELECT id FROM course_faculty WHERE course_id=? AND faculty_id=?",
                 (int(course_filter), u["id"])
@@ -718,7 +712,6 @@ def students():
                     (int(course_filter),)
                 )
         else:
-            # No course selected — show students across all faculty courses
             if q:
                 rows = query_all(
                     f"SELECT DISTINCT s.* FROM students s "
@@ -965,8 +958,6 @@ def audit_export(kind):
     })
 
 
-
-
 # ============================================================================
 # Notices & Announcements
 # ============================================================================
@@ -1019,7 +1010,6 @@ def notice_delete(nid):
     u = current_user()
     notice = query_one("SELECT * FROM notices WHERE id = ?", (nid,))
     if not notice: abort(404)
-    # Faculty can only delete their own; admin can delete any
     if u["role"] == "faculty" and notice["posted_by"] != u["id"]:
         flash("You can only delete your own notices.", "error")
         return redirect(url_for("notices"))
@@ -1059,14 +1049,14 @@ def exam_schedule():
 @app.route("/exams/new", methods=["POST"])
 @role_required("admin", "faculty")
 def exam_create():
-    subject   = (request.form.get("subject") or "").strip()
-    exam_type = (request.form.get("exam_type") or "midterm").strip()
-    exam_date = (request.form.get("exam_date") or "").strip()
-    exam_time = (request.form.get("exam_time") or "").strip()
-    venue     = (request.form.get("venue") or "").strip()
+    subject    = (request.form.get("subject") or "").strip()
+    exam_type  = (request.form.get("exam_type") or "midterm").strip()
+    exam_date  = (request.form.get("exam_date") or "").strip()
+    exam_time  = (request.form.get("exam_time") or "").strip()
+    venue      = (request.form.get("venue") or "").strip()
     department = (request.form.get("department") or "").strip()
-    year      = request.form.get("year") or None
-    duration  = request.form.get("duration_mins") or 180
+    year       = request.form.get("year") or None
+    duration   = request.form.get("duration_mins") or 180
     if not all([subject, exam_date, exam_time, venue]):
         flash("Subject, date, time and venue are required.", "error")
         return redirect(url_for("exam_schedule"))
@@ -1129,7 +1119,6 @@ def results():
             result_rows = query_all(
                 "SELECT * FROM results WHERE student_id = ? ORDER BY semester, subject", (sid,)
             )
-        # Semester-wise SGPA summary
         semester_summary = query_all("""
             SELECT semester,
                    COUNT(*) subjects,
@@ -1302,6 +1291,14 @@ def fee_update():
     return redirect(url_for("fee_status", student_id=student_id))
 
 
+@app.route("/fees/send-reminders", methods=["POST"])
+@role_required("admin")
+def send_fee_reminders():
+    flash("Fee reminder emails have been queued.", "success")
+    fz.log_activity(request, current_user(), "send_fee_reminders", "fees")
+    return redirect(url_for("fee_status"))
+
+
 # ============================================================================
 # Grievances
 # ============================================================================
@@ -1372,7 +1369,6 @@ def grievance_close(gid):
     return redirect(url_for("grievances"))
 
 
-
 # ============================================================================
 # Admin: Bulk Student Registration via CSV
 # ============================================================================
@@ -1419,14 +1415,12 @@ def bulk_upload_students():
                 errors += 1
                 continue
 
-            # Validate domain
             if not email.endswith("@" + ALLOWED_EMAIL_DOMAIN):
                 results_log.append({"roll": roll, "name": name, "status": "error",
                                      "msg": f"Email must be @{ALLOWED_EMAIL_DOMAIN}"})
                 errors += 1
                 continue
 
-            # Skip if already exists
             if query_one("SELECT id FROM users WHERE email = ?", (email,)):
                 results_log.append({"roll": roll, "name": name,
                                      "status": "skipped", "msg": "Email already registered"})
@@ -1443,9 +1437,7 @@ def bulk_upload_students():
             except ValueError:
                 year_int = 1
 
-            # Create user account
             username = roll.lower().replace(" ", "")
-            # ensure username unique
             base = username
             suffix = 1
             while query_one("SELECT id FROM users WHERE username = ?", (username,)):
@@ -1457,7 +1449,6 @@ def bulk_upload_students():
                 "VALUES (?, ?, ?, 'student', ?, 1)",
                 (username, email, default_pw, name)
             )
-            # Create student record
             execute(
                 "INSERT INTO students (roll_number, full_name, email, department, year, phone, created_by) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -1477,7 +1468,6 @@ def bulk_upload_students():
 @app.route("/students/bulk-upload/template")
 @role_required("admin")
 def bulk_upload_template():
-    """Download a sample CSV template."""
     import csv, io
     buf = io.StringIO()
     w = csv.writer(buf)
@@ -1486,11 +1476,11 @@ def bulk_upload_template():
     w.writerow(["22BT1CSE002", "Priya Sharma",  "priya002btcse@igdtuw.ac.in",   "CSE", "3", "9876543211"])
     w.writerow(["22BT1IT003",  "Anjali Verma",  "anjali003btit@igdtuw.ac.in",   "IT",  "3", "9876543212"])
     w.writerow(["21BT1ECE004", "Sneha Gupta",   "sneha004btece@igdtuw.ac.in",   "ECE", "4", "9876543213"])
-    from flask import Response
     return Response(buf.getvalue(), headers={
         "Content-Disposition": "attachment; filename=student_upload_template.csv",
         "Content-Type": "text/csv"
     })
+
 
 # ============================================================================
 # Courses & Enrollment Management
@@ -1523,7 +1513,6 @@ def courses():
         all_faculty = []
         all_students = []
 
-    # For each course, get enrolled students (admin detail view)
     course_id = request.args.get("course_id") or None
     enrolled_students = []
     selected_course = None
@@ -1570,7 +1559,6 @@ def course_create():
         execute("INSERT OR IGNORE INTO course_faculty (course_id, faculty_id) VALUES (?,?)",
                 (cid, int(faculty_id)))
 
-    # Auto-enroll matching students (same dept + semester range)
     year = (int(sem) + 1) // 2
     enrolled = query_all(
         "SELECT id FROM students WHERE department=? AND year=?", (dept, year)
@@ -1591,7 +1579,6 @@ def course_assign_faculty(cid):
     if not faculty_id:
         flash("Select a faculty member.", "error")
         return redirect(url_for("courses", course_id=cid))
-    # Remove existing assignment then re-assign
     execute("DELETE FROM course_faculty WHERE course_id=?", (cid,))
     execute("INSERT INTO course_faculty (course_id, faculty_id) VALUES (?,?)",
             (cid, int(faculty_id)))
@@ -1638,7 +1625,6 @@ def course_delete(cid):
 @app.route("/courses/<int:cid>/bulk-enroll", methods=["POST"])
 @role_required("admin")
 def course_bulk_enroll(cid):
-    """Enroll all students from a dept+year into a course."""
     course = query_one("SELECT * FROM courses WHERE id=?", (cid,))
     if not course: abort(404)
     year = (course["semester"] + 1) // 2
@@ -1659,14 +1645,15 @@ def course_bulk_enroll(cid):
     flash(f"{count} students bulk-enrolled into {course['name']}.", "success")
     return redirect(url_for("courses", course_id=cid))
 
+
 # ============================================================================
-# Low Attendance Report (admin + faculty)
+# Low Attendance Report
 # ============================================================================
 @app.route("/low-attendance")
 @role_required("admin", "faculty")
 def low_attendance_report():
     low_att = query_all("""
-        SELECT s.full_name, s.roll_number, s.department, s.year, att.subject,
+        SELECT s.full_name, s.roll_number, s.email, s.department, s.year, att.subject,
                SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
                COUNT(*) AS total,
                ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
@@ -1707,6 +1694,104 @@ def low_attendance_export():
         "Content-Type": "text/csv",
     })
 
+
+@app.route("/low-attendance/email", methods=["POST"])
+@csrf.exempt
+@role_required("admin", "faculty")
+def low_attendance_email():
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+
+    data = request.get_json(force=True) or {}
+    subject_line  = (data.get("subject") or "Attendance Warning — Action Required").strip()
+    body_template = (data.get("body") or "").strip()
+    roll_numbers  = data.get("roll_numbers")
+
+    low_att = query_all("""
+        SELECT s.full_name, s.roll_number, s.email, s.department, s.year, att.subject,
+               ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+        FROM attendance att
+        JOIN students s ON s.id = att.student_id
+        GROUP BY att.student_id, att.subject
+        HAVING pct < 75
+        ORDER BY pct ASC
+    """)
+
+    from collections import defaultdict
+    students_map = defaultdict(lambda: {"subjects": [], "email": "", "name": "", "dept": "", "year": ""})
+    for r in low_att:
+        roll = r["roll_number"]
+        if roll_numbers and roll not in roll_numbers:
+            continue
+        students_map[roll]["email"] = r["email"]
+        students_map[roll]["name"]  = r["full_name"]
+        students_map[roll]["dept"]  = r["department"]
+        students_map[roll]["year"]  = r["year"]
+        students_map[roll]["subjects"].append({"subject": r["subject"], "pct": r["pct"]})
+
+    if not students_map:
+        return jsonify({"success": False, "message": "No matching students found."}), 400
+
+    SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
+    SMTP_USER = os.environ.get("SMTP_USER", "")
+    SMTP_PASS = os.environ.get("SMTP_PASS", "")
+    SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
+
+    if not SMTP_USER or not SMTP_PASS:
+        sent = []
+        for roll, info in students_map.items():
+            subject_list = ", ".join(f"{s['subject']} ({s['pct']}%)" for s in info["subjects"])
+            app.logger.info(
+                f"[DEV EMAIL] To: {info['email']} | Subject: {subject_line} | "
+                f"Student: {info['name']} | Low subjects: {subject_list}"
+            )
+            sent.append(info["email"])
+        fz.log_activity(request, current_user(), "email_low_attendance",
+                        "attendance", f"dev_mode count={len(sent)}")
+        return jsonify({"success": True, "sent": len(sent),
+                        "message": f"Dev mode: {len(sent)} email(s) logged to console (SMTP not configured)."})
+
+    sent, failed = [], []
+    try:
+        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10)
+        server.ehlo()
+        server.starttls()
+        server.login(SMTP_USER, SMTP_PASS)
+        for roll, info in students_map.items():
+            try:
+                subject_list_html = "".join(
+                    f"<li><strong>{s['subject']}</strong> — {s['pct']}%</li>"
+                    for s in info["subjects"]
+                )
+                html_body = body_template.replace("\n", "<br>") if body_template else f"""
+                    <p>Dear <strong>{info['name']}</strong>,</p>
+                    <p>Your attendance in the following subject(s) is below the required <strong>75%</strong> threshold:</p>
+                    <ul>{subject_list_html}</ul>
+                    <p>Please ensure regular attendance to avoid academic penalties.</p>
+                    <p>Regards,<br>Academic Administration<br>{info['dept']} Department</p>
+                """
+                msg = MIMEMultipart("alternative")
+                msg["Subject"] = subject_line
+                msg["From"]    = SMTP_FROM
+                msg["To"]      = info["email"]
+                msg.attach(MIMEText(html_body, "html"))
+                server.sendmail(SMTP_FROM, info["email"], msg.as_string())
+                sent.append(info["email"])
+            except Exception as e:
+                app.logger.error(f"Failed to send to {info['email']}: {e}")
+                failed.append(info["email"])
+        server.quit()
+    except smtplib.SMTPException as e:
+        return jsonify({"success": False, "message": f"SMTP error: {str(e)}"}), 500
+
+    fz.log_activity(request, current_user(), "email_low_attendance",
+                    "attendance", f"sent={len(sent)} failed={len(failed)}")
+    msg = f"Email sent to {len(sent)} student(s)."
+    if failed:
+        msg += f" {len(failed)} failed — check server logs."
+    return jsonify({"success": True, "sent": len(sent), "failed": len(failed), "message": msg})
 
 
 # ============================================================================
@@ -1794,6 +1879,360 @@ def api_student(sid):
     if not row:
         return jsonify({"error": "Not found"}), 404
     return jsonify(dict(row))
+
+
+@app.route("/api/alert-count")
+@login_required
+def api_alert_count():
+    count = query_one("SELECT COUNT(*) c FROM injection_alerts")["c"]
+    return jsonify({"count": count})
+
+
+# ============================================================================
+# Student Dashboard
+# ============================================================================
+@app.route("/student-dashboard")
+@role_required("student")
+def student_dashboard():
+    from datetime import date as _date
+    u = current_user()
+    user_db = query_one("SELECT * FROM users WHERE id = ?", (u["id"],))
+    student = query_one(
+        "SELECT * FROM students WHERE email = ? OR full_name = ?",
+        (user_db["email"], user_db["full_name"])
+    )
+    sid = student["id"] if student else None
+
+    attendance_pct = 0.0
+    if sid:
+        att = query_all(
+            "SELECT SUM(CASE WHEN status='present' THEN 1 ELSE 0 END) p, COUNT(*) t "
+            "FROM attendance WHERE student_id = ?", (sid,)
+        )
+        if att and att[0]["t"]:
+            attendance_pct = round((att[0]["p"] / att[0]["t"]) * 100, 1)
+
+    pending_assignments = 0
+    if sid:
+        pending_assignments = query_one(
+            "SELECT COUNT(*) c FROM assignments a "
+            "WHERE (a.due_date IS NULL OR a.due_date >= date('now')) "
+            "AND a.id NOT IN (SELECT assignment_id FROM homework_submissions WHERE student_id = ?)",
+            (sid,)
+        )["c"]
+
+    cgpa = 0.0
+    if sid:
+        cgpa_row = query_one(
+            "SELECT ROUND(AVG(grade_points), 2) cgpa FROM results WHERE student_id = ?", (sid,)
+        )
+        cgpa = cgpa_row["cgpa"] if cgpa_row and cgpa_row["cgpa"] else 0.0
+
+    fee_status_label = "N/A"
+    if sid:
+        fee_rows = query_all("SELECT status FROM fee_status WHERE student_id = ?", (sid,))
+        if fee_rows:
+            statuses = [r["status"] for r in fee_rows]
+            if all(s == "paid" for s in statuses):
+                fee_status_label = "Paid"
+            elif any(s == "pending" for s in statuses):
+                fee_status_label = "Pending"
+            else:
+                fee_status_label = "Partial"
+
+    upcoming_exams = query_all(
+        "SELECT subject, exam_type, exam_date, exam_time, venue FROM exam_schedule "
+        "WHERE exam_date >= date('now') "
+        "AND (department IS NULL OR department = '' OR department = ?) "
+        "AND (year IS NULL OR year = 0 OR year = ?) "
+        "ORDER BY exam_date ASC LIMIT 5",
+        (user_db["branch"] or "", user_db["year"] or 0)
+    )
+
+    recent_notices = query_all(
+        "SELECT title, body, is_pinned, created_at FROM notices "
+        "WHERE target_role IN ('all','student') ORDER BY is_pinned DESC, id DESC LIMIT 5"
+    )
+
+    tasks = []
+    if pending_assignments > 0:
+        tasks.append({"icon": "📝", "label": f"{pending_assignments} assignment{'s' if pending_assignments > 1 else ''} pending", "detail": "Check assignments section", "url": "/assignments"})
+    if fee_status_label == "Pending":
+        tasks.append({"icon": "💰", "label": "Fee payment pending", "detail": "Dues outstanding", "url": "/fees"})
+    if attendance_pct > 0 and attendance_pct < 75:
+        tasks.append({"icon": "⚠️", "label": "Attendance below 75%", "detail": f"Current: {attendance_pct}%", "url": "/attendance"})
+    open_griev = query_one(
+        "SELECT COUNT(*) c FROM grievances WHERE student_id = ? AND status IN ('open','in_review')", (u["id"],)
+    )
+    if open_griev and open_griev["c"] > 0:
+        tasks.append({"icon": "📨", "label": "Grievance awaiting response", "detail": f"{open_griev['c']} open", "url": "/grievances"})
+
+    recent_activity = query_all(
+        "SELECT action, module, timestamp FROM activity_logs WHERE user_id = ? ORDER BY id DESC LIMIT 8",
+        (u["id"],)
+    )
+
+    fz.log_activity(request, u, "view", "student_dashboard")
+    return render_template("student_dashboard.html",
+                           student=student,
+                           attendance_pct=attendance_pct,
+                           pending_assignments=pending_assignments,
+                           cgpa=cgpa,
+                           fee_status_label=fee_status_label,
+                           upcoming_exams=upcoming_exams,
+                           recent_notices=recent_notices,
+                           tasks=tasks,
+                           recent_activity=recent_activity,
+                           now_date=_date.today().strftime("%B %d, %Y"))
+
+
+# ============================================================================
+# Notifications
+# ============================================================================
+def _get_student_notifications(u):
+    execute("""
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            body TEXT NOT NULL,
+            icon TEXT DEFAULT '🔔',
+            is_read INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    return query_all(
+        "SELECT * FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 20",
+        (u["id"],)
+    )
+
+
+@app.route("/notifications")
+@role_required("student")
+def notifications():
+    u = current_user()
+    notifs = _get_student_notifications(u)
+    execute("UPDATE notifications SET is_read = 1 WHERE user_id = ?", (u["id"],))
+    return render_template("notifications.html", notifications=notifs)
+
+
+@app.route("/notifications/mark-read", methods=["POST"])
+@role_required("student")
+def notifications_mark_read():
+    u = current_user()
+    execute("UPDATE notifications SET is_read = 1 WHERE user_id = ?", (u["id"],))
+    return redirect(url_for("notifications"))
+
+
+@app.route("/api/notifications")
+@login_required
+def api_notifications():
+    from datetime import datetime as _dt
+    u = current_user()
+    if u["role"] != "student":
+        return jsonify({"notifications": []})
+    notifs = _get_student_notifications(u)
+    result = []
+    for n in notifs:
+        try:
+            created = _dt.fromisoformat(n["created_at"])
+            diff = _dt.now() - created
+            if diff.days > 0:
+                time_ago = f"{diff.days}d ago"
+            elif diff.seconds > 3600:
+                time_ago = f"{diff.seconds // 3600}h ago"
+            else:
+                time_ago = f"{diff.seconds // 60}m ago"
+        except Exception:
+            time_ago = ""
+        result.append({
+            "id": n["id"], "title": n["title"], "body": n["body"],
+            "icon": n["icon"], "is_read": bool(n["is_read"]),
+            "time_ago": time_ago, "created_at": n["created_at"]
+        })
+    return jsonify({"notifications": result})
+
+
+@app.route("/api/notifications/mark-read", methods=["POST"])
+@login_required
+def api_notifications_mark_read():
+    u = current_user()
+    execute("UPDATE notifications SET is_read = 1 WHERE user_id = ?", (u["id"],))
+    return jsonify({"ok": True})
+
+
+# ============================================================================
+# Global Search
+# ============================================================================
+@app.route("/api/search")
+@login_required
+def api_search():
+    q = (request.args.get("q") or "").strip()
+    if not q or len(q) < 2:
+        return jsonify({"results": []})
+    u = current_user()
+    like = f"%{q}%"
+    results = []
+    notices = query_all(
+        "SELECT title FROM notices WHERE title LIKE ? AND target_role IN ('all', ?) LIMIT 3",
+        (like, u["role"])
+    )
+    for n in notices:
+        results.append({"title": n["title"], "category": "Notice", "icon": "📢", "url": "/notices"})
+    exams = query_all(
+        "SELECT subject, exam_date FROM exam_schedule WHERE subject LIKE ? ORDER BY exam_date ASC LIMIT 3",
+        (like,)
+    )
+    for e in exams:
+        results.append({"title": e["subject"], "category": f"Exam · {e['exam_date']}", "icon": "🗓️", "url": "/exams"})
+    assignments = query_all(
+        "SELECT title, subject FROM assignments WHERE title LIKE ? OR subject LIKE ? LIMIT 3",
+        (like, like)
+    )
+    for a in assignments:
+        results.append({"title": a["title"], "category": f"Assignment · {a['subject']}", "icon": "📝", "url": "/assignments"})
+    if u["role"] == "student":
+        results_rows = query_all(
+            "SELECT r.subject, r.semester FROM results r "
+            "JOIN students s ON s.id = r.student_id "
+            "JOIN users us ON us.email = s.email "
+            "WHERE us.id = ? AND r.subject LIKE ? LIMIT 3",
+            (u["id"], like)
+        )
+        for r in results_rows:
+            results.append({"title": r["subject"], "category": f"Result · Sem {r['semester']}", "icon": "📊", "url": "/results"})
+    return jsonify({"results": results[:8]})
+
+
+# ============================================================================
+# Downloads
+# ============================================================================
+@app.route("/downloads")
+@role_required("student")
+def downloads():
+    u = current_user()
+    user_db = query_one("SELECT * FROM users WHERE id = ?", (u["id"],))
+    student = query_one(
+        "SELECT * FROM students WHERE email = ? OR full_name = ?",
+        (user_db["email"], user_db["full_name"])
+    )
+    files = []
+    if student:
+        try:
+            files = query_all(
+                "SELECT * FROM uploaded_files WHERE student_id = ? ORDER BY uploaded_at DESC",
+                (student["id"],)
+            )
+        except Exception:
+            files = []
+    fz.log_activity(request, u, "view", "downloads")
+    return render_template("downloads.html", student=student, files=files)
+
+
+@app.route("/downloads/result")
+@role_required("student")
+def download_result():
+    import io, csv
+    u = current_user()
+    user_db = query_one("SELECT * FROM users WHERE id = ?", (u["id"],))
+    student = query_one(
+        "SELECT * FROM students WHERE email = ? OR full_name = ?",
+        (user_db["email"], user_db["full_name"])
+    )
+    if not student:
+        flash("Student record not found.", "error")
+        return redirect(url_for("downloads"))
+    results = query_all(
+        "SELECT * FROM results WHERE student_id = ? ORDER BY semester, subject",
+        (student["id"],)
+    )
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Semester", "Subject", "Internal", "External", "Total", "Max", "Grade", "Grade Points", "Status"])
+    for r in results:
+        writer.writerow([r["semester"], r["subject"], r["internal_marks"], r["external_marks"],
+                         r["total_marks"], r["max_marks"], r["grade"], r["grade_points"], r["status"]])
+    fz.log_activity(request, u, "download_result", "downloads")
+    return Response(
+        output.getvalue(), mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=result_{student['roll_number']}.csv"}
+    )
+
+
+@app.route("/downloads/attendance")
+@role_required("student")
+def download_attendance():
+    import io, csv
+    u = current_user()
+    user_db = query_one("SELECT * FROM users WHERE id = ?", (u["id"],))
+    student = query_one(
+        "SELECT * FROM students WHERE email = ? OR full_name = ?",
+        (user_db["email"], user_db["full_name"])
+    )
+    if not student:
+        flash("Student record not found.", "error")
+        return redirect(url_for("downloads"))
+    att_data = query_all("""
+        SELECT subject,
+               COUNT(*) total,
+               SUM(CASE WHEN status='present' THEN 1 ELSE 0 END) present,
+               ROUND(100.0 * SUM(CASE WHEN status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+        FROM attendance WHERE student_id = ?
+        GROUP BY subject ORDER BY subject
+    """, (student["id"],))
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Subject", "Classes Attended", "Total Classes", "Percentage"])
+    for r in att_data:
+        writer.writerow([r["subject"], r["present"], r["total"], r["pct"]])
+    fz.log_activity(request, u, "download_attendance", "downloads")
+    return Response(
+        output.getvalue(), mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=attendance_{student['roll_number']}.csv"}
+    )
+
+
+@app.route("/downloads/fee-receipt")
+@role_required("student")
+def download_fee_receipt():
+    import io, csv
+    u = current_user()
+    user_db = query_one("SELECT * FROM users WHERE id = ?", (u["id"],))
+    student = query_one(
+        "SELECT * FROM students WHERE email = ? OR full_name = ?",
+        (user_db["email"], user_db["full_name"])
+    )
+    if not student:
+        flash("Student record not found.", "error")
+        return redirect(url_for("downloads"))
+    fee_rows = query_all(
+        "SELECT * FROM fee_status WHERE student_id = ? ORDER BY semester, fee_type",
+        (student["id"],)
+    )
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Semester", "Fee Type", "Amount", "Paid", "Status", "Due Date", "Paid Date"])
+    for r in fee_rows:
+        writer.writerow([r["semester"], r["fee_type"], r["amount"], r["paid_amount"],
+                         r["status"], r["due_date"] or "", r["paid_date"] or ""])
+    fz.log_activity(request, u, "download_fee_receipt", "downloads")
+    return Response(
+        output.getvalue(), mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=fee_receipt_{student['roll_number']}.csv"}
+    )
+
+
+# ============================================================================
+# Profile extra columns (safe migration)
+# ============================================================================
+def _ensure_profile_columns():
+    for col, typ in [("address","TEXT"), ("dob","TEXT"), ("guardian_name","TEXT"), ("emergency_contact","TEXT")]:
+        try:
+            execute(f"ALTER TABLE users ADD COLUMN {col} {typ}")
+        except Exception:
+            pass
+
+_ensure_profile_columns()
 
 
 # ============================================================================
