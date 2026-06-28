@@ -217,10 +217,11 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
-          {% for f in fee_rows %}
-          {% set bal      = f.amount - f.paid_amount %}
-          {% set is_soon  = f.due_date and f.status in ('pending','partial') and (f.due_date - today).days <= 2 and (f.due_date - today).days >= 0 %}
-          <tr class="hover:bg-slate-50 {{ 'bg-amber-50/40' if is_soon else '' }}">
+        {% for f in fee_rows %}
+        {% set bal = f.amount - f.paid_amount %}
+        {% set is_soon = f.is_soon %}
+
+        <tr class="hover:bg-slate-50 {{ 'bg-amber-50/40' if is_soon else '' }}">
             <td class="px-4 py-3 font-medium">
               Sem {{ f.semester }}
               {% if is_soon %}
@@ -234,12 +235,17 @@
               ₹{{ '{:,.0f}'.format(bal) }}
             </td>
             <td class="px-4 py-3 text-xs {{ 'text-amber-600 font-semibold' if is_soon else 'text-slate-500' }}">
-              {{ f.due_date or '—' }}
-              {% if is_soon and (f.due_date - today).days == 0 %}
-                <span class="block text-red-500 font-bold">TODAY!</span>
-              {% elif is_soon and (f.due_date - today).days == 1 %}
-                <span class="block text-orange-500">Tomorrow</span>
-              {% endif %}
+                {{ f.due_date or '—' }}
+
+                {% for item in student_due_soon %}
+                   {% if item.fee_type == f.fee_type and item.semester == f.semester %}
+                       {% if item.days_left == 0 %}
+                          <span class="block text-red-500 font-bold">TODAY!</span>
+                       {% elif item.days_left == 1 %}
+                         <span class="block text-orange-500">Tomorrow</span>
+                       {% endif %}
+                   {% endif %}
+                {% endfor %}
             </td>
             <td class="px-4 py-3 text-center">
               {% if f.status == 'paid' %}

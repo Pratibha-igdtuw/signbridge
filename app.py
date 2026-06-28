@@ -1228,25 +1228,40 @@ def fee_status():
             "WHERE f.student_id = ? ORDER BY f.semester, f.fee_type",
             (sid,)
         )
+        fee_rows = [dict(row) for row in fee_rows]
 
-    for f in fee_rows:                                              
-        if f["due_date"] and f["status"] in ("pending","partial"):  
-            from datetime import datetime                            
-            d = datetime.strptime(str(f["due_date"]),"%Y-%m-%d").date() 
-            days_left = (d - today).days                            
-            bal = f["amount"] - f["paid_amount"]                    
-            if 0 <= days_left <= 2 and bal > 0:                     
-                    student_due_soon.append({                            
-                        "fee_type" : f["fee_type"],                     
-                        "semester" : f["semester"],                     
-                        "balance"  : bal,                               
-                        "due_date" : f["due_date"],                     
-                        "days_left": days_left,                         
-                    })                                                   
-        if u["role"] == "admin":                                        
-            check_fee_due_dates(db, None, None, None, None)            
-            due_soon = student_due_soon                                  
+        from datetime import datetime
+
+        for f in fee_rows:
+
+    # Add a default value
+            f["is_soon"] = False
+
+            if f["due_date"] and f["status"] in ("pending", "partial"):
+
+                d = datetime.strptime(str(f["due_date"]), "%Y-%m-%d").date()
+
+                days_left = (d - today).days
+
+                balance = f["amount"] - f["paid_amount"]
+
+                if 0 <= days_left <= 2 and balance > 0:
+
+                   f["is_soon"] = True
+
+                   student_due_soon.append({
+                        "fee_type": f["fee_type"],
+                        "semester": f["semester"],
+                        "balance": balance,
+                        "due_date": f["due_date"],   # Keep it as string
+                        "days_left": days_left,
+                    })
+
+        if u["role"] == "admin":
+            check_fee_due_dates(db, None, None, None, None)
+            due_soon = student_due_soon                               
     fz.log_activity(request, u, "view", "fees")
+   
     return render_template("fee_status.html", selected_student=selected_student,
                            fee_rows=fee_rows, students=students,
                            sid=int(sid) if sid else None,
