@@ -765,7 +765,30 @@ def student_new():
              cleaned["phone"], session["user_id"]),
         )
         fz.log_activity(request, current_user(), "create", "students", f"roll={cleaned['roll_number']}")
-        flash("Student added.", "success")
+
+        # Auto-create a login account for the student
+        # Username = email prefix (before @), password = roll number
+        auto_username = cleaned["email"].split("@")[0].lower()
+        auto_password = cleaned["roll_number"]
+        existing_user = query_one("SELECT id FROM users WHERE username = ? OR email = ?",
+                                  (auto_username, cleaned["email"]))
+        if not existing_user:
+            execute(
+                "INSERT INTO users (username, email, password_hash, role, full_name, profile_complete) "
+                "VALUES (?, ?, ?, 'student', ?, 1)",
+                (auto_username, cleaned["email"],
+                 generate_password_hash(auto_password),
+                 cleaned["full_name"]),
+            )
+            flash(
+                f"Student added. Login credentials — "
+                f"Username: {auto_username} | Password: {auto_password} "
+                f"(share this with the student)",
+                "success"
+            )
+        else:
+            flash("Student added. (A login account with this email already exists.)", "success")
+
         return redirect(url_for("students"))
     return render_template("student_form.html", form={}, mode="new")
 
@@ -1027,14 +1050,23 @@ def notice_delete(nid):
 def exam_schedule():
     u = current_user()
     if u["role"] == "student":
-        user_db = query_one("SELECT branch, year FROM users WHERE id = ?", (u["id"],))
+        # Look up student record via users table email
+        user_db = query_one("SELECT email FROM users WHERE id = ?", (u["id"],))
+        student_db = query_one("SELECT department, year FROM students WHERE email = ?",
+                               (user_db["email"],)) if user_db else None
+        if student_db:
+            dept = student_db["department"] or ""
+            year = student_db["year"] or 0
+        else:
+            dept = ""
+            year = 0
         rows = query_all(
             "SELECT e.*, us.full_name created_by_name FROM exam_schedule e "
             "LEFT JOIN users us ON e.created_by = us.id "
             "WHERE (e.department IS NULL OR e.department = '' OR e.department = ?) "
             "  AND (e.year IS NULL OR e.year = 0 OR e.year = ?) "
             "ORDER BY e.exam_date ASC, e.exam_time ASC",
-            (user_db["branch"] or "", user_db["year"] or 0)
+            (dept, year)
         )
     else:
         rows = query_all(
@@ -1289,14 +1321,6 @@ def fee_update():
     fz.log_activity(request, current_user(), "update_fee", "fees", f"student={student_id}")
     flash("Fee record updated.", "success")
     return redirect(url_for("fee_status", student_id=student_id))
-
-
-@app.route("/fees/send-reminders", methods=["POST"])
-@role_required("admin")
-def send_fee_reminders():
-    flash("Fee reminder emails have been queued.", "success")
-    fz.log_activity(request, current_user(), "send_fee_reminders", "fees")
-    return redirect(url_for("fee_status"))
 
 
 # ============================================================================
