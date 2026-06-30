@@ -153,26 +153,87 @@
 
     /* ── Dark theme ── */
     html[data-theme="dark"] body { background: #0f172a !important; color: #cbd5e1 !important; }
+
+    /* Cards and surfaces */
     html[data-theme="dark"] .bg-white { background: #1e293b !important; }
     html[data-theme="dark"] .bg-slate-100 { background: #0f172a !important; }
-    html[data-theme="dark"] .bg-slate-50 { background: #1e293b !important; }
-    html[data-theme="dark"] .border-slate-200 { border-color: #334155 !important; }
-    html[data-theme="dark"] .border-slate-100 { border-color: #1e293b !important; }
+    html[data-theme="dark"] .bg-slate-50 { background: #162032 !important; }
+
+    /* Borders */
+    html[data-theme="dark"] .border-slate-200 { border-color: #2d3f55 !important; }
+    html[data-theme="dark"] .border-slate-100 { border-color: #243044 !important; }
+
+    /* Text */
     html[data-theme="dark"] .text-ink { color: #f1f5f9 !important; }
-    html[data-theme="dark"] .text-slate-800 { color: #cbd5e1 !important; }
-    html[data-theme="dark"] .text-slate-700 { color: #94a3b8 !important; }
+    html[data-theme="dark"] .text-slate-800 { color: #e2e8f0 !important; }
+    html[data-theme="dark"] .text-slate-700 { color: #cbd5e1 !important; }
     html[data-theme="dark"] .text-slate-600 { color: #94a3b8 !important; }
-    html[data-theme="dark"] .text-slate-500 { color: #64748b !important; }
-    html[data-theme="dark"] .bg-amber-50 { background: #1c1505 !important; }
-    html[data-theme="dark"] .bg-red-50 { background: #1c0606 !important; }
-    html[data-theme="dark"] .bg-teal-50 { background: #011b19 !important; }
-    html[data-theme="dark"] .notif-dropdown { background: #1e293b; border-color: #334155; }
-    html[data-theme="dark"] header { background: #1e293b !important; border-color: #334155 !important; }
-    html[data-theme="dark"] input, html[data-theme="dark"] select, html[data-theme="dark"] textarea {
-      background: #1e293b !important;
+    html[data-theme="dark"] .text-slate-500 { color: #7a8fa6 !important; }
+    html[data-theme="dark"] .text-slate-400 { color: #5a7290 !important; }
+
+    /* Low attendance table — fix red-on-red */
+    html[data-theme="dark"] .bg-red-50 { background: #2a1515 !important; }
+    html[data-theme="dark"] .border-red-200 { border-color: #5a2020 !important; }
+    html[data-theme="dark"] .text-red-700 { color: #fca5a5 !important; }
+    html[data-theme="dark"] .text-red-600 { color: #f87171 !important; }
+    html[data-theme="dark"] .text-red-500 { color: #f87171 !important; }
+
+    /* Teal/success */
+    html[data-theme="dark"] .bg-teal-50 { background: #0d2420 !important; }
+    html[data-theme="dark"] .text-teal-800 { color: #5eead4 !important; }
+    html[data-theme="dark"] .text-teal-600 { color: #2dd4bf !important; }
+
+    /* Amber */
+    html[data-theme="dark"] .bg-amber-50 { background: #1f1a08 !important; }
+    html[data-theme="dark"] .text-amber-600 { color: #fbbf24 !important; }
+
+    /* Stat cards on dashboard */
+    html[data-theme="dark"] .divide-slate-100 > * { border-color: #243044 !important; }
+    html[data-theme="dark"] .divide-y > * + * { border-color: #243044 !important; }
+
+    /* Table rows */
+    html[data-theme="dark"] tr:hover { background: #243044 !important; }
+    html[data-theme="dark"] thead tr { border-color: #2d3f55 !important; }
+    html[data-theme="dark"] tbody tr { border-color: #1e2d3d !important; }
+
+    /* Table text — fix near-invisible hash columns */
+    html[data-theme="dark"] td { color: #94a3b8 !important; }
+    html[data-theme="dark"] th { color: #64748b !important; }
+    html[data-theme="dark"] td.font-medium, html[data-theme="dark"] td strong { color: #cbd5e1 !important; }
+
+    /* Inputs */
+    html[data-theme="dark"] input:not([disabled]),
+    html[data-theme="dark"] select,
+    html[data-theme="dark"] textarea {
+      background: #162032 !important;
       color: #cbd5e1 !important;
-      border-color: #475569 !important;
+      border-color: #2d3f55 !important;
     }
+    html[data-theme="dark"] input[disabled] {
+      background: #0f172a !important;
+      color: #4a5568 !important;
+    }
+
+    /* Header */
+    html[data-theme="dark"] header { background: #1e293b !important; border-color: #2d3f55 !important; }
+
+    /* Notification dropdown */
+    html[data-theme="dark"] .notif-dropdown { background: #1e293b !important; border-color: #2d3f55 !important; }
+    html[data-theme="dark"] .notif-dropdown .border-slate-100 { border-color: #243044 !important; }
+
+    /* Search results dropdown */
+    html[data-theme="dark"] #search-results { background: #1e293b !important; border-color: #2d3f55 !important; }
+    html[data-theme="dark"] #search-results a:hover { background: #243044 !important; }
+
+    /* Badge pills */
+    html[data-theme="dark"] .bg-slate-100 { background: #243044 !important; }
+    html[data-theme="dark"] .text-slate-600 { color: #94a3b8 !important; }
+
+    /* Student dropdown picker */
+    html[data-theme="dark"] #student-dropdown { background: #1e293b !important; border-color: #2d3f55 !important; }
+    html[data-theme="dark"] .hover\:bg-slate-50:hover { background: #243044 !important; }
+    html[data-theme="dark"] .hover\:bg-teal-50:hover { background: #0d2420 !important; }
+    
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen">
@@ -233,6 +294,8 @@
           {{ nav('assignments', 'Assignments', '📝') }}
           {{ nav('results', 'Results', '📊') }}
           {{ nav('sgpa', 'SGPA Calculator', '🎓') }}
+          {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
+          {{ nav('syllabus.admin_index', 'Manage Syllabus', '⚙️') }}
         </div>
 
         <!-- COMMUNICATION -->
@@ -314,6 +377,7 @@
           {{ nav('assignments', 'Assignments', '📝') }}
           {{ nav('results', 'Results', '📊') }}
           {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
+          {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
         </div>
 
         <!-- COMMUNICATION -->
@@ -361,6 +425,7 @@
           {{ nav('assignments', 'Assignments', '📝') }}
           {{ nav('results', 'My Results', '📊') }}
           {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
+          {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
         </div>
 
         <!-- INFORMATION -->

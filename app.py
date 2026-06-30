@@ -37,6 +37,7 @@ import security as sec
 import forensics as fz
 from auth import (login_required, role_required, jwt_required, current_user,
                   issue_jwt)
+
 from late_fee_system import (
     apply_fines_to_fee_rows,
     get_student_fine_summary,
@@ -47,6 +48,9 @@ from late_fee_system import (
     FINE_WEEK_3,
 )
 from fee_due_notification import check_fee_due_dates
+from syllabus import syllabus_bp, init_syllabus_db
+
+
 app = Flask(__name__)
 app.config.from_object(Config)
 csrf = CSRFProtect(app)
@@ -64,6 +68,9 @@ db.init_db()
 db.seed()
 db.seed_extras()
 db.seed_courses()
+
+app.register_blueprint(syllabus_bp)
+init_syllabus_db()
 
 
 @app.context_processor
@@ -763,18 +770,55 @@ def student_new():
                 break
         if query_one("SELECT id FROM students WHERE roll_number = ?", (cleaned["roll_number"],)):
             errors.append("A student with that roll number already exists.")
+
+        programme = (request.form.get("programme") or "").strip()
+        current_semester = request.form.get("current_semester") or None
+        valid_programmes = {"B.Tech", "M.Tech", "MCA", "BCA", "B.Sc", "M.Sc"}
+        if programme and programme not in valid_programmes:
+            errors.append("Invalid programme selected.")
+        try:
+            current_semester = int(current_semester) if current_semester else None
+            if current_semester and not (1 <= current_semester <= 8):
+                errors.append("Current semester must be between 1 and 8.")
+        except (TypeError, ValueError):
+            current_semester = None
+
         if errors:
             for e in errors: flash(e, "error")
             return render_template("student_form.html", form=request.form, mode="new")
         sid = execute(
-            "INSERT INTO students (roll_number, full_name, email, department, year, cgpa, phone, created_by) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO students (roll_number, full_name, email, department, year, cgpa, phone, "
+            "created_by, programme, current_semester) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (cleaned["roll_number"], cleaned["full_name"], cleaned["email"],
              cleaned["department"], cleaned["year"], cleaned["cgpa"],
-             cleaned["phone"], session["user_id"]),
+             cleaned["phone"], session["user_id"], programme or None, current_semester),
         )
         fz.log_activity(request, current_user(), "create", "students", f"roll={cleaned['roll_number']}")
-        flash("Student added.", "success")
+
+        # Auto-create a login account for the student
+        # Username = email prefix (before @), password = roll number
+        auto_username = cleaned["email"].split("@")[0].lower()
+        auto_password = cleaned["roll_number"]
+        existing_user = query_one("SELECT id FROM users WHERE username = ? OR email = ?",
+                                  (auto_username, cleaned["email"]))
+        if not existing_user:
+            execute(
+                "INSERT INTO users (username, email, password_hash, role, full_name, profile_complete) "
+                "VALUES (?, ?, ?, 'student', ?, 1)",
+                (auto_username, cleaned["email"],
+                 generate_password_hash(auto_password),
+                 cleaned["full_name"]),
+            )
+            flash(
+                f"Student added. Login credentials — "
+                f"Username: {auto_username} | Password: {auto_password} "
+                f"(share this with the student)",
+                "success"
+            )
+        else:
+            flash("Student added. (A login account with this email already exists.)", "success")
+
         return redirect(url_for("students"))
     return render_template("student_form.html", form={}, mode="new")
 
@@ -789,16 +833,31 @@ def student_edit(sid):
         clash = query_one("SELECT id FROM students WHERE roll_number = ? AND id != ?",
                           (cleaned["roll_number"], sid))
         if clash: errors.append("Another student already has that roll number.")
+
+        programme = (request.form.get("programme") or "").strip()
+        current_semester = request.form.get("current_semester") or None
+        valid_programmes = {"B.Tech", "M.Tech", "MCA", "BCA", "B.Sc", "M.Sc"}
+        if programme and programme not in valid_programmes:
+            errors.append("Invalid programme selected.")
+        try:
+            current_semester = int(current_semester) if current_semester else None
+            if current_semester and not (1 <= current_semester <= 8):
+                errors.append("Current semester must be between 1 and 8.")
+        except (TypeError, ValueError):
+            current_semester = None
+
         if errors:
             for e in errors: flash(e, "error")
             return render_template("student_form.html", form=request.form, mode="edit", sid=sid)
         execute(
             "UPDATE students SET roll_number=?, full_name=?, email=?, department=?, "
-            "year=?, cgpa=?, phone=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            "year=?, cgpa=?, phone=?, programme=?, current_semester=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
             (cleaned["roll_number"], cleaned["full_name"], cleaned["email"],
-             cleaned["department"], cleaned["year"], cleaned["cgpa"], cleaned["phone"], sid),
+             cleaned["department"], cleaned["year"], cleaned["cgpa"], cleaned["phone"],
+             programme or None, current_semester, sid),
         )
-        fz.log_activity(request, current_user(), "update", "students", f"id={sid}")
+        fz.log_activity(request, current_user(), "update", "students",
+                        f"id={sid} programme={programme} current_semester={current_semester}")
         flash("Student updated.", "success")
         return redirect(url_for("students"))
     return render_template("student_form.html", form=dict(student), mode="edit", sid=sid)
@@ -1036,14 +1095,23 @@ def notice_delete(nid):
 def exam_schedule():
     u = current_user()
     if u["role"] == "student":
-        user_db = query_one("SELECT branch, year FROM users WHERE id = ?", (u["id"],))
+        # Look up student record via users table email
+        user_db = query_one("SELECT email FROM users WHERE id = ?", (u["id"],))
+        student_db = query_one("SELECT department, year FROM students WHERE email = ?",
+                               (user_db["email"],)) if user_db else None
+        if student_db:
+            dept = student_db["department"] or ""
+            year = student_db["year"] or 0
+        else:
+            dept = ""
+            year = 0
         rows = query_all(
             "SELECT e.*, us.full_name created_by_name FROM exam_schedule e "
             "LEFT JOIN users us ON e.created_by = us.id "
             "WHERE (e.department IS NULL OR e.department = '' OR e.department = ?) "
             "  AND (e.year IS NULL OR e.year = 0 OR e.year = ?) "
             "ORDER BY e.exam_date ASC, e.exam_time ASC",
-            (user_db["branch"] or "", user_db["year"] or 0)
+            (dept, year)
         )
     else:
         rows = query_all(
@@ -1110,7 +1178,31 @@ def results():
             (user_db["email"], user_db["full_name"])
         )
         sid = selected_student["id"] if selected_student else None
+    elif u["role"] == "faculty":
+        # Only show students enrolled in this faculty's courses
+        students = query_all("""
+            SELECT DISTINCT s.id, s.roll_number, s.full_name
+            FROM students s
+            JOIN enrollments e ON e.student_id = s.id
+            JOIN course_faculty cf ON cf.course_id = e.course_id
+            WHERE cf.faculty_id = ?
+            ORDER BY s.roll_number
+        """, (u["id"],))
+        sid = request.args.get("student_id") or None
+        if sid:
+            # Verify this student actually belongs to the faculty before allowing access
+            allowed = query_one("""
+                SELECT s.id FROM students s
+                JOIN enrollments e ON e.student_id = s.id
+                JOIN course_faculty cf ON cf.course_id = e.course_id
+                WHERE cf.faculty_id = ? AND s.id = ?
+            """, (u["id"], sid))
+            if allowed:
+                selected_student = query_one("SELECT * FROM students WHERE id = ?", (sid,))
+            else:
+                sid = None
     else:
+        # Admin sees all students
         students = query_all("SELECT id, roll_number, full_name FROM students ORDER BY roll_number")
         sid = request.args.get("student_id") or None
         if sid:
@@ -1708,18 +1800,36 @@ def course_bulk_enroll(cid):
 @app.route("/low-attendance")
 @role_required("admin", "faculty")
 def low_attendance_report():
-    low_att = query_all("""
-        SELECT s.full_name, s.roll_number, s.email, s.department, s.year, att.subject,
-               SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
-               COUNT(*) AS total,
-               ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
-        FROM attendance att
-        JOIN students s ON s.id = att.student_id
-        GROUP BY att.student_id, att.subject
-        HAVING pct < 75
-        ORDER BY pct ASC
-    """)
-    fz.log_activity(request, current_user(), "view_low_attendance", "attendance")
+    u = current_user()
+    if u["role"] == "faculty":
+        low_att = query_all("""
+            SELECT s.full_name, s.roll_number, s.email, s.department, s.year, att.subject,
+                   SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
+                   COUNT(*) AS total,
+                   ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+            FROM attendance att
+            JOIN students s ON s.id = att.student_id
+            JOIN enrollments e ON e.student_id = s.id
+            JOIN course_faculty cf ON cf.course_id = e.course_id
+            WHERE cf.faculty_id = ?
+            GROUP BY att.student_id, att.subject
+            HAVING pct < 75
+            ORDER BY pct ASC
+        """, (u["id"],))
+    else:
+        # Admin sees all students
+        low_att = query_all("""
+            SELECT s.full_name, s.roll_number, s.email, s.department, s.year, att.subject,
+                   SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
+                   COUNT(*) AS total,
+                   ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+            FROM attendance att
+            JOIN students s ON s.id = att.student_id
+            GROUP BY att.student_id, att.subject
+            HAVING pct < 75
+            ORDER BY pct ASC
+        """)
+    fz.log_activity(request, u, "view_low_attendance", "attendance")
     return render_template("low_attendance.html", low_att=low_att)
 
 
@@ -1727,17 +1837,34 @@ def low_attendance_report():
 @role_required("admin", "faculty")
 def low_attendance_export():
     import csv, io
-    low_att = query_all("""
-        SELECT s.full_name, s.roll_number, s.department, s.year, att.subject,
-               SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
-               COUNT(*) AS total,
-               ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
-        FROM attendance att
-        JOIN students s ON s.id = att.student_id
-        GROUP BY att.student_id, att.subject
-        HAVING pct < 75
-        ORDER BY pct ASC
-    """)
+    u = current_user()
+    if u["role"] == "faculty":
+        low_att = query_all("""
+            SELECT s.full_name, s.roll_number, s.department, s.year, att.subject,
+                   SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
+                   COUNT(*) AS total,
+                   ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+            FROM attendance att
+            JOIN students s ON s.id = att.student_id
+            JOIN enrollments e ON e.student_id = s.id
+            JOIN course_faculty cf ON cf.course_id = e.course_id
+            WHERE cf.faculty_id = ?
+            GROUP BY att.student_id, att.subject
+            HAVING pct < 75
+            ORDER BY pct ASC
+        """, (u["id"],))
+    else:
+        low_att = query_all("""
+            SELECT s.full_name, s.roll_number, s.department, s.year, att.subject,
+                   SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
+                   COUNT(*) AS total,
+                   ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+            FROM attendance att
+            JOIN students s ON s.id = att.student_id
+            GROUP BY att.student_id, att.subject
+            HAVING pct < 75
+            ORDER BY pct ASC
+        """)
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["Student Name", "Roll No", "Department", "Year", "Subject", "Present", "Total", "Attendance %"])
@@ -1764,15 +1891,30 @@ def low_attendance_email():
     body_template = (data.get("body") or "").strip()
     roll_numbers  = data.get("roll_numbers")
 
-    low_att = query_all("""
-        SELECT s.full_name, s.roll_number, s.email, s.department, s.year, att.subject,
-               ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
-        FROM attendance att
-        JOIN students s ON s.id = att.student_id
-        GROUP BY att.student_id, att.subject
-        HAVING pct < 75
-        ORDER BY pct ASC
-    """)
+    u = current_user()
+    if u["role"] == "faculty":
+        low_att = query_all("""
+            SELECT s.full_name, s.roll_number, s.email, s.department, s.year, att.subject,
+                   ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+            FROM attendance att
+            JOIN students s ON s.id = att.student_id
+            JOIN enrollments e ON e.student_id = s.id
+            JOIN course_faculty cf ON cf.course_id = e.course_id
+            WHERE cf.faculty_id = ?
+            GROUP BY att.student_id, att.subject
+            HAVING pct < 75
+            ORDER BY pct ASC
+        """, (u["id"],))
+    else:
+        low_att = query_all("""
+            SELECT s.full_name, s.roll_number, s.email, s.department, s.year, att.subject,
+                   ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+            FROM attendance att
+            JOIN students s ON s.id = att.student_id
+            GROUP BY att.student_id, att.subject
+            HAVING pct < 75
+            ORDER BY pct ASC
+        """)
 
     from collections import defaultdict
     students_map = defaultdict(lambda: {"subjects": [], "email": "", "name": "", "dept": "", "year": ""})

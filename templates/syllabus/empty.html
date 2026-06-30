@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Not Available{% endblock %}
+{% block heading %}Scheme & Syllabus{% endblock %}
+{% block content %}
+<nav class="flex items-center gap-2 text-xs text-slate-400 mb-5">
+  <a href="{{ url_for('syllabus.index') }}" class="hover:text-signal">Scheme & Syllabus</a>
+  <span>›</span>
+  <a href="{{ url_for('syllabus.semester_subjects', semester=subject.semester) }}"
+     class="hover:text-signal">{{ label }}</a>
+  <span>›</span>
+  <span class="text-slate-600">{{ subject.subject_name }}</span>
+</nav>
+<div class="bg-white rounded-xl border border-slate-200 px-6 py-20 text-center slide-up max-w-lg mx-auto">
+  <div class="text-5xl mb-4">📄</div>
+  <div class="text-base font-semibold text-slate-700 mb-1">No syllabus uploaded yet</div>
+  <div class="text-sm text-slate-400 mb-5">
+    The {{ 'Teaching Scheme' if doc_type == 'scheme' else 'Syllabus' }} for
+    <strong>{{ subject.subject_name }}</strong> hasn't been uploaded yet.
+    Please check back later or contact your administrator.
+  </div>
+  <a href="{{ url_for('syllabus.semester_subjects', semester=subject.semester) }}"
+     class="inline-flex items-center gap-2 bg-signal hover:bg-teal-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+    ← Back to {{ label }}
+  </a>
+</div>
+{% endblock %}

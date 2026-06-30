@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Scheme & Syllabus{% endblock %}
+{% block heading %}Scheme & Syllabus{% endblock %}
+{% block content %}
+
+<style>
+.sem-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.sem-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.10); }
+.d1{animation-delay:.05s}.d2{animation-delay:.1s}.d3{animation-delay:.15s}
+.d4{animation-delay:.2s}.d5{animation-delay:.25s}.d6{animation-delay:.3s}
+.d7{animation-delay:.35s}.d8{animation-delay:.4s}
+</style>
+
+{% if student_locked %}
+<!-- Incomplete profile warning -->
+<div class="bg-white rounded-xl border border-amber-200 px-6 py-16 text-center slide-up max-w-lg mx-auto">
+  <div class="text-5xl mb-4">⚠️</div>
+  <div class="text-base font-semibold text-slate-700 mb-1">Academic Profile Incomplete</div>
+  <div class="text-sm text-slate-400 mb-2">
+    Your Programme, Department or Semester hasn't been set up yet.
+    Scheme & Syllabus content is matched to your academic profile, so please
+    contact your administrator to complete it before you can browse.
+  </div>
+</div>
+{% else %}
+
+{% if user.role == 'student' and student %}
+<div class="mb-5 flex items-center gap-2 flex-wrap">
+  <span class="text-xs bg-teal-50 text-teal-700 px-3 py-1 rounded-full font-medium">{{ student.programme }}</span>
+  <span class="text-xs bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-medium">{{ student.department }}</span>
+  {% if student.current_semester %}
+  <span class="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-medium">
+    {{ semester_labels.get(student.current_semester, '') }}
+  </span>
+  {% endif %}
+  <span class="text-xs text-slate-400">Showing subjects for your enrolled Programme & Department only</span>
+</div>
+{% endif %}
+
+<!-- Search bar -->
+<div class="mb-6 slide-up d1">
+  <form action="{{ url_for('syllabus.search') }}" method="get" class="flex gap-3 max-w-xl">
+    <input name="q" type="text" placeholder="🔍 Search subject or course code…"
+           class="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-sm
+                  focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+    <select name="sem" class="rounded-lg border border-slate-300 px-3 py-2.5 text-sm
+                               focus:border-signal outline-none">
+      <option value="">All Semesters</option>
+      {% for n, label in semester_labels.items() %}
+      <option value="{{ n }}">{{ label }}</option>
+      {% endfor %}
+    </select>
+    <button class="bg-signal hover:bg-teal-700 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition">
+      Search
+    </button>
+  </form>
+</div>
+
+<!-- Semester Grid -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+  {% set delay_classes = ['d1','d2','d3','d4','d5','d6','d7','d8'] %}
+  {% for n, label in semester_labels.items() %}
+  {% set count = counts.get(n, 0) %}
+  <a href="{{ url_for('syllabus.semester_subjects', semester=n) }}"
+     class="sem-card slide-up {{ delay_classes[loop.index0] }} bg-white rounded-xl border border-slate-200 p-5 flex flex-col gap-3 group">
+    <div class="flex items-center justify-between">
+      <span class="text-2xl">📚</span>
+      {% if count > 0 %}
+      <span class="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full font-semibold">
+        {{ count }} subject{{ 's' if count != 1 else '' }}
+      </span>
+      {% else %}
+      <span class="text-xs bg-slate-100 text-slate-400 px-2 py-0.5 rounded-full">Empty</span>
+      {% endif %}
+    </div>
+    <div>
+      <div class="font-semibold text-ink text-sm group-hover:text-signal transition">{{ label }}</div>
+      <div class="text-xs text-slate-400 mt-0.5">
+        {% if count > 0 %}{{ count }} subject{{ 's' if count != 1 else '' }} available{% else %}No uploads yet{% endif %}
+      </div>
+    </div>
+    <div class="text-xs text-signal font-medium">View subjects →</div>
+  </a>
+  {% endfor %}
+</div>
+
+<!-- Recently Viewed -->
+{% if recently %}
+<div class="bg-white rounded-xl border border-slate-200 p-5 slide-up">
+  <h2 class="text-sm font-semibold text-ink mb-4">🕐 Recently Viewed</h2>
+  <div class="flex flex-wrap gap-2">
+    {% for r in recently %}
+    <a href="{{ url_for('syllabus.view_pdf', subject_id=r.subject_id, doc_type=r.doc_type) }}"
+       class="flex items-center gap-2 px-3 py-1.5 bg-slate-50 hover:bg-teal-50 border border-slate-200
+              hover:border-teal-300 rounded-lg text-xs text-slate-600 hover:text-teal-700 transition">
+      <span>{{ '📋' if r.doc_type == 'scheme' else '📄' }}</span>
+      {{ r.subject_name }}
+      <span class="text-slate-400">Sem {{ r.semester }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if user.role == 'admin' %}
+<div class="mt-6 slide-up">
+  <a href="{{ url_for('syllabus.admin_index') }}"
+     class="inline-flex items-center gap-2 bg-ink hover:bg-steel text-white text-sm font-medium px-5 py-2.5 rounded-lg transition">
+    ⚙️ Manage Scheme & Syllabus
+  </a>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

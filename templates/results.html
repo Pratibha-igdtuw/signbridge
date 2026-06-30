@@ -3,6 +3,13 @@
 {% block heading %}Results &amp; Marksheet{% endblock %}
 {% block content %}
 
+<style>
+.sms-scroll::-webkit-scrollbar { width: 4px; }
+.sms-scroll::-webkit-scrollbar-track { background: transparent; }
+.sms-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+.sms-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.sms-scroll { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+</style>
 <div class="grid lg:grid-cols-3 gap-6">
   <!-- Left: controls + post result form -->
   <div class="space-y-5">
@@ -30,7 +37,7 @@
             onclick="clearSearch()">✕</span>
         </div>
         <div id="student-dropdown"
-             class="hidden absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+             class="hidden absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg max-h-72 overflow-y-auto sms-scroll">
           <div id="student-list">
             <div class="student-option px-3 py-2 text-sm text-slate-400 cursor-pointer hover:bg-slate-50"
                  data-value="" data-label="— Choose student —"
