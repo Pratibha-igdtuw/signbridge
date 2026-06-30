@@ -37,7 +37,16 @@ import security as sec
 import forensics as fz
 from auth import (login_required, role_required, jwt_required, current_user,
                   issue_jwt)
-
+from late_fee_system import (
+    apply_fines_to_fee_rows,
+    get_student_fine_summary,
+    check_and_notify_fines,
+    GRACE_DAYS,
+    FINE_WEEK_1,
+    FINE_WEEK_2,
+    FINE_WEEK_3,
+)
+from fee_due_notification import check_fee_due_dates
 app = Flask(__name__)
 app.config.from_object(Config)
 csrf = CSRFProtect(app)
@@ -1185,14 +1194,18 @@ def result_delete(rid):
 # ============================================================================
 # Fee Status
 # ============================================================================
-@app.route("/fees")
+@app.route("/fee_status")
 @login_required
 def fee_status():
     u = current_user()
     selected_student = None
-    fee_rows = []
-    students = []
-
+    fee_rows         = []
+    fine_summary     = {}
+    students         = []
+    today            = date.today()
+    due_soon         = []
+    student_due_soon = []
+ 
     if u["role"] == "student":
         user_db = query_one("SELECT * FROM users WHERE id = ?", (u["id"],))
         selected_student = query_one(
@@ -1201,68 +1214,107 @@ def fee_status():
         )
         sid = selected_student["id"] if selected_student else None
     else:
-        students = query_all("SELECT id, roll_number, full_name FROM students ORDER BY roll_number")
+        students = query_all(
+            "SELECT id, roll_number, full_name FROM students ORDER BY roll_number"
+        )
         sid = request.args.get("student_id") or None
         if sid:
-            selected_student = query_one("SELECT * FROM students WHERE id = ?", (sid,))
-    today            = date.today()          
-    due_soon         = []                    
-    student_due_soon = []                    
-
-
+            selected_student = query_one(
+                "SELECT * FROM students WHERE id = ?", (sid,)
+            )
+ 
     if sid:
-        fee_rows = query_all(
+        raw_fees = query_all(
             "SELECT f.*, u.full_name updated_by_name FROM fee_status f "
             "LEFT JOIN users u ON f.updated_by = u.id "
             "WHERE f.student_id = ? ORDER BY f.semester, f.fee_type",
             (sid,)
         )
-        fee_rows = [dict(row) for row in fee_rows]
-
-        from datetime import datetime
-
+ 
+        # ── Apply fine calculation to every fee row ──
+        fee_rows     = apply_fines_to_fee_rows(raw_fees)
+        fine_summary = get_student_fine_summary(fee_rows)
+ 
+        # Due-soon warnings (within 2 days)
         for f in fee_rows:
-
-    # Add a default value
-            f["is_soon"] = False
-
             if f["due_date"] and f["status"] in ("pending", "partial"):
-
-                d = datetime.strptime(str(f["due_date"]), "%Y-%m-%d").date()
-
-                days_left = (d - today).days
-
-                balance = f["amount"] - f["paid_amount"]
-
-                if 0 <= days_left <= 2 and balance > 0:
-
-                   f["is_soon"] = True
-
-                   student_due_soon.append({
-                        "fee_type": f["fee_type"],
-                        "semester": f["semester"],
-                        "balance": balance,
-                        "due_date": f["due_date"],   # Keep it as string
-                        "days_left": days_left,
-                    })
-
+                try:
+                    from datetime import datetime as _dt
+                    due_d     = _dt.strptime(str(f["due_date"]), "%Y-%m-%d").date()
+                    days_left = (due_d - today).days
+                    if 0 <= days_left <= 2 and f["balance"] > 0:
+                        student_due_soon.append({
+                            "fee_type" : f["fee_type"],
+                            "semester" : f["semester"],
+                            "balance"  : f["balance"],
+                            "due_date" : f["due_date"],
+                            "days_left": days_left,
+                        })
+                except (ValueError, TypeError):
+                    pass
+ 
+        # Admin: scan all students for due-soon banner
         if u["role"] == "admin":
-            check_fee_due_dates(db, None, None, None, None)
-            due_soon = student_due_soon                               
+            all_due_rows = query_all(
+                "SELECT f.*, s.full_name student_name, s.roll_number "
+                "FROM fee_status f "
+                "JOIN students s ON s.id = f.student_id "
+                "WHERE f.due_date IS NOT NULL "
+                "  AND f.status IN ('pending','partial') "
+                "ORDER BY f.due_date ASC"
+            )
+            for f in all_due_rows:
+                try:
+                    from datetime import datetime as _dt
+                    due_d     = _dt.strptime(str(f["due_date"]), "%Y-%m-%d").date()
+                    days_left = (due_d - today).days
+                    bal       = f["amount"] - f["paid_amount"]
+                    if 0 <= days_left <= 2 and bal > 0:
+                        due_soon.append({
+                            "student"  : f["student_name"],
+                            "roll"     : f["roll_number"],
+                            "fee_type" : f["fee_type"],
+                            "semester" : f["semester"],
+                            "balance"  : bal,
+                            "due_date" : f["due_date"],
+                            "days_left": days_left,
+                        })
+                except (ValueError, TypeError):
+                    pass
+ 
     fz.log_activity(request, u, "view", "fees")
-   
-    return render_template("fee_status.html", selected_student=selected_student,
-                           fee_rows=fee_rows, students=students,
-                           sid=int(sid) if sid else None,
-                           due_soon=due_soon,                
-                           student_due_soon=student_due_soon,
-                           today=today,                      
-                           )
+    return render_template(
+        "fee_status.html",
+        selected_student = selected_student,
+        fee_rows         = fee_rows,
+        fine_summary     = fine_summary,
+        students         = students,
+        sid              = int(sid) if sid else None,
+        today            = today,
+        due_soon         = due_soon,
+        student_due_soon = student_due_soon,
+        GRACE_DAYS       = GRACE_DAYS,
+        FINE_WEEK_1      = FINE_WEEK_1,
+        FINE_WEEK_2      = FINE_WEEK_2,
+        FINE_WEEK_3      = FINE_WEEK_3,
+    )
+ 
 @app.route("/fees/send-reminders", methods=["POST"])
 @role_required("admin")
 def send_fee_reminders():
-    count = check_fee_due_dates(db, None, None, None, None)
-    flash(f"{count} fee reminder notification(s) sent.", "success")
+    from late_fee_system import check_and_notify_fines
+    from fee_due_notification import check_fee_due_dates
+ 
+    due_count = check_fee_due_dates(db, None, None, None, None)
+    fine_count = check_and_notify_fines(admin_user_id=session["user_id"])
+ 
+    fz.log_activity(request, current_user(), "send_fee_reminders", "fees",
+                    f"due={due_count} fines={fine_count}")
+    flash(
+        f"✅ {due_count} due-date reminder(s) and "
+        f"{fine_count} late-fine notice(s) posted to students.",
+        "success"
+    )
     return redirect(url_for("fee_status"))
 
 @app.route("/fees/update", methods=["POST"])
@@ -1275,28 +1327,32 @@ def fee_update():
     paid_amount = request.form.get("paid_amount") or 0
     due_date    = (request.form.get("due_date") or "").strip()
     remarks     = (request.form.get("remarks") or "").strip()
+    waive_fine  = bool(request.form.get("waive_fine"))   # ← NEW
+ 
     if not all([student_id, semester]):
         flash("Student and semester are required.", "error")
         return redirect(url_for("fee_status"))
-    amt  = float(amount)
-    paid = float(paid_amount)
+ 
+    amt    = float(amount)
+    paid   = float(paid_amount)
     status = "paid" if paid >= amt else ("partial" if paid > 0 else "pending")
+ 
+    # If admin waives fine, note it in remarks
+    if waive_fine:
+        remarks = (remarks + " | Fine waived by admin").strip(" |")
+ 
     execute(
-        "INSERT OR REPLACE INTO fee_status (student_id, semester, fee_type, amount, paid_amount, "
-        "due_date, status, remarks, updated_by) VALUES (?,?,?,?,?,?,?,?,?)",
-        (int(student_id), int(semester), fee_type, amt, paid, due_date, status, remarks, session["user_id"])
+        "INSERT OR REPLACE INTO fee_status "
+        "(student_id, semester, fee_type, amount, paid_amount, "
+        "due_date, status, remarks, updated_by) "
+        "VALUES (?,?,?,?,?,?,?,?,?)",
+        (int(student_id), int(semester), fee_type, amt, paid,
+         due_date, status, remarks, session["user_id"])
     )
-    fz.log_activity(request, current_user(), "update_fee", "fees", f"student={student_id}")
+    fz.log_activity(request, current_user(), "update_fee", "fees",
+                    f"student={student_id} waive_fine={waive_fine}")
     flash("Fee record updated.", "success")
     return redirect(url_for("fee_status", student_id=student_id))
-
-
-@app.route("/fees/send-reminders", methods=["POST"])
-@role_required("admin")
-def send_fee_reminders():
-    flash("Fee reminder emails have been queued.", "success")
-    fz.log_activity(request, current_user(), "send_fee_reminders", "fees")
-    return redirect(url_for("fee_status"))
 
 
 # ============================================================================
