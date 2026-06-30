@@ -37,6 +37,7 @@ import security as sec
 import forensics as fz
 from auth import (login_required, role_required, jwt_required, current_user,
                   issue_jwt)
+from syllabus import syllabus_bp, init_syllabus_db
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -55,6 +56,9 @@ db.init_db()
 db.seed()
 db.seed_extras()
 db.seed_courses()
+
+app.register_blueprint(syllabus_bp)
+init_syllabus_db()
 
 
 @app.context_processor
@@ -754,15 +758,29 @@ def student_new():
                 break
         if query_one("SELECT id FROM students WHERE roll_number = ?", (cleaned["roll_number"],)):
             errors.append("A student with that roll number already exists.")
+
+        programme = (request.form.get("programme") or "").strip()
+        current_semester = request.form.get("current_semester") or None
+        valid_programmes = {"B.Tech", "M.Tech", "MCA", "BCA", "B.Sc", "M.Sc"}
+        if programme and programme not in valid_programmes:
+            errors.append("Invalid programme selected.")
+        try:
+            current_semester = int(current_semester) if current_semester else None
+            if current_semester and not (1 <= current_semester <= 8):
+                errors.append("Current semester must be between 1 and 8.")
+        except (TypeError, ValueError):
+            current_semester = None
+
         if errors:
             for e in errors: flash(e, "error")
             return render_template("student_form.html", form=request.form, mode="new")
         sid = execute(
-            "INSERT INTO students (roll_number, full_name, email, department, year, cgpa, phone, created_by) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO students (roll_number, full_name, email, department, year, cgpa, phone, "
+            "created_by, programme, current_semester) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (cleaned["roll_number"], cleaned["full_name"], cleaned["email"],
              cleaned["department"], cleaned["year"], cleaned["cgpa"],
-             cleaned["phone"], session["user_id"]),
+             cleaned["phone"], session["user_id"], programme or None, current_semester),
         )
         fz.log_activity(request, current_user(), "create", "students", f"roll={cleaned['roll_number']}")
 
@@ -803,16 +821,31 @@ def student_edit(sid):
         clash = query_one("SELECT id FROM students WHERE roll_number = ? AND id != ?",
                           (cleaned["roll_number"], sid))
         if clash: errors.append("Another student already has that roll number.")
+
+        programme = (request.form.get("programme") or "").strip()
+        current_semester = request.form.get("current_semester") or None
+        valid_programmes = {"B.Tech", "M.Tech", "MCA", "BCA", "B.Sc", "M.Sc"}
+        if programme and programme not in valid_programmes:
+            errors.append("Invalid programme selected.")
+        try:
+            current_semester = int(current_semester) if current_semester else None
+            if current_semester and not (1 <= current_semester <= 8):
+                errors.append("Current semester must be between 1 and 8.")
+        except (TypeError, ValueError):
+            current_semester = None
+
         if errors:
             for e in errors: flash(e, "error")
             return render_template("student_form.html", form=request.form, mode="edit", sid=sid)
         execute(
             "UPDATE students SET roll_number=?, full_name=?, email=?, department=?, "
-            "year=?, cgpa=?, phone=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            "year=?, cgpa=?, phone=?, programme=?, current_semester=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
             (cleaned["roll_number"], cleaned["full_name"], cleaned["email"],
-             cleaned["department"], cleaned["year"], cleaned["cgpa"], cleaned["phone"], sid),
+             cleaned["department"], cleaned["year"], cleaned["cgpa"], cleaned["phone"],
+             programme or None, current_semester, sid),
         )
-        fz.log_activity(request, current_user(), "update", "students", f"id={sid}")
+        fz.log_activity(request, current_user(), "update", "students",
+                        f"id={sid} programme={programme} current_semester={current_semester}")
         flash("Student updated.", "success")
         return redirect(url_for("students"))
     return render_template("student_form.html", form=dict(student), mode="edit", sid=sid)

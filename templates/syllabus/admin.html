@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+{% block title %}Manage Scheme & Syllabus{% endblock %}
+{% block heading %}Scheme & Syllabus Management{% endblock %}
+{% block content %}
+
+<style>
+.d1{animation-delay:.05s}.d2{animation-delay:.1s}.d3{animation-delay:.15s}
+</style>
+
+<div class="flex items-center justify-between mb-5">
+  <a href="{{ url_for('syllabus.index') }}" class="text-xs text-signal hover:underline">← Student View</a>
+</div>
+
+<!-- Add Subject Form -->
+<div class="bg-white rounded-xl border border-slate-200 p-5 mb-6 slide-up d1">
+  <h2 class="text-sm font-semibold text-ink mb-4">➕ Add New Subject</h2>
+  <form method="post" action="{{ url_for('syllabus.admin_subject_new') }}" class="grid grid-cols-2 md:grid-cols-4 gap-3" id="add-subject-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Programme *</label>
+      <select name="programme" id="programme-select" required
+              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none"
+              onchange="updateDepartments()">
+        <option value="">— Select —</option>
+        {% for p in programmes %}
+        <option value="{{ p }}">{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Department *</label>
+      <select name="department" id="department-select" required
+              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none">
+        <option value="">Select Programme first</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Academic Year *</label>
+      <input name="academic_year" required placeholder="e.g. 2025-26"
+             pattern="\d{4}-\d{2}" title="Format: YYYY-YY, e.g. 2025-26"
+             class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none">
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Semester *</label>
+      <select name="semester" required
+              class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none">
+        <option value="">— Select —</option>
+        {% for n, label in semester_labels.items() %}
+        <option value="{{ n }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="md:col-span-2">
+      <label class="block text-xs font-medium text-slate-500 mb-1">Subject Name *</label>
+      <input name="subject_name" required placeholder="e.g. Cyber Security"
+             class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none">
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Course Code *</label>
+      <input name="course_code" required placeholder="e.g. CS601"
+             class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none"
+             pattern="[A-Za-z0-9\-]{2,20}" title="Letters, digits and hyphens only (2–20 chars)">
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Credits</label>
+      <input name="credits" type="number" value="4" min="1" max="10"
+             class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none">
+    </div>
+
+    <div class="col-span-2 md:col-span-4 flex">
+      <button class="bg-signal hover:bg-teal-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition">
+        Add Subject
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- Filter Bar -->
+<div class="bg-white rounded-xl border border-slate-200 p-4 mb-4 slide-up">
+  <form method="get" class="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Programme</label>
+      <select name="programme" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none">
+        <option value="">All Programmes</option>
+        {% for p in programmes %}
+        <option value="{{ p }}" {{ 'selected' if f_programme == p else '' }}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Department</label>
+      <select name="department" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none">
+        <option value="">All Departments</option>
+        {% for d in all_departments %}
+        <option value="{{ d }}" {{ 'selected' if f_department == d else '' }}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Academic Year</label>
+      <select name="academic_year" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none">
+        <option value="">All Years</option>
+        {% for y in years %}
+        <option value="{{ y }}" {{ 'selected' if f_year == y else '' }}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Semester</label>
+      <select name="semester" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none">
+        <option value="">All Semesters</option>
+        {% for n, label in semester_labels.items() %}
+        <option value="{{ n }}" {{ 'selected' if f_semester == n else '' }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="flex gap-2">
+      <button class="flex-1 bg-ink hover:bg-steel text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+        Filter
+      </button>
+      {% if f_programme or f_department or f_year or f_semester %}
+      <a href="{{ url_for('syllabus.admin_index') }}"
+         class="px-3 py-2 text-sm text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 transition">
+        Clear
+      </a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<!-- Subjects Table -->
+<div class="bg-white rounded-xl border border-slate-200 overflow-hidden slide-up d2">
+  <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+    <h2 class="text-sm font-semibold text-ink">📚 Subjects ({{ subjects|length }})</h2>
+  </div>
+
+  {% if subjects %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-slate-200">
+          <th class="text-left py-3 px-5 font-medium text-slate-500 text-xs">Programme</th>
+          <th class="text-left py-3 px-4 font-medium text-slate-500 text-xs">Department</th>
+          <th class="text-left py-3 px-4 font-medium text-slate-500 text-xs">Year</th>
+          <th class="text-left py-3 px-4 font-medium text-slate-500 text-xs">Semester</th>
+          <th class="text-left py-3 px-4 font-medium text-slate-500 text-xs">Subject</th>
+          <th class="text-left py-3 px-4 font-medium text-slate-500 text-xs">Code</th>
+          <th class="text-center py-3 px-4 font-medium text-slate-500 text-xs">Credits</th>
+          <th class="text-center py-3 px-4 font-medium text-slate-500 text-xs">Docs</th>
+          <th class="text-left py-3 px-4 font-medium text-slate-500 text-xs">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for s in subjects %}
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-3 px-5 text-xs font-medium text-slate-600">{{ s.programme }}</td>
+          <td class="py-3 px-4">
+            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{{ s.department }}</span>
+          </td>
+          <td class="py-3 px-4 text-xs text-slate-500">{{ s.academic_year }}</td>
+          <td class="py-3 px-4">
+            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">Sem {{ s.semester }}</span>
+          </td>
+          <td class="py-3 px-4 font-medium text-ink">{{ s.subject_name }}</td>
+          <td class="py-3 px-4 font-mono text-xs text-slate-500">{{ s.course_code }}</td>
+          <td class="py-3 px-4 text-center text-slate-500">{{ s.credits }}</td>
+          <td class="py-3 px-4 text-center">
+            {% if s.active_docs > 0 %}
+            <span class="text-xs text-teal-600 font-medium">{{ s.active_docs }}/2</span>
+            {% else %}
+            <span class="text-xs text-slate-300">—</span>
+            {% endif %}
+          </td>
+          <td class="py-3 px-4">
+            <div class="flex items-center gap-2 flex-wrap">
+              <button onclick="openUpload({{ s.id }}, '{{ s.subject_name|e }}', 'scheme')"
+                      class="text-xs px-2 py-1 bg-teal-50 text-teal-700 border border-teal-200 rounded hover:bg-teal-100 transition">
+                📋 Scheme
+              </button>
+              <button onclick="openUpload({{ s.id }}, '{{ s.subject_name|e }}', 'syllabus')"
+                      class="text-xs px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100 transition">
+                📄 Syllabus
+              </button>
+              <a href="{{ url_for('syllabus.admin_history', subject_id=s.id) }}"
+                 class="text-xs px-2 py-1 bg-slate-100 text-slate-600 rounded hover:bg-slate-200 transition">
+                🕐 History
+              </a>
+              <form method="post"
+                    action="{{ url_for('syllabus.admin_subject_delete', subject_id=s.id) }}"
+                    onsubmit="return confirm('Delete {{ s.subject_name|e }} and ALL its documents?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="text-xs px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 transition">
+                  🗑 Delete
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="px-6 py-16 text-center">
+    <div class="text-4xl mb-3">📚</div>
+    <div class="text-sm text-slate-400">
+      {% if f_programme or f_department or f_year or f_semester %}
+      No subjects match the selected filters.
+      {% else %}
+      No subjects added yet. Use the form above to get started.
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Upload Modal -->
+<div id="upload-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+    <h3 class="text-sm font-semibold text-ink mb-1" id="modal-title">Upload PDF</h3>
+    <p class="text-xs text-slate-400 mb-4" id="modal-subtitle"></p>
+    <form method="post" id="upload-form" enctype="multipart/form-data" class="space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="doc_type" id="modal-doc-type">
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">PDF File * (max 10 MB)</label>
+        <input type="file" name="pdf_file" accept=".pdf,application/pdf" required
+               id="modal-file-input"
+               class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2
+                      focus:border-signal outline-none file:mr-3 file:text-xs file:font-medium
+                      file:bg-signal file:text-white file:border-0 file:rounded file:px-3 file:py-1"
+               onchange="previewFile(this)">
+        <div id="file-preview" class="hidden mt-2 text-xs text-teal-600 flex items-center gap-1.5">
+          <span>✓</span><span id="file-name"></span>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Academic Year</label>
+        <input name="academic_year" placeholder="e.g. 2024-25"
+               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none">
+      </div>
+      <!-- Upload progress -->
+      <div id="upload-progress" class="hidden">
+        <div class="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+          <div id="progress-bar" class="h-full bg-signal rounded-full transition-all duration-300 w-0"></div>
+        </div>
+        <div class="text-xs text-slate-400 mt-1">Uploading…</div>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="submit" id="upload-btn"
+                class="flex-1 bg-signal hover:bg-teal-700 text-white text-sm font-medium py-2.5 rounded-lg transition">
+          Upload PDF
+        </button>
+        <button type="button" onclick="closeUpload()"
+                class="px-4 py-2.5 text-sm text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 transition">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// ── Dependent Programme → Department dropdown ──
+var DEPARTMENTS_BY_PROGRAMME = {{ departments_by_programme | tojson }};
+
+function updateDepartments() {
+  var programme = document.getElementById('programme-select').value;
+  var deptSelect = document.getElementById('department-select');
+  deptSelect.innerHTML = '';
+
+  if (!programme) {
+    deptSelect.innerHTML = '<option value="">Select Programme first</option>';
+    return;
+  }
+
+  var depts = DEPARTMENTS_BY_PROGRAMME[programme] || [];
+  deptSelect.innerHTML = '<option value="">— Select —</option>';
+  depts.forEach(function(d) {
+    var opt = document.createElement('option');
+    opt.value = d;
+    opt.textContent = d;
+    deptSelect.appendChild(opt);
+  });
+}
+
+// ── Upload Modal ──
+function openUpload(subjectId, subjectName, docType) {
+  var modal = document.getElementById('upload-modal');
+  var form  = document.getElementById('upload-form');
+  var label = docType === 'scheme' ? 'Teaching Scheme' : 'Syllabus';
+  document.getElementById('modal-title').textContent = 'Upload ' + label;
+  document.getElementById('modal-subtitle').textContent = subjectName;
+  document.getElementById('modal-doc-type').value = docType;
+  form.action = '/syllabus/admin/upload/' + subjectId;
+  document.getElementById('file-preview').classList.add('hidden');
+  document.getElementById('modal-file-input').value = '';
+  modal.style.display = 'flex';
+  modal.classList.remove('hidden');
+}
+
+function closeUpload() {
+  var modal = document.getElementById('upload-modal');
+  modal.style.display = 'none';
+  modal.classList.add('hidden');
+}
+
+function previewFile(input) {
+  if (input.files && input.files[0]) {
+    var name = input.files[0].name;
+    var size = (input.files[0].size / 1024 / 1024).toFixed(2);
+    document.getElementById('file-name').textContent = name + ' (' + size + ' MB)';
+    document.getElementById('file-preview').classList.remove('hidden');
+  }
+}
+
+document.getElementById('upload-form').addEventListener('submit', function() {
+  document.getElementById('upload-progress').classList.remove('hidden');
+  document.getElementById('upload-btn').disabled = true;
+  document.getElementById('upload-btn').textContent = 'Uploading…';
+  var bar = document.getElementById('progress-bar');
+  var pct = 0;
+  var iv = setInterval(function() {
+    pct = Math.min(pct + 10, 90);
+    bar.style.width = pct + '%';
+    if (pct >= 90) clearInterval(iv);
+  }, 200);
+});
+
+document.getElementById('upload-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeUpload();
+});
+</script>
+
+{% endblock %}
