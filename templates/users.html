@@ -95,6 +95,23 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="text-signal hover:underline text-xs">Unlock</button>
               </form>
+                  {% set st = u['status'] if 'status' in u.keys() else 'active' %}
+                  {% if st == 'pending' %}
+                  <form method="post" action="{{ url_for('user_approve', uid=u.id) }}" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="ml-2 text-xs text-teal-600 hover:underline">Approve</button>
+                  </form>
+                  {% elif st == 'active' %}
+                  <form method="post" action="{{ url_for('user_suspend', uid=u.id) }}" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="ml-2 text-xs text-red-500 hover:underline">Suspend</button>
+                  </form>
+                  {% elif st == 'suspended' %}
+                  <form method="post" action="{{ url_for('user_activate', uid=u.id) }}" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="ml-2 text-xs text-teal-600 hover:underline">Activate</button>
+                  </form>
+                  {% endif %}
             {% endif %}
             {% if u.id != user.id %}
               <form method="post" action="{{ url_for('admin_delete_user', uid=u.id) }}" class="inline"

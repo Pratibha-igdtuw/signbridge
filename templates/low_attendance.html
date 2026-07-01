@@ -3,24 +3,12 @@
 {% block heading %}Low Attendance Report{% endblock %}
 {% block content %}
 
-<div class="flex items-center justify-between mb-5 gap-3 flex-wrap">
+<div class="flex items-center justify-between mb-5">
   <p class="text-sm text-slate-500">Students with attendance below 75% in one or more subjects.</p>
-  <div class="flex items-center gap-2">
-    {% if low_att %}
-    <button id="emailAllBtn" onclick="openEmailModal(null)"
-            class="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-md transition">
-      ✉ Email all students
-    </button>
-    <button id="emailSelBtn" onclick="openEmailModal('selected')" disabled
-            class="inline-flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm rounded-md transition disabled:opacity-40 disabled:cursor-not-allowed">
-      ✉ Email selected (<span id="selCount">0</span>)
-    </button>
-    {% endif %}
-    <a href="{{ url_for('low_attendance_export') }}"
-       class="inline-flex items-center gap-2 px-4 py-2 bg-ink hover:bg-steel text-white text-sm rounded-md transition">
-      ⬇ Export CSV
-    </a>
-  </div>
+  <a href="{{ url_for('low_attendance_export') }}"
+     class="inline-flex items-center gap-2 px-4 py-2 bg-ink hover:bg-steel text-white text-sm rounded-md transition">
+    ⬇ Export CSV
+  </a>
 </div>
 
 {% if low_att %}
@@ -28,9 +16,6 @@
   <table class="w-full text-sm evidence">
     <thead class="bg-red-50 text-left text-xs uppercase eyebrow text-red-600">
       <tr>
-        <th class="px-4 py-3">
-          <input type="checkbox" id="selectAll" onchange="toggleAll(this)" class="rounded">
-        </th>
         <th class="px-4 py-3 font-semibold">Student Name</th>
         <th class="px-4 py-3 font-semibold">Roll No.</th>
         <th class="px-4 py-3 font-semibold">Department</th>
@@ -38,15 +23,11 @@
         <th class="px-4 py-3 font-semibold">Subject</th>
         <th class="px-4 py-3 font-semibold text-right">Attendance %</th>
         <th class="px-4 py-3 font-semibold text-right">Classes Attended</th>
-        <th class="px-4 py-3 font-semibold text-center">Notify</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-slate-100">
       {% for r in low_att %}
-      <tr class="hover:bg-red-50/50" data-roll="{{ r.roll_number }}">
-        <td class="px-4 py-3">
-          <input type="checkbox" class="row-check rounded" value="{{ r.roll_number }}" onchange="updateSel()">
-        </td>
+      <tr class="hover:bg-red-50/50">
         <td class="px-4 py-3 font-medium text-ink">{{ r.full_name }}</td>
         <td class="px-4 py-3 font-mono text-xs text-steel">{{ r.roll_number }}</td>
         <td class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-slate-100 text-xs">{{ r.department }}</span></td>
@@ -54,12 +35,6 @@
         <td class="px-4 py-3">{{ r.subject }}</td>
         <td class="px-4 py-3 text-right font-bold text-red-600">{{ r.pct }}%</td>
         <td class="px-4 py-3 text-right font-mono text-xs text-slate-500">{{ r.present }}/{{ r.total }}</td>
-        <td class="px-4 py-3 text-center">
-          <button onclick="openEmailModal(['{{ r.roll_number }}'])"
-                  class="text-xs px-2 py-1 rounded border border-slate-200 hover:bg-slate-50 text-slate-600 transition">
-            ✉
-          </button>
-        </td>
       </tr>
       {% endfor %}
     </tbody>
@@ -72,122 +47,4 @@
   <p class="text-slate-500 text-sm">All students have attendance at or above 75% in every subject.</p>
 </div>
 {% endif %}
-
-<!-- Email Modal -->
-<div id="emailModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center hidden">
-  <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4" onclick="event.stopPropagation()">
-    <div class="px-6 py-4 border-b border-slate-100">
-      <h3 class="font-semibold text-slate-800">Send attendance warning</h3>
-      <p id="modalSubtitle" class="text-sm text-slate-500 mt-0.5"></p>
-    </div>
-    <div class="px-6 py-4 space-y-4">
-      <div>
-        <label class="block text-xs font-medium text-slate-500 uppercase mb-1">Subject</label>
-        <input id="emailSubject" type="text" value="Attendance Warning — Action Required"
-               class="w-full text-sm border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-300">
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-slate-500 uppercase mb-1">Message <span class="normal-case text-slate-400">(leave blank for default)</span></label>
-        <textarea id="emailBody" rows="5" placeholder="Leave blank to use the default attendance warning message…"
-                  class="w-full text-sm border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-300 resize-y"></textarea>
-      </div>
-    </div>
-    <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-      <button onclick="closeEmailModal()"
-              class="px-4 py-2 text-sm rounded-md border border-slate-200 hover:bg-slate-50 text-slate-700 transition">
-        Cancel
-      </button>
-      <button id="sendBtn" onclick="sendEmails()"
-              class="px-4 py-2 text-sm rounded-md bg-red-600 hover:bg-red-700 text-white transition">
-        Send email
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- Toast -->
-<div id="toast" class="fixed bottom-5 right-5 z-50 hidden">
-  <div class="flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium"
-       id="toastInner"></div>
-</div>
-
-<script>
-let pendingRolls = null;
-
-function updateSel() {
-  const checked = [...document.querySelectorAll('.row-check:checked')];
-  const uniqRolls = [...new Set(checked.map(c => c.value))];
-  document.getElementById('selCount').textContent = uniqRolls.length;
-  document.getElementById('emailSelBtn').disabled = uniqRolls.length === 0;
-  const all = document.querySelectorAll('.row-check');
-  document.getElementById('selectAll').indeterminate = checked.length > 0 && checked.length < all.length;
-  document.getElementById('selectAll').checked = checked.length === all.length;
-}
-
-function toggleAll(cb) {
-  document.querySelectorAll('.row-check').forEach(c => c.checked = cb.checked);
-  updateSel();
-}
-
-function openEmailModal(rolls) {
-  if (rolls === 'selected') {
-    const checked = [...document.querySelectorAll('.row-check:checked')];
-    rolls = [...new Set(checked.map(c => c.value))];
-    if (rolls.length === 0) return;
-  }
-  pendingRolls = rolls;
-  const count = rolls === null
-    ? document.querySelectorAll('.row-check').length + ' row(s) across all students'
-    : rolls.length === 1 ? '1 student' : rolls.length + ' students';
-  document.getElementById('modalSubtitle').textContent = `Sending to ${count}`;
-  document.getElementById('emailBody').value = '';
-  document.getElementById('emailModal').classList.remove('hidden');
-}
-
-function closeEmailModal() {
-  document.getElementById('emailModal').classList.add('hidden');
-  pendingRolls = null;
-}
-
-async function sendEmails() {
-  const btn = document.getElementById('sendBtn');
-  btn.disabled = true;
-  btn.textContent = 'Sending…';
-
-  const payload = {
-    subject: document.getElementById('emailSubject').value,
-    body: document.getElementById('emailBody').value,
-    roll_numbers: pendingRolls,
-  };
-
-  try {
-    const res = await fetch('{{ url_for("low_attendance_email") }}', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    closeEmailModal();
-    showToast(data.success, data.message);
-  } catch (e) {
-    showToast(false, 'Request failed. Check your connection.');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Send email';
-  }
-}
-
-function showToast(success, msg) {
-  const t = document.getElementById('toast');
-  const inner = document.getElementById('toastInner');
-  inner.className = `flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium ${
-    success ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
-  }`;
-  inner.textContent = (success ? '✓ ' : '✗ ') + msg;
-  t.classList.remove('hidden');
-  setTimeout(() => t.classList.add('hidden'), 4000);
-}
-
-document.getElementById('emailModal').addEventListener('click', closeEmailModal);
-</script>
 {% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Two-Factor Authentication{% endblock %}
+{% block auth %}
+<div class="min-h-screen flex items-center justify-center bg-slate-100">
+  <div class="bg-white rounded-xl shadow-sm border border-slate-200 w-full max-w-sm p-8">
+    <div class="text-center mb-6">
+      <div class="text-4xl mb-2">🔐</div>
+      <h1 class="text-xl font-semibold text-ink">Two-Factor Authentication</h1>
+      <p class="text-sm text-slate-500 mt-1">Enter the 6-digit code from your authenticator app</p>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="mb-4 px-4 py-2 rounded text-sm {{ 'bg-red-50 text-red-700 border border-red-200' if cat=='error' else 'bg-teal-50 text-teal-700 border border-teal-200' }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+    <form method="post" action="{{ url_for('verify_2fa') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-slate-700 mb-1">Authentication Code</label>
+        <input name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+               placeholder="000000" autofocus required
+               class="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-center text-2xl tracking-widest
+                      font-mono focus:outline-none focus:ring-2 focus:ring-signal">
+      </div>
+      <button type="submit"
+              class="w-full bg-signal text-white py-2.5 rounded-lg font-medium hover:bg-teal-700 transition">
+        Verify
+      </button>
+    </form>
+    <p class="mt-4 text-center text-xs text-slate-400">
+      <a href="{{ url_for('login') }}" class="hover:text-slate-600">← Back to login</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

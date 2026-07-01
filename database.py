@@ -470,9 +470,168 @@ def seed_courses():
     print("Courses seeded and students enrolled.")
 
 
+# ============================================================================
+# Migration helpers — run once to add columns/tables to existing DBs
+# ============================================================================
+def migrate_db():
+    """Apply schema migrations to an existing database safely."""
+    conn = get_connection()
+    cur = conn.cursor()
+
+    # 1. Add user_id FK to students (security fix for name-based lookups)
+    try:
+        cur.execute("ALTER TABLE students ADD COLUMN user_id INTEGER REFERENCES users(id)")
+    except Exception:
+        pass  # already exists
+
+    # 2. Add credits to results (needed for proper weighted CGPA)
+    try:
+        cur.execute("ALTER TABLE results ADD COLUMN credits INTEGER DEFAULT 4")
+    except Exception:
+        pass
+
+    # 3. Add is_late to homework_submissions
+    try:
+        cur.execute("ALTER TABLE homework_submissions ADD COLUMN is_late INTEGER DEFAULT 0")
+    except Exception:
+        pass
+
+    # 4. SGPA drafts table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS sgpa_drafts (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            semester    INTEGER NOT NULL,
+            subject     TEXT NOT NULL,
+            grade       TEXT NOT NULL,
+            credits     INTEGER NOT NULL DEFAULT 4,
+            updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(student_id, semester, subject)
+        )
+    """)
+
+    # 5. Timetable / class schedule
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS timetable (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            course_id   INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+            department  TEXT NOT NULL,
+            semester    INTEGER NOT NULL,
+            section     TEXT NOT NULL DEFAULT 'A',
+            day_of_week TEXT NOT NULL,
+            start_time  TEXT NOT NULL,
+            end_time    TEXT NOT NULL,
+            room        TEXT,
+            faculty_id  INTEGER REFERENCES users(id),
+            subject     TEXT NOT NULL,
+            academic_year TEXT NOT NULL DEFAULT '2024-25',
+            created_by  INTEGER REFERENCES users(id),
+            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # 6. Leave applications
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS leave_applications (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            faculty_id      INTEGER REFERENCES users(id),
+            subject         TEXT,
+            leave_type      TEXT NOT NULL DEFAULT 'medical',
+            from_date       TEXT NOT NULL,
+            to_date         TEXT NOT NULL,
+            reason          TEXT NOT NULL,
+            status          TEXT NOT NULL DEFAULT 'pending',
+            faculty_remark  TEXT,
+            reviewed_by     INTEGER REFERENCES users(id),
+            reviewed_at     DATETIME,
+            created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+def backfill_user_id():
+    """Link existing student records to users via email."""
+    students = query_all("SELECT id, email FROM students WHERE user_id IS NULL")
+    for s in students:
+        user = query_one("SELECT id FROM users WHERE email = ?", (s["email"],))
+        if user:
+            execute("UPDATE students SET user_id = ? WHERE id = ?", (user["id"], s["id"]))
+
+
+def seed_timetable():
+    """Seed sample timetable data if empty."""
+    if query_one("SELECT id FROM timetable LIMIT 1"):
+        return
+    faculty = query_one("SELECT id FROM users WHERE role='faculty' LIMIT 1")
+    admin   = query_one("SELECT id FROM users WHERE role='admin' LIMIT 1")
+    fid = faculty["id"] if faculty else 1
+    aid = admin["id"] if admin else 1
+
+    days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+    slots = [
+        ("09:00", "10:00"), ("10:00", "11:00"), ("11:15", "12:15"),
+        ("02:00", "03:00"), ("03:00", "04:00"),
+    ]
+    subjects = [
+        ("Mathematics", 5, "CSE"), ("DSA", 5, "CSE"), ("OS", 5, "CSE"),
+        ("DBMS", 5, "CSE"), ("Networks", 5, "CSE"),
+    ]
+    import random
+    random.seed(42)
+    for day in days:
+        used_slots = random.sample(slots, 3)
+        for (start, end), (subj, sem, dept) in zip(used_slots, random.sample(subjects, 3)):
+            try:
+                execute(
+                    "INSERT OR IGNORE INTO timetable "
+                    "(department, semester, section, day_of_week, start_time, end_time, "
+                    "room, faculty_id, subject, academic_year, created_by) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    (dept, sem, "A", day, start, end, f"Room {random.randint(101,310)}",
+                     fid, subj, "2024-25", aid)
+                )
+            except Exception:
+                pass
+
+
+# ============================================================================
+# v3 Enhanced migrations
+# ============================================================================
+def migrate_v3(conn):
+    """Run once — adds columns/tables introduced in v3 Enhanced."""
+    cur = conn.cursor()
+
+    # 2FA columns on users
+    for col_sql in [
+        "ALTER TABLE users ADD COLUMN totp_secret TEXT",
+        "ALTER TABLE users ADD COLUMN totp_enabled INTEGER DEFAULT 0",
+        # Registration approval workflow
+        "ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'",
+        # Password expiry tracking
+        "ALTER TABLE users ADD COLUMN last_password_change DATETIME DEFAULT CURRENT_TIMESTAMP",
+    ]:
+        try:
+            cur.execute(col_sql)
+        except Exception:
+            pass  # column already exists
+
+    # Ensure existing users get 'active' status (not NULL)
+    cur.execute("UPDATE users SET status='active' WHERE status IS NULL")
+
+    conn.commit()
+
+
 if __name__ == "__main__":
     init_db()
+    migrate_db()
     seed()
     seed_extras()
     seed_courses()
+    backfill_user_id()
+    seed_timetable()
+    migrate_v3(get_connection())
     print("Database initialized and seeded at", Config.DB_PATH)

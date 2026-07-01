@@ -23,6 +23,7 @@
         <th class="text-left px-5 py-2 font-medium text-slate-500 text-xs">Roll No.</th>
         <th class="text-left px-5 py-2 font-medium text-slate-500 text-xs">File</th>
         <th class="text-left px-5 py-2 font-medium text-slate-500 text-xs">Submitted</th>
+        <th class="text-center px-5 py-2 font-medium text-slate-500 text-xs">Status</th>
         <th class="px-5 py-2"></th>
       </tr>
     </thead>
@@ -33,6 +34,13 @@
         <td class="px-5 py-3 font-mono text-xs">{{ s.roll_number }}</td>
         <td class="px-5 py-3 text-slate-500 text-xs">{{ s.original_name }}</td>
         <td class="px-5 py-3 font-mono text-xs text-slate-400">{{ s.submitted_at }}</td>
+        <td class="px-5 py-3 text-center">
+          {% if s.is_late %}
+            <span class="text-[10px] font-semibold bg-red-100 text-red-600 px-2 py-0.5 rounded-full">⏰ LATE</span>
+          {% else %}
+            <span class="text-[10px] font-semibold bg-teal-100 text-teal-600 px-2 py-0.5 rounded-full">✓ ON TIME</span>
+          {% endif %}
+        </td>
         <td class="px-5 py-3">
           <a href="{{ url_for('homework_download', hid=s.id) }}"
              class="text-xs text-signal hover:underline">⬇ Download</a>

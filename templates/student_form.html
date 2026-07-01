@@ -32,16 +32,6 @@
 
     <div class="grid grid-cols-3 gap-4">
       <div>
-        <label class="block text-sm font-medium text-steel mb-1">Programme</label>
-        <select name="programme"
-                class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
-                       focus:border-signal focus:ring-1 focus:ring-signal outline-none">
-          {% for p in ['B.Tech','M.Tech','MCA','BCA','B.Sc','M.Sc'] %}
-            <option value="{{ p }}" {{ 'selected' if form.programme==p else '' }}>{{ p }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div>
         <label class="block text-sm font-medium text-steel mb-1">Department</label>
         <select name="department"
                 class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
@@ -56,20 +46,6 @@
         <input name="year" type="number" min="1" max="5" value="{{ form.year or '' }}" required
                class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
                       focus:border-signal focus:ring-1 focus:ring-signal outline-none">
-      </div>
-    </div>
-
-    <div class="grid grid-cols-2 gap-4">
-      <div>
-        <label class="block text-sm font-medium text-steel mb-1">Current Semester</label>
-        <select name="current_semester"
-                class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
-                       focus:border-signal focus:ring-1 focus:ring-signal outline-none">
-          {% for s in range(1, 9) %}
-            <option value="{{ s }}" {{ 'selected' if form.current_semester|int==s else '' }}>Semester {{ s }}</option>
-          {% endfor %}
-        </select>
-        <p class="text-xs text-slate-400 mt-1">Used to scope Scheme &amp; Syllabus access.</p>
       </div>
       <div>
         <label class="block text-sm font-medium text-steel mb-1">CGPA</label>

@@ -1,5 +1,5 @@
 """
-Configuration for the Secure Student Management System v3.
+Configuration for the Secure Student Management System v3 Enhanced.
 """
 import os
 
@@ -18,7 +18,6 @@ class Config:
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = False
 
-    # Session timeout: 20 minutes idle
     PERMANENT_SESSION_LIFETIME = 20 * 60
     SESSION_TIMEOUT_SECONDS = 20 * 60
 
@@ -27,3 +26,15 @@ class Config:
 
     RATELIMIT_DEFAULT = "200 per minute"
     RATELIMIT_STORAGE_URL = "memory://"
+
+    # Flask-Mail
+    MAIL_SERVER   = os.environ.get("MAIL_SERVER",   "smtp.gmail.com")
+    MAIL_PORT     = int(os.environ.get("MAIL_PORT", "587"))
+    MAIL_USE_TLS  = True
+    MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "")
+    MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "")
+    MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER", "noreply@idonportal.com")
+    MAIL_SUPPRESS_SEND = os.environ.get("MAIL_SUPPRESS_SEND", "true").lower() == "true"
+
+    # Security headers
+    FORCE_HTTPS = os.environ.get("FORCE_HTTPS", "false").lower() == "true"

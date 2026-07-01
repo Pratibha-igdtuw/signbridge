@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block title %}Analytics
+<!-- Attendance Heatmap Calendar -->
+<div class="bg-white border border-slate-200 rounded-xl p-6 mt-6">
+  <h3 class="font-semibold text-ink mb-1">Attendance Calendar <span class="text-sm font-normal text-slate-400">— last 365 days</span></h3>
+  <p class="text-xs text-slate-500 mb-4">Each cell represents one day. Hover for date and status.</p>
+  <div id="heatmap-container" class="overflow-x-auto"></div>
+  <div class="flex gap-4 mt-3 text-xs text-slate-500 items-center">
+    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-teal-500 inline-block"></span> Present</span>
+    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-red-400 inline-block"></span> Absent</span>
+    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-teal-300 inline-block"></span> High (≥75%)</span>
+    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-amber-300 inline-block"></span> Mid (50–74%)</span>
+    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-red-300 inline-block"></span> Low (&lt;50%)</span>
+    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-slate-200 inline-block"></span> No class</span>
+  </div>
+</div>
+<script>
+(function(){
+  const heatmap = {{ heatmap|tojson }};
+  const container = document.getElementById('heatmap-container');
+  if (!container) return;
+
+  const today = new Date();
+  const startDate = new Date(today);
+  startDate.setDate(today.getDate() - 364);
+  // Align to Sunday
+  startDate.setDate(startDate.getDate() - startDate.getDay());
+
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const colorMap = {
+    present: '#14b8a6', absent: '#f87171',
+    high: '#2dd4bf', mid: '#fcd34d', low: '#fca5a5',
+    none: '#e2e8f0'
+  };
+
+  const CELL = 12, GAP = 2, WEEKS = 53;
+  const svgW = WEEKS * (CELL + GAP);
+  const svgH = 7 * (CELL + GAP) + 20;
+
+  let svg = `<svg width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">`;
+
+  // Month labels
+  let lastMonth = -1;
+  for (let w = 0; w < WEEKS; w++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + w * 7);
+    if (d.getMonth() !== lastMonth) {
+      lastMonth = d.getMonth();
+      svg += `<text x="${w*(CELL+GAP)}" y="10" font-size="9" fill="#94a3b8">${months[d.getMonth()]}</text>`;
+    }
+  }
+
+  // Cells
+  const cur = new Date(startDate);
+  for (let w = 0; w < WEEKS; w++) {
+    for (let d = 0; d < 7; d++) {
+      const dateStr = cur.toISOString().slice(0,10);
+      const status = heatmap[dateStr] || 'none';
+      const color = colorMap[status] || colorMap.none;
+      const x = w * (CELL + GAP);
+      const y = 16 + d * (CELL + GAP);
+      const title = `${dateStr}: ${status === 'none' ? 'no class' : status}`;
+      svg += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${color}">
+                <title>${title}</title>
+              </rect>`;
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
+  svg += '</svg>';
+  container.innerHTML = svg;
+})();
+</script>
+
+{% endblock %}
+{% block heading %}
+  {% if user.role == 'student' %}My Analytics{% else %}Class Analytics{% endif %}
+{% endblock %}
+{% block content %}
+
+{# Summary stat cards #}
+<div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  {% if user.role == 'student' and student %}
+    {% set att_pct = att_trend[-1].pct if att_trend else 0 %}
+    <div class="bg-white rounded-lg border border-slate-200 p-4">
+      <div class="text-xs eyebrow uppercase text-slate-400 mb-1">Overall Attendance</div>
+      <div class="text-2xl font-bold {{ 'text-teal-600' if att_pct >= 75 else 'text-red-500' }}">
+        {{ att_pct }}%
+      </div>
+      <div class="text-xs text-slate-400 mt-1">Last recorded week</div>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-4">
+      <div class="text-xs eyebrow uppercase text-slate-400 mb-1">Latest SGPA</div>
+      <div class="text-2xl font-bold text-ink">
+        {% if sgpa_progression %}{{ sgpa_progression[-1].sgpa }}{% else %}—{% endif %}
+      </div>
+      <div class="text-xs text-slate-400 mt-1">
+        Sem {{ sgpa_progression[-1].semester if sgpa_progression else '—' }}
+      </div>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-4">
+      <div class="text-xs eyebrow uppercase text-slate-400 mb-1">Pending Submissions</div>
+      <div class="text-2xl font-bold {{ 'text-red-500' if pending_assignments > 0 else 'text-teal-600' }}">
+        {{ pending_assignments }}
+      </div>
+      <div class="text-xs text-slate-400 mt-1">Assignment{{ 's' if pending_assignments != 1 }} to submit</div>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-4">
+      <div class="text-xs eyebrow uppercase text-slate-400 mb-1">Leave Applications</div>
+      <div class="text-2xl font-bold text-ink">{{ leave_count }}</div>
+      <div class="text-xs text-slate-400 mt-1">Total submitted</div>
+    </div>
+  {% else %}
+    <div class="bg-white rounded-lg border border-slate-200 p-4">
+      <div class="text-xs eyebrow uppercase text-slate-400 mb-1">Class Attendance (Latest Week)</div>
+      <div class="text-2xl font-bold text-ink">
+        {% if att_trend %}{{ att_trend[-1].pct }}%{% else %}—{% endif %}
+      </div>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-4">
+      <div class="text-xs eyebrow uppercase text-slate-400 mb-1">Active Assignments</div>
+      <div class="text-2xl font-bold text-ink">{{ pending_assignments }}</div>
+    </div>
+  {% endif %}
+</div>
+
+<div class="grid lg:grid-cols-2 gap-6">
+  {# Attendance Trend Chart #}
+  <div class="bg-white rounded-lg border border-slate-200 p-5">
+    <h3 class="text-sm font-semibold text-ink mb-4">
+      📅 Attendance Trend
+      <span class="text-xs text-slate-400 font-normal ml-1">(by week)</span>
+    </h3>
+    {% if att_trend %}
+    <canvas id="attChart" height="200"></canvas>
+    {% else %}
+    <p class="text-sm text-slate-400 py-8 text-center">No attendance data yet.</p>
+    {% endif %}
+  </div>
+
+  {# SGPA Progression Chart #}
+  {% if user.role == 'student' %}
+  <div class="bg-white rounded-lg border border-slate-200 p-5">
+    <h3 class="text-sm font-semibold text-ink mb-4">
+      🎓 SGPA Progression
+      <span class="text-xs text-slate-400 font-normal ml-1">(by semester)</span>
+    </h3>
+    {% if sgpa_progression %}
+    <canvas id="sgpaChart" height="200"></canvas>
+    {% else %}
+    <p class="text-sm text-slate-400 py-8 text-center">No results posted yet.</p>
+    {% endif %}
+  </div>
+
+  {# Subject-wise attendance breakdown #}
+  {% if student %}
+  <div class="bg-white rounded-lg border border-slate-200 p-5 lg:col-span-2">
+    <h3 class="text-sm font-semibold text-ink mb-4">📊 Subject-wise Attendance Breakdown</h3>
+    <canvas id="subjectChart" height="100"></canvas>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+
+{# Quick action links #}
+<div class="mt-6 grid sm:grid-cols-3 gap-4">
+  <a href="{{ url_for('attendance') }}"
+     class="bg-white rounded-lg border border-slate-200 p-4 hover:border-signal transition group">
+    <div class="text-xl mb-1">📅</div>
+    <div class="text-sm font-semibold text-ink group-hover:text-signal">View Attendance</div>
+    <div class="text-xs text-slate-400">Full subject-wise details</div>
+  </a>
+  {% if user.role == 'student' %}
+  <a href="{{ url_for('sgpa') }}"
+     class="bg-white rounded-lg border border-slate-200 p-4 hover:border-signal transition group">
+    <div class="text-xl mb-1">🎓</div>
+    <div class="text-sm font-semibold text-ink group-hover:text-signal">SGPA / CGPA Calculator</div>
+    <div class="text-xs text-slate-400">Saved drafts per semester</div>
+  </a>
+  <a href="{{ url_for('leaves') }}"
+     class="bg-white rounded-lg border border-slate-200 p-4 hover:border-signal transition group">
+    <div class="text-xl mb-1">🏖️</div>
+    <div class="text-sm font-semibold text-ink group-hover:text-signal">Leave Applications</div>
+    <div class="text-xs text-slate-400">Apply or track status</div>
+  </a>
+  {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+const SIGNAL = '#0d9488';
+const ALERT  = '#f87171';
+
+{% if att_trend %}
+new Chart(document.getElementById('attChart'), {
+  type: 'line',
+  data: {
+    labels: {{ att_trend | map(attribute='week') | list | tojson }},
+    datasets: [{
+      label: 'Attendance %',
+      data: {{ att_trend | map(attribute='pct') | list | tojson }},
+      borderColor: SIGNAL,
+      backgroundColor: 'rgba(13,148,136,.1)',
+      fill: true,
+      tension: 0.3,
+      pointBackgroundColor: SIGNAL,
+      pointRadius: 5,
+    }]
+  },
+  options: {
+    scales: {
+      y: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: '#f1f5f9' } },
+      x: { grid: { display: false } }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ctx.parsed.y + '%' } }
+    }
+  }
+});
+{% endif %}
+
+{% if sgpa_progression %}
+new Chart(document.getElementById('sgpaChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ sgpa_progression | map(attribute='semester') | list | tojson | replace('[', '["Sem ') | replace(', ', '", "Sem ') | replace(']', '"]') }},
+    datasets: [{
+      label: 'SGPA',
+      data: {{ sgpa_progression | map(attribute='sgpa') | list | tojson }},
+      backgroundColor: ctx => ctx.parsed.y >= 8 ? 'rgba(13,148,136,.8)' :
+                               ctx.parsed.y >= 6 ? 'rgba(251,191,36,.8)' : 'rgba(248,113,113,.8)',
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    scales: {
+      y: { min: 0, max: 10, grid: { color: '#f1f5f9' } },
+      x: { grid: { display: false } }
+    },
+    plugins: { legend: { display: false } }
+  }
+});
+{% endif %}
+
+{% if user.role == 'student' and student %}
+// Subject-wise attendance from results data — fetch via the attendance page
+// (We'll build from att_trend context; placeholder shown if data insufficient)
+{% endif %}
+</script>
+{% endblock %}

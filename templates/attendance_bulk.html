@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Bulk Attendance{% endblock %}
+{% block heading %}Bulk Attendance Marking{% endblock %}
+{% block content %}
+
+<div class="mb-4">
+  <p class="text-sm text-slate-500">
+    Select a course, set the date and subject, check <strong>Mark All Present</strong> then individually
+    override any absent students — one submit marks the entire class.
+  </p>
+</div>
+
+{# Course filter pills #}
+{% if my_courses %}
+<div class="mb-5 flex flex-wrap gap-2 items-center">
+  <span class="text-xs font-semibold text-slate-500 eyebrow uppercase">Course:</span>
+  <a href="{{ url_for('attendance_bulk_mark') }}"
+     class="px-3 py-1.5 rounded-md text-xs font-medium transition
+            {{ 'bg-signal text-white' if not course_filter else 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
+    All
+  </a>
+  {% for c in my_courses %}
+  <a href="{{ url_for('attendance_bulk_mark', course_id=c.id) }}"
+     class="px-3 py-1.5 rounded-md text-xs font-medium transition
+            {{ 'bg-signal text-white' if course_filter == c.id else 'bg-white border border-slate-200 text-slate-600 hover:border-signal' }}">
+    {{ c.name }} · Sem{{ c.semester }} {{ c.section }}
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if course_filter and students %}
+<form method="post" action="{{ url_for('attendance_bulk_mark', course_id=course_filter) }}"
+      id="bulk-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="course_id" value="{{ course_filter }}">
+
+  <div class="bg-white rounded-lg border border-slate-200 p-5">
+    {# Header controls #}
+    <div class="grid sm:grid-cols-3 gap-4 mb-5 pb-5 border-b border-slate-100">
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Subject</label>
+        <input name="subject" required placeholder="e.g. Mathematics"
+               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                      focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Date</label>
+        <input name="date" type="date" required value="{{ today }}"
+               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                      focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+      </div>
+      <div class="flex items-end">
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox" name="mark_all_present" id="mark-all-cb"
+                 class="w-4 h-4 accent-teal-600" onchange="toggleMarkAll(this.checked)">
+          <span class="text-sm font-semibold text-slate-700">✅ Mark All Present</span>
+        </label>
+      </div>
+    </div>
+
+    {# Student rows #}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm evidence">
+        <thead>
+          <tr class="border-b border-slate-200">
+            <th class="text-left py-2 font-medium text-slate-500 text-xs">Roll No</th>
+            <th class="text-left py-2 font-medium text-slate-500 text-xs">Name</th>
+            <th class="text-center py-2 font-medium text-slate-500 text-xs w-28">Status</th>
+            <th class="text-center py-2 font-medium text-slate-500 text-xs w-20" id="override-col" style="display:none">
+              Mark Absent
+            </th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100" id="student-rows">
+          {% for s in students %}
+          <tr data-sid="{{ s.id }}">
+            <input type="hidden" name="student_ids" value="{{ s.id }}">
+            <td class="py-2.5 font-mono text-xs text-slate-500">{{ s.roll_number }}</td>
+            <td class="py-2.5 font-medium text-steel">{{ s.full_name }}</td>
+            <td class="py-2.5 text-center individual-status-cell">
+              <select name="status_{{ s.id }}"
+                      class="rounded-md border border-slate-300 px-2 py-1 text-xs
+                             focus:border-signal focus:ring-1 focus:ring-signal outline-none status-sel">
+                <option value="present">✅ Present</option>
+                <option value="absent">❌ Absent</option>
+              </select>
+            </td>
+            <td class="py-2.5 text-center override-cell" style="display:none">
+              <input type="checkbox" name="override_{{ s.id }}"
+                     class="w-4 h-4 accent-red-500 override-cb"
+                     onchange="highlightRow(this)">
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-5 flex items-center justify-between">
+      <span class="text-xs text-slate-400">{{ students|length }} students in this course</span>
+      <button type="submit"
+              class="bg-signal hover:bg-teal-700 text-white text-sm font-semibold px-6 py-2 rounded-md transition">
+        Submit Attendance
+      </button>
+    </div>
+  </div>
+</form>
+
+{% elif course_filter %}
+<div class="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-400 text-sm">
+  No students enrolled in this course yet.
+</div>
+{% else %}
+<div class="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-400 text-sm">
+  Select a course above to load the student list.
+</div>
+{% endif %}
+
+<script>
+function toggleMarkAll(checked) {
+  const statusCells = document.querySelectorAll('.individual-status-cell');
+  const overrideCells = document.querySelectorAll('.override-cell');
+  const overrideCol = document.getElementById('override-col');
+
+  if (checked) {
+    statusCells.forEach(td => td.style.display = 'none');
+    overrideCells.forEach(td => td.style.display = '');
+    overrideCol.style.display = '';
+    // Reset all override checkboxes
+    document.querySelectorAll('.override-cb').forEach(cb => { cb.checked = false; });
+    document.querySelectorAll('#student-rows tr').forEach(r => r.classList.remove('bg-red-50'));
+  } else {
+    statusCells.forEach(td => td.style.display = '');
+    overrideCells.forEach(td => td.style.display = 'none');
+    overrideCol.style.display = 'none';
+  }
+}
+
+function highlightRow(cb) {
+  const row = cb.closest('tr');
+  row.classList.toggle('bg-red-50', cb.checked);
+}
+</script>
+{% endblock %}

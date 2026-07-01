@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -19,234 +19,55 @@
     }
   </script>
   <style>
-    body { -webkit-font-smoothing: antialiased; transition: background 0.3s, color 0.3s; }
+    body { -webkit-font-smoothing: antialiased; }
     .eyebrow { letter-spacing: .18em; }
     table.evidence td, table.evidence th { font-variant-numeric: tabular-nums; }
     @keyframes pulse-badge { 0%,100%{opacity:1} 50%{opacity:.6} }
     .badge-pulse { animation: pulse-badge 2s ease-in-out infinite; }
     .nav-active { background: rgba(255,255,255,0.1); color: #fff; }
+    /* Session countdown */
     #session-warn { display:none; }
-
-    /* ── Collapsible nav sections ── */
-    .nav-section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-      user-select: none;
-      padding: 0 12px;
-      margin-bottom: 2px;
-    }
-    .nav-section-header:hover .nav-section-label { color: #94a3b8; }
-    .nav-chevron {
-      font-size: 10px;
-      color: #475569;
-      transition: transform 0.25s ease;
-      display: inline-block;
-    }
-    .nav-chevron.open { transform: rotate(180deg); }
-    .nav-section-items {
-      overflow: hidden;
-      max-height: 600px;
-      opacity: 1;
-      transition: max-height 0.3s ease, opacity 0.25s ease;
-    }
-    .nav-section-items.collapsed {
-      max-height: 0;
-      opacity: 0;
-    }
-
-    /* ── Mobile sidebar ── */
-    #sidebar {
-      transition: transform 0.3s ease;
-    }
-    #sidebar-overlay {
-      transition: opacity 0.3s ease;
-    }
-    @media (max-width: 767px) {
-      #sidebar {
-        position: fixed;
-        top: 0; left: 0; bottom: 0;
-        z-index: 40;
-        transform: translateX(-100%);
-      }
-      #sidebar.open {
-        transform: translateX(0);
-      }
-    }
-
-    /* ── Responsive table wrapper ── */
-    .table-responsive {
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    /* ── Auto scroll all tables ── */
-    table {
-      min-width: 600px;
-    }
-
-    /* ── Page Animations ── */
-    @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-    @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-    .fade-in { animation: fadeIn 0.4s ease both; }
-    .slide-up { animation: slideUp 0.5s ease both; }
-    .card-hover { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-
-    /* ── Avatar ── */
-    .avatar-initials {
-      width: 36px; height: 36px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #0d9488, #0f172a);
-      color: #fff;
-      font-size: 13px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .avatar-lg {
-      width: 72px; height: 72px;
-      font-size: 24px;
-    }
-
-    /* ── Notification bell ── */
-    .notif-badge {
-      position: absolute;
-      top: -4px; right: -4px;
-      width: 16px; height: 16px;
-      background: #ef4444;
-      color: #fff;
-      border-radius: 50%;
-      font-size: 9px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      animation: pulse-badge 2s ease-in-out infinite;
-    }
-    .notif-dropdown {
-      position: absolute;
-      right: 0;
-      top: calc(100% + 8px);
-      width: 320px;
-      background: #fff;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-      z-index: 100;
-      display: none;
-      overflow: hidden;
-    }
-    .notif-dropdown.open { display: block; animation: slideUp 0.2s ease; }
-
-    /* ── Search bar ── */
-    #global-search { transition: width 0.3s ease; }
-
-    /* ── Progress bar animation ── */
-    @keyframes fillBar { from { width: 0; } }
-    .progress-bar { animation: fillBar 1s ease both; }
-
-    /* ── Dark theme ── */
-    html[data-theme="dark"] body { background: #0f172a !important; color: #cbd5e1 !important; }
-
-    /* Cards and surfaces */
-    html[data-theme="dark"] .bg-white { background: #1e293b !important; }
-    html[data-theme="dark"] .bg-slate-100 { background: #0f172a !important; }
-    html[data-theme="dark"] .bg-slate-50 { background: #162032 !important; }
-
-    /* Borders */
-    html[data-theme="dark"] .border-slate-200 { border-color: #2d3f55 !important; }
-    html[data-theme="dark"] .border-slate-100 { border-color: #243044 !important; }
-
-    /* Text */
-    html[data-theme="dark"] .text-ink { color: #f1f5f9 !important; }
-    html[data-theme="dark"] .text-slate-800 { color: #e2e8f0 !important; }
-    html[data-theme="dark"] .text-slate-700 { color: #cbd5e1 !important; }
-    html[data-theme="dark"] .text-slate-600 { color: #94a3b8 !important; }
-    html[data-theme="dark"] .text-slate-500 { color: #7a8fa6 !important; }
-    html[data-theme="dark"] .text-slate-400 { color: #5a7290 !important; }
-
-    /* Low attendance table — fix red-on-red */
-    html[data-theme="dark"] .bg-red-50 { background: #2a1515 !important; }
-    html[data-theme="dark"] .border-red-200 { border-color: #5a2020 !important; }
-    html[data-theme="dark"] .text-red-700 { color: #fca5a5 !important; }
-    html[data-theme="dark"] .text-red-600 { color: #f87171 !important; }
-    html[data-theme="dark"] .text-red-500 { color: #f87171 !important; }
-
-    /* Teal/success */
-    html[data-theme="dark"] .bg-teal-50 { background: #0d2420 !important; }
-    html[data-theme="dark"] .text-teal-800 { color: #5eead4 !important; }
-    html[data-theme="dark"] .text-teal-600 { color: #2dd4bf !important; }
-
-    /* Amber */
-    html[data-theme="dark"] .bg-amber-50 { background: #1f1a08 !important; }
-    html[data-theme="dark"] .text-amber-600 { color: #fbbf24 !important; }
-
-    /* Stat cards on dashboard */
-    html[data-theme="dark"] .divide-slate-100 > * { border-color: #243044 !important; }
-    html[data-theme="dark"] .divide-y > * + * { border-color: #243044 !important; }
-
-    /* Table rows */
-    html[data-theme="dark"] tr:hover { background: #243044 !important; }
-    html[data-theme="dark"] thead tr { border-color: #2d3f55 !important; }
-    html[data-theme="dark"] tbody tr { border-color: #1e2d3d !important; }
-
-    /* Table text — fix near-invisible hash columns */
-    html[data-theme="dark"] td { color: #94a3b8 !important; }
-    html[data-theme="dark"] th { color: #64748b !important; }
-    html[data-theme="dark"] td.font-medium, html[data-theme="dark"] td strong { color: #cbd5e1 !important; }
-
-    /* Inputs */
-    html[data-theme="dark"] input:not([disabled]),
-    html[data-theme="dark"] select,
-    html[data-theme="dark"] textarea {
-      background: #162032 !important;
-      color: #cbd5e1 !important;
-      border-color: #2d3f55 !important;
-    }
-    html[data-theme="dark"] input[disabled] {
-      background: #0f172a !important;
-      color: #4a5568 !important;
-    }
-
-    /* Header */
-    html[data-theme="dark"] header { background: #1e293b !important; border-color: #2d3f55 !important; }
-
-    /* Notification dropdown */
-    html[data-theme="dark"] .notif-dropdown { background: #1e293b !important; border-color: #2d3f55 !important; }
-    html[data-theme="dark"] .notif-dropdown .border-slate-100 { border-color: #243044 !important; }
-
-    /* Search results dropdown */
-    html[data-theme="dark"] #search-results { background: #1e293b !important; border-color: #2d3f55 !important; }
-    html[data-theme="dark"] #search-results a:hover { background: #243044 !important; }
-
-    /* Badge pills */
-    html[data-theme="dark"] .bg-slate-100 { background: #243044 !important; }
-    html[data-theme="dark"] .text-slate-600 { color: #94a3b8 !important; }
-
-    /* Student dropdown picker */
-    html[data-theme="dark"] #student-dropdown { background: #1e293b !important; border-color: #2d3f55 !important; }
-    html[data-theme="dark"] .hover\:bg-slate-50:hover { background: #243044 !important; }
-    html[data-theme="dark"] .hover\:bg-teal-50:hover { background: #0d2420 !important; }
-    
   </style>
+  <!-- Dark mode CSS variables -->
+  <style>
+    :root,[data-theme="light"] {
+      --bg-page: #f1f5f9; --bg-sidebar: #0f172a; --bg-card: #ffffff;
+      --text-main: #1e293b; --text-muted: #64748b; --border-col: #e2e8f0;
+      --header-bg: #ffffff; --table-row-alt: #f8fafc;
+    }
+    [data-theme="dark"] {
+      --bg-page: #0f172a; --bg-sidebar: #020617; --bg-card: #1e293b;
+      --text-main: #e2e8f0; --text-muted: #94a3b8; --border-col: #334155;
+      --header-bg: #1e293b; --table-row-alt: #162032;
+    }
+    body { background-color: var(--bg-page); color: var(--text-main); }
+    .dark-card { background: var(--bg-card); border-color: var(--border-col); }
+    .dark-header { background: var(--bg-header, var(--header-bg)); border-color: var(--border-col); }
+    [data-theme="dark"] .bg-white { background-color: var(--bg-card) !important; }
+    [data-theme="dark"] .bg-slate-100 { background-color: var(--bg-page) !important; }
+    [data-theme="dark"] .bg-slate-50 { background-color: #162032 !important; }
+    [data-theme="dark"] .border-slate-200 { border-color: var(--border-col) !important; }
+    [data-theme="dark"] .text-slate-800 { color: var(--text-main) !important; }
+    [data-theme="dark"] .text-slate-600 { color: var(--text-muted) !important; }
+    [data-theme="dark"] .text-slate-500 { color: var(--text-muted) !important; }
+    [data-theme="dark"] .text-ink { color: #e2e8f0 !important; }
+    [data-theme="dark"] header { background: var(--header-bg) !important; }
+    [data-theme="dark"] table tr:nth-child(even) td,
+    [data-theme="dark"] table tr:nth-child(even) { background: var(--table-row-alt) !important; }
+    /* apply theme before render to avoid flash */
+  </style>
+  <script>
+    (function(){
+      var t = localStorage.getItem('sms-theme') || 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen">
 {% if user %}
-
-<!-- Mobile sidebar overlay -->
-<div id="sidebar-overlay"
-     class="fixed inset-0 bg-black/50 z-30 hidden opacity-0"
-     onclick="closeSidebar()"></div>
-
 <div class="flex min-h-screen">
   <!-- Sidebar -->
-  <aside id="sidebar" class="w-60 shrink-0 bg-ink text-slate-300 flex flex-col">
+  <aside class="w-60 shrink-0 bg-ink text-slate-300 flex flex-col">
     <div class="px-5 py-5 border-b border-white/10">
       <div class="eyebrow text-[10px] uppercase text-signal font-semibold">IDon Portal</div>
       <div class="text-white font-semibold text-lg leading-tight mt-1">Secure&nbsp;SMS</div>
@@ -260,245 +81,127 @@
         {% endif %}
       </div>
     </div>
-
-    <nav class="flex-1 px-3 py-4 space-y-1 text-sm overflow-y-auto">
+    <nav class="flex-1 px-3 py-4 space-y-1 text-sm">
       {% macro nav(endpoint, label, icon='') %}
         <a href="{{ url_for(endpoint) }}"
-           onclick="closeSidebar()"
            class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
                   {{ 'nav-active' if request.endpoint == endpoint else '' }}">
           {% if icon %}<span>{{ icon }}</span>{% endif %}{{ label }}
         </a>
       {% endmacro %}
 
-      {# ── ADMIN ── #}
+      {# ============================================================
+         ADMIN NAVIGATION — Full system access
+         ============================================================ #}
       {% if user.role == 'admin' %}
+        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pb-1">Overview</div>
+        {{ nav('dashboard', 'Dashboard', '📊') }}
+        {{ nav('student_analytics', 'Analytics', '📈') }}
 
-        <!-- OVERVIEW -->
-        <div class="nav-section-header" onclick="toggleNav('admin-overview')">
-          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Overview</span>
-          <span class="nav-chevron" id="chev-admin-overview">▼</span>
-        </div>
-        <div class="nav-section-items collapsed" id="nav-admin-overview">
-          {{ nav('dashboard', 'Dashboard', '📊') }}
-        </div>
+        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Academics</div>
+        {{ nav('students', 'Student Records', '👥') }}
+        {{ nav('attendance', 'Attendance', '📅') }}
+        {{ nav('attendance_bulk_mark', 'Bulk Attendance', '✅') }}
+        {{ nav('assignments', 'Assignments', '📝') }}
+        {{ nav('results', 'Results', '📊') }}
+        {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
+        {{ nav('timetable', 'Timetable', '🗒️') }}
+        {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
+        {{ nav('syllabus.admin_index', 'Manage Syllabus', '⚙️') }}
 
-        <!-- ACADEMICS -->
-        <div class="nav-section-header mt-2" onclick="toggleNav('admin-academics')">
-          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Academics</span>
-          <span class="nav-chevron" id="chev-admin-academics">▼</span>
-        </div>
-        <div class="nav-section-items collapsed" id="nav-admin-academics">
-          {{ nav('students', 'Student Records', '👥') }}
-          {{ nav('attendance', 'Attendance', '📅') }}
-          {{ nav('assignments', 'Assignments', '📝') }}
-          {{ nav('results', 'Results', '📊') }}
-          {{ nav('sgpa', 'SGPA Calculator', '🎓') }}
-          {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
-          {{ nav('syllabus.admin_index', 'Manage Syllabus', '⚙️') }}
-        </div>
+        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Communication</div>
+        {{ nav('notices', 'Notices', '📢') }}
+        {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
+        {{ nav('grievances', 'Grievances', '📨') }}
+        {{ nav('leaves', 'Leave Applications', '🏖️') }}
 
-        <!-- COMMUNICATION -->
-        <div class="nav-section-header mt-2" onclick="toggleNav('admin-communication')">
-          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Communication</span>
-          <span class="nav-chevron" id="chev-admin-communication">▼</span>
-        </div>
-        <div class="nav-section-items collapsed" id="nav-admin-communication">
-          <!-- CHANGED: Notices link with fee reminder badge for admin -->
-          <a href="{{ url_for('notices') }}"
-             class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
-                    {{ 'nav-active' if request.endpoint == 'notices' else '' }}">
-            <span>📢</span>
-            Notices
-            {% if unread_notices and unread_notices > 0 %}
-            <span class="ml-auto text-[9px] font-bold bg-red-500 text-white
-                         px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-              {{ unread_notices }}
-            </span>
-            {% endif %}
-          </a>
-          {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
-          {{ nav('grievances', 'Grievances', '📨') }}
-        </div>
+        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Finance & Users</div>
+        {{ nav('fee_status', 'Fee Status', '💰') }}
+        {{ nav('courses', 'Courses & Enrollment', '📚') }}
+        {{ nav('bulk_upload_students', 'Bulk Student Upload', '📥') }}
+        {{ nav('files', 'File Manager', '📁') }}
+        {{ nav('users_list', 'User Accounts', '🛡️') }}
+        <a href="{{ url_for('pending_users') }}"
+           class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
+                  {{ 'nav-active' if request.endpoint == 'pending_users' else '' }}">
+          <span class="flex items-center gap-2">⏳ Pending Approvals</span>
+          {% if pending_count > 0 %}
+          <span class="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">{{ pending_count }}</span>
+          {% endif %}
+        </a>
 
-        <!-- FINANCE & USERS -->
-        <div class="nav-section-header mt-2" onclick="toggleNav('admin-finance')">
-          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Finance &amp; Users</span>
-          <span class="nav-chevron" id="chev-admin-finance">▼</span>
-        </div>
-        <div class="nav-section-items collapsed" id="nav-admin-finance">
-          {{ nav('fee_status', 'Fee Status', '💰') }}
-          {{ nav('courses', 'Courses & Enrollment', '📚') }}
-          {{ nav('bulk_upload_students', 'Bulk Student Upload', '📥') }}
-          {{ nav('files', 'File Manager', '📁') }}
-          {{ nav('users_list', 'User Accounts', '🛡️') }}
-        </div>
+        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Forensics</div>
+        {{ nav('audit_activity', 'Activity Logs', '📋') }}
+        {{ nav('audit_logins', 'Login History', '🔐') }}
+        {{ nav('audit_files', 'File Access', '🗂️') }}
+        <a href="{{ url_for('audit_alerts') }}"
+           class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
+                  {{ 'nav-active' if request.endpoint == 'audit_alerts' else '' }}">
+          <span class="flex items-center gap-2">⚠️ Injection Alerts</span>
+          <span id="alert-badge" class="hidden badge-pulse bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center"></span>
+        </a>
+        {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
 
-        <!-- FORENSICS -->
-        <div class="nav-section-header mt-2" onclick="toggleNav('admin-forensics')">
-          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Forensics</span>
-          <span class="nav-chevron" id="chev-admin-forensics">▼</span>
-        </div>
-        <div class="nav-section-items collapsed" id="nav-admin-forensics">
-          {{ nav('audit_activity', 'Activity Logs', '📋') }}
-          {{ nav('audit_logins', 'Login History', '🔐') }}
-          {{ nav('audit_files', 'File Access', '🗂️') }}
-          <a href="{{ url_for('audit_alerts') }}"
-             onclick="closeSidebar()"
-             class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
-                    {{ 'nav-active' if request.endpoint == 'audit_alerts' else '' }}">
-            <span class="flex items-center gap-2">⚠️ Injection Alerts</span>
-            <span id="alert-badge" class="hidden badge-pulse bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center"></span>
-          </a>
-          {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
-        </div>
-
-      {# ── FACULTY ── #}
+      {# ============================================================
+         FACULTY NAVIGATION — Teaching & academic management only
+         ============================================================ #}
       {% elif user.role == 'faculty' %}
+        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pb-1">Overview</div>
+        {{ nav('dashboard', 'Dashboard', '📊') }}
+        {{ nav('student_analytics', 'Analytics', '📈') }}
 
-        <!-- OVERVIEW -->
-        <div class="nav-section-header" onclick="toggleNav('fac-overview')">
-          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Overview</span>
-          <span class="nav-chevron" id="chev-fac-overview">▼</span>
-        </div>
-        <div class="nav-section-items collapsed" id="nav-fac-overview">
-          {{ nav('dashboard', 'Dashboard', '📊') }}
-        </div>
+        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Academics</div>
+        {{ nav('courses', 'My Courses', '📚') }}
+        {{ nav('students', 'My Students', '👥') }}
+        {{ nav('attendance', 'Attendance', '📅') }}
+        {{ nav('attendance_bulk_mark', 'Bulk Attendance', '✅') }}
+        {{ nav('assignments', 'Assignments', '📝') }}
+        {{ nav('results', 'Results', '📊') }}
+        {{ nav('timetable', 'Timetable', '🗒️') }}
+        {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
+        {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
 
-        <!-- ACADEMICS -->
-        <div class="nav-section-header mt-2" onclick="toggleNav('fac-academics')">
-          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Academics</span>
-          <span class="nav-chevron" id="chev-fac-academics">▼</span>
-        </div>
-        <div class="nav-section-items collapsed" id="nav-fac-academics">
-          {{ nav('courses', 'My Courses', '📚') }}
-          {{ nav('students', 'My Students', '👥') }}
-          {{ nav('attendance', 'Attendance', '📅') }}
-          {{ nav('assignments', 'Assignments', '📝') }}
-          {{ nav('results', 'Results', '📊') }}
-          {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
-          {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
-        </div>
+        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Communication</div>
+        {{ nav('notices', 'Notices', '📢') }}
+        {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
+        {{ nav('grievances', 'Grievances', '📨') }}
+        {{ nav('leaves', 'Leave Applications', '🏖️') }}
 
-        <!-- COMMUNICATION -->
-        <div class="nav-section-header mt-2" onclick="toggleNav('fac-communication')">
-          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Communication</span>
-          <span class="nav-chevron" id="chev-fac-communication">▼</span>
-        </div>
-        <div class="nav-section-items collapsed" id="nav-fac-communication">
-          <!-- CHANGED: Notices with badge for faculty too -->
-          <a href="{{ url_for('notices') }}"
-             class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
-                    {{ 'nav-active' if request.endpoint == 'notices' else '' }}">
-            <span>📢</span>
-            Notices
-            {% if unread_notices and unread_notices > 0 %}
-            <span class="ml-auto text-[9px] font-bold bg-red-500 text-white
-                         px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-              {{ unread_notices }}
-            </span>
-            {% endif %}
-          </a>
-          {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
-          {{ nav('grievances', 'Grievances', '📨') }}
-        </div>
-
-      {# ── STUDENT ── #}
+      {# ============================================================
+         STUDENT NAVIGATION — Personal academic view only
+         ============================================================ #}
       {% elif user.role == 'student' %}
+        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pb-1">My Academics</div>
+        {{ nav('student_analytics', 'My Analytics', '📈') }}
+        {{ nav('attendance', 'My Attendance', '📅') }}
+        {{ nav('assignments', 'Assignments', '📝') }}
+        {{ nav('results', 'My Results', '📊') }}
+        {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
+        {{ nav('timetable', 'Class Timetable', '🗒️') }}
+        {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
 
-        <!-- HOME -->
-        <div class="nav-section-header" onclick="toggleNav('stu-home')">
-          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Home</span>
-          <span class="nav-chevron" id="chev-stu-home">▼</span>
-        </div>
-        <div class="nav-section-items collapsed" id="nav-stu-home">
-          {{ nav('student_dashboard', 'My Dashboard', '🏠') }}
-        </div>
+        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Information</div>
+        {{ nav('notices', 'Notices', '📢') }}
+        {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
+        {{ nav('fee_status', 'Fee Status', '💰') }}
 
-        <!-- MY ACADEMICS -->
-        <div class="nav-section-header mt-2" onclick="toggleNav('stu-academics')">
-          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">My Academics</span>
-          <span class="nav-chevron" id="chev-stu-academics">▼</span>
-        </div>
-        <div class="nav-section-items collapsed" id="nav-stu-academics">
-          {{ nav('attendance', 'My Attendance', '📅') }}
-          {{ nav('assignments', 'Assignments', '📝') }}
-          {{ nav('results', 'My Results', '📊') }}
-          {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
-          {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
-        </div>
-
-        <!-- INFORMATION -->
-        <div class="nav-section-header mt-2" onclick="toggleNav('stu-information')">
-          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Information</span>
-          <span class="nav-chevron" id="chev-stu-information">▼</span>
-        </div>
-        <div class="nav-section-items collapsed" id="nav-stu-information">
-          <!-- CHANGED: Notices with red badge showing unread fee notices count -->
-          <a href="{{ url_for('notices') }}"
-             class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
-                    {{ 'nav-active' if request.endpoint == 'notices' else '' }}">
-            <span>📢</span>
-            Notices
-            {% if unread_notices and unread_notices > 0 %}
-            <span class="ml-auto text-[9px] font-bold bg-red-500 text-white
-                         px-1.5 py-0.5 rounded-full min-w-[18px] text-center
-                         badge-pulse">
-              {{ unread_notices }}
-            </span>
-            {% endif %}
-          </a>
-          {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
-          <!-- CHANGED: Fee Status with warning indicator when dues exist -->
-          <a href="{{ url_for('fee_status') }}"
-             class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
-                    {{ 'nav-active' if request.endpoint == 'fee_status' else '' }}">
-            <span>💰</span>
-            Fee Status
-            {% if unread_notices and unread_notices > 0 %}
-            <span class="ml-auto text-[9px] font-bold bg-amber-500 text-white
-                         px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-              !
-            </span>
-            {% endif %}
-          </a>
-        </div>
-
-        <!-- DOWNLOADS -->
-        <div class="nav-section-header mt-2" onclick="toggleNav('stu-downloads')">
-          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Downloads</span>
-          <span class="nav-chevron" id="chev-stu-downloads">▼</span>
-        </div>
-        <div class="nav-section-items collapsed" id="nav-stu-downloads">
-          {{ nav('downloads', 'My Downloads', '📥') }}
-        </div>
-
-        <!-- SUPPORT -->
-        <div class="nav-section-header mt-2" onclick="toggleNav('stu-support')">
-          <span class="nav-section-label eyebrow text-[10px] uppercase text-slate-500 py-1">Support</span>
-          <span class="nav-chevron" id="chev-stu-support">▼</span>
-        </div>
-        <div class="nav-section-items collapsed" id="nav-stu-support">
-          {{ nav('grievances', 'Grievances', '📨') }}
-        </div>
-
+        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Support</div>
+        {{ nav('grievances', 'Grievances', '📨') }}
+        {{ nav('leaves', 'Leave Applications', '🏖️') }}
       {% endif %}
     </nav>
 
-    <!-- Session countdown + user info + avatar -->
+    <!-- Session countdown + user info -->
     <div class="px-4 py-4 border-t border-white/10 text-xs">
       <div id="session-warn" class="mb-2 px-2 py-1.5 bg-yellow-500/20 text-yellow-300 rounded text-[11px]">
         ⏱ Session expires in <span id="session-countdown"></span>
       </div>
-      <div class="flex items-center gap-3 mb-2">
-        <div class="avatar-initials" id="sidebar-avatar">{{ user.full_name[:2] if user.full_name else 'U' }}</div>
-        <div>
-          <div class="text-white font-medium leading-tight">{{ user.full_name }}</div>
-          <div class="text-slate-400 capitalize">{{ user.role }}</div>
-        </div>
-      </div>
-      <div class="flex gap-3 mt-1">
+      <div class="text-white font-medium">{{ user.full_name }}</div>
+      <div class="text-slate-400 capitalize">{{ user.role }}</div>
+      <div class="flex gap-3 mt-2">
         <a href="{{ url_for('profile') }}" class="text-signal hover:text-teal-300">Profile</a>
+        <span class="text-slate-600">·</span>
+        <a href="{{ url_for('twofa_setup') }}" class="text-signal hover:text-teal-300">2FA</a>
         <span class="text-slate-600">·</span>
         <a href="{{ url_for('logout') }}" class="text-signal hover:text-teal-300">Sign out →</a>
       </div>
@@ -507,77 +210,33 @@
 
   <!-- Main -->
   <div class="flex-1 flex flex-col min-w-0">
-    <header class="bg-white border-b border-slate-200 px-4 md:px-6 py-3 flex items-center gap-3">
-      <!-- Hamburger — mobile only -->
-      <button onclick="openSidebar()"
-              class="md:hidden flex flex-col gap-1.5 p-1 text-slate-600 hover:text-ink"
-              aria-label="Open menu">
-        <span class="block w-5 h-0.5 bg-current"></span>
-        <span class="block w-5 h-0.5 bg-current"></span>
-        <span class="block w-5 h-0.5 bg-current"></span>
-      </button>
-      <h1 class="text-lg font-semibold text-ink flex-shrink-0">{% block heading %}{% endblock %}</h1>
-
-      <!-- Global search -->
-      <div class="hidden md:flex flex-1 max-w-sm mx-4 relative" id="search-wrapper">
-        <input id="global-search" type="text" placeholder="🔍 Search notices, exams, assignments…"
-               class="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:border-signal focus:ring-1 focus:ring-signal outline-none bg-slate-50"
-               autocomplete="off"
-               oninput="runSearch(this.value)">
-        <div id="search-results" class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto text-sm">
-        </div>
-      </div>
-
-      <div class="flex items-center gap-3 ml-auto">
-        <!-- Dark/Light theme toggle -->
-        <button onclick="toggleTheme()" id="theme-btn"
-                class="text-slate-500 hover:text-ink p-1.5 rounded-md hover:bg-slate-100 transition"
-                title="Toggle theme">
+    <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between">
+      <h1 class="text-xl font-semibold text-ink">{% block heading %}{% endblock %}</h1>
+      <div class="flex items-center gap-3">
+        {% if user and user.role == 'admin' and pending_count > 0 %}
+        <a href="{{ url_for('pending_users') }}"
+           class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-800 text-xs font-medium rounded-full hover:bg-amber-200 transition">
+          <span>⏳</span> {{ pending_count }} pending approval{{ 's' if pending_count != 1 else '' }}
+        </a>
+        {% endif %}
+        <button id="theme-toggle" title="Toggle dark mode"
+                onclick="toggleTheme()"
+                class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition text-slate-500 hover:text-slate-800">
           <span id="theme-icon">🌙</span>
         </button>
-
-        <!-- Notification bell -->
-        {% if user.role == 'student' %}
-        <div class="relative" id="notif-wrapper">
-          <button onclick="toggleNotifDropdown()"
-                  class="relative p-1.5 rounded-md hover:bg-slate-100 transition text-slate-600 hover:text-ink">
-            <span class="text-lg">🔔</span>
-            <span id="notif-count-badge" class="notif-badge hidden">0</span>
-          </button>
-          <div id="notif-dropdown" class="notif-dropdown">
-            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-              <span class="font-semibold text-sm text-ink">Notifications</span>
-              <button onclick="markAllRead()" class="text-xs text-signal hover:underline">Mark all read</button>
-            </div>
-            <div id="notif-list" class="divide-y divide-slate-100 max-h-64 overflow-y-auto">
-              <div class="px-4 py-6 text-center text-slate-400 text-sm">Loading…</div>
-            </div>
-            <div class="px-4 py-2 border-t border-slate-100 text-center">
-              <a href="{{ url_for('notifications') }}" class="text-xs text-signal hover:underline">View all notifications</a>
-            </div>
-          </div>
-        </div>
-        {% endif %}
-
-        <!-- Avatar -->
-        <a href="{{ url_for('profile') }}" class="avatar-initials" title="{{ user.full_name }}">
-          {{ user.full_name[:2] if user.full_name else 'U' }}
-        </a>
       </div>
     </header>
-    <main class="flex-1 px-4 md:px-8 py-4 md:py-6 overflow-x-hidden fade-in">
-      <div class="overflow-x-auto">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% for category, msg in messages %}
-            <div class="mb-3 px-4 py-2.5 rounded-md text-sm border
-                        {{ 'bg-teal-50 border-teal-200 text-teal-800' if category=='success'
-                           else 'bg-red-50 border-red-200 text-red-800' }}">
-              {{ msg }}
-            </div>
-          {% endfor %}
-        {% endwith %}
-        {% block content %}{% endblock %}
-      </div>
+    <main class="flex-1 px-8 py-6">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, msg in messages %}
+          <div class="mb-3 px-4 py-2.5 rounded-md text-sm border
+                      {{ 'bg-teal-50 border-teal-200 text-teal-800' if category=='success'
+                         else 'bg-red-50 border-red-200 text-red-800' }}">
+            {{ msg }}
+          </div>
+        {% endfor %}
+      {% endwith %}
+      {% block content %}{% endblock %}
     </main>
   </div>
 </div>
@@ -602,7 +261,7 @@
 </script>
 {% endif %}
 
-<!-- Session idle countdown -->
+<!-- Session idle countdown (warn at 3 min remaining of 20 min) -->
 <script>
   (function() {
     const TIMEOUT_MS = {{ config.SESSION_TIMEOUT_SECONDS }} * 1000;
@@ -610,12 +269,15 @@
     let lastActivity = Date.now();
     let warnEl = document.getElementById('session-warn');
     let countEl = document.getElementById('session-countdown');
+
     function resetTimer() { lastActivity = Date.now(); }
     ['click','keydown','mousemove','touchstart'].forEach(e => document.addEventListener(e, resetTimer, {passive:true}));
+
     function fmt(ms) {
       let s = Math.floor(ms/1000);
       return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
     }
+
     setInterval(function() {
       let elapsed = Date.now() - lastActivity;
       let remaining = TIMEOUT_MS - elapsed;
@@ -631,185 +293,24 @@
   })();
 </script>
 
-<!-- Collapsible nav + mobile sidebar -->
+{% else %}
+  {% block auth %}{% endblock %}
+{% endif %}
 <script>
-  function toggleNav(id) {
-    var items = document.getElementById('nav-' + id);
-    var chev  = document.getElementById('chev-' + id);
-    if (!items || !chev) return;
-    items.classList.toggle('collapsed');
-    chev.classList.toggle('open');
-  }
-
-  function openSidebar() {
-    var sb = document.getElementById('sidebar');
-    var ov = document.getElementById('sidebar-overlay');
-    sb.classList.add('open');
-    ov.classList.remove('hidden');
-    setTimeout(function() { ov.classList.remove('opacity-0'); }, 10);
-    document.body.style.overflow = 'hidden';
-  }
-
-  function closeSidebar() {
-    var sb = document.getElementById('sidebar');
-    var ov = document.getElementById('sidebar-overlay');
-    sb.classList.remove('open');
-    ov.classList.add('opacity-0');
-    setTimeout(function() { ov.classList.add('hidden'); }, 300);
-    document.body.style.overflow = '';
-  }
-
-  // Auto-expand the section containing the active link on page load
-  document.addEventListener('DOMContentLoaded', function () {
-    var activeLink = document.querySelector('.nav-active');
-    if (activeLink) {
-      var section = activeLink.closest('.nav-section-items');
-      if (section) {
-        section.classList.remove('collapsed');
-        var sectionId = section.id.replace('nav-', '');
-        var chev = document.getElementById('chev-' + sectionId);
-        if (chev) chev.classList.add('open');
-      }
-    }
-  });
-</script>
-
-<!-- Dark/Light Theme Toggle -->
-<script>
-  (function() {
-    var saved = localStorage.getItem('sms-theme') || 'light';
-    document.documentElement.setAttribute('data-theme', saved);
-    document.getElementById('theme-icon').textContent = saved === 'dark' ? '☀️' : '🌙';
-  })();
-
   function toggleTheme() {
     var html = document.documentElement;
-    var current = html.getAttribute('data-theme');
-    var next = current === 'dark' ? 'light' : 'dark';
+    var current = html.getAttribute('data-theme') || 'light';
+    var next = current === 'light' ? 'dark' : 'light';
     html.setAttribute('data-theme', next);
     localStorage.setItem('sms-theme', next);
     document.getElementById('theme-icon').textContent = next === 'dark' ? '☀️' : '🌙';
   }
-</script>
-
-<!-- Notifications (student only) -->
-{% if user.role == 'student' %}
-<script>
-  var _notifOpen = false;
-
-  function toggleNotifDropdown() {
-    _notifOpen = !_notifOpen;
-    var d = document.getElementById('notif-dropdown');
-    d.classList.toggle('open', _notifOpen);
-    if (_notifOpen) loadNotifications();
-  }
-
-  document.addEventListener('click', function(e) {
-    if (_notifOpen && !document.getElementById('notif-wrapper').contains(e.target)) {
-      _notifOpen = false;
-      document.getElementById('notif-dropdown').classList.remove('open');
-    }
-  });
-
-  async function loadNotifications() {
-    try {
-      const r = await fetch('/api/notifications');
-      const data = await r.json();
-      const list = document.getElementById('notif-list');
-      const badge = document.getElementById('notif-count-badge');
-      if (!data.notifications || data.notifications.length === 0) {
-        list.innerHTML = '<div class="px-4 py-6 text-center text-slate-400 text-sm">No new notifications</div>';
-        badge.classList.add('hidden');
-        return;
-      }
-      var unread = data.notifications.filter(n => !n.is_read).length;
-      if (unread > 0) {
-        badge.textContent = unread > 9 ? '9+' : unread;
-        badge.classList.remove('hidden');
-      } else {
-        badge.classList.add('hidden');
-      }
-      list.innerHTML = data.notifications.slice(0, 5).map(n => `
-        <div class="px-4 py-3 hover:bg-slate-50 transition ${n.is_read ? 'opacity-60' : ''}">
-          <div class="flex items-start gap-2">
-            <span class="text-base mt-0.5">${n.icon || '🔔'}</span>
-            <div class="flex-1 min-w-0">
-              <div class="text-sm font-medium text-slate-700 truncate">${n.title}</div>
-              <div class="text-xs text-slate-400 mt-0.5">${n.body}</div>
-              <div class="text-xs text-slate-300 mt-0.5">${n.time_ago}</div>
-            </div>
-            ${!n.is_read ? '<span class="w-2 h-2 bg-signal rounded-full mt-1.5 flex-shrink-0"></span>' : ''}
-          </div>
-        </div>
-      `).join('');
-    } catch(e) {
-      document.getElementById('notif-list').innerHTML = '<div class="px-4 py-4 text-center text-slate-400 text-sm">Unable to load</div>';
-    }
-  }
-
-  async function markAllRead() {
-    await fetch('/api/notifications/mark-read', {method:'POST', headers:{'X-CSRFToken': '{{ csrf_token() }}'}});
-    loadNotifications();
-  }
-
-  // Load count on page load
-  (async function() {
-    try {
-      const r = await fetch('/api/notifications');
-      const data = await r.json();
-      if (data.notifications) {
-        var unread = data.notifications.filter(n => !n.is_read).length;
-        var badge = document.getElementById('notif-count-badge');
-        if (unread > 0) {
-          badge.textContent = unread > 9 ? '9+' : unread;
-          badge.classList.remove('hidden');
-        }
-      }
-    } catch(e) {}
+  // Set correct icon on load
+  (function(){
+    var t = localStorage.getItem('sms-theme') || 'light';
+    var icon = document.getElementById('theme-icon');
+    if (icon) icon.textContent = t === 'dark' ? '☀️' : '🌙';
   })();
 </script>
-{% endif %}
-
-<!-- Global Search -->
-<script>
-  var _searchTimeout = null;
-
-  function runSearch(q) {
-    clearTimeout(_searchTimeout);
-    var res = document.getElementById('search-results');
-    if (!q || q.length < 2) { res.classList.add('hidden'); return; }
-    _searchTimeout = setTimeout(async function() {
-      try {
-        const r = await fetch('/api/search?q=' + encodeURIComponent(q));
-        const data = await r.json();
-        if (!data.results || data.results.length === 0) {
-          res.innerHTML = '<div class="px-4 py-3 text-slate-400">No results found</div>';
-        } else {
-          res.innerHTML = data.results.map(item => `
-            <a href="${item.url}" class="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition">
-              <span>${item.icon}</span>
-              <div>
-                <div class="font-medium text-slate-700">${item.title}</div>
-                <div class="text-xs text-slate-400">${item.category}</div>
-              </div>
-            </a>
-          `).join('');
-        }
-        res.classList.remove('hidden');
-      } catch(e) {}
-    }, 250);
-  }
-
-  document.addEventListener('click', function(e) {
-    var wrapper = document.getElementById('search-wrapper');
-    if (wrapper && !wrapper.contains(e.target)) {
-      document.getElementById('search-results').classList.add('hidden');
-    }
-  });
-</script>
-
-{% else %}
-  {% block auth %}{% endblock %}
-{% endif %}
 </body>
 </html>
