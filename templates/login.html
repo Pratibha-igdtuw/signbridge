@@ -44,15 +44,7 @@
       <h2 class="text-2xl font-semibold text-ink">Sign in</h2>
       <p class="text-sm text-slate-500 mt-1">Access the IDon portal.</p>
 
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for category, msg in messages %}
-          <div class="mt-4 px-4 py-2.5 rounded-md text-sm border
-                      {{ 'bg-teal-50 border-teal-200 text-teal-800' if category=='success'
-                         else 'bg-red-50 border-red-200 text-red-800' }}">{{ msg }}</div>
-        {% endfor %}
-      {% endwith %}
-
-      <form method="post" class="mt-6 space-y-4">
+      <form method="post" class="mt-6 space-y-4 js-validate">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>
           <label class="block text-sm font-medium text-steel mb-1">Username</label>

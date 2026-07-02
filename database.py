@@ -9,9 +9,11 @@ from config import Config
 
 
 def get_connection():
-    conn = sqlite3.connect(Config.DB_PATH)
+    conn = sqlite3.connect(Config.DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 30000")
     return conn
 
 
@@ -623,6 +625,37 @@ def migrate_v3(conn):
     cur.execute("UPDATE users SET status='active' WHERE status IS NULL")
 
     conn.commit()
+
+
+def migrate_v4(conn):
+    """v4 additions: in-app notification center."""
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS notifications (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            message    TEXT NOT NULL,
+            link       TEXT,
+            is_read    INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read)")
+    conn.commit()
+
+
+def create_notification(user_id, message, link=None):
+    """Insert a single in-app notification for one user."""
+    return execute(
+        "INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)",
+        (user_id, message, link),
+    )
+
+
+def notify_users(user_ids, message, link=None):
+    """Insert the same notification for multiple users (e.g. all students)."""
+    for uid in set(user_ids):
+        create_notification(uid, message, link)
 
 
 if __name__ == "__main__":
