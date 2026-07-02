@@ -58,7 +58,7 @@
       <button class="bg-signal hover:bg-teal-700 text-white text-sm font-medium px-5 py-2 rounded-md transition">
         ＋ Create Course
       </button>
-      <span class="text-xs text-slate-400 ml-3">Students matching dept + year will be auto-enrolled.</span>
+      <span class="text-xs text-slate-400 ml-3">Students matching dept + year + section will be auto-enrolled.</span>
     </div>
   </form>
 </div>
@@ -117,7 +117,7 @@
         <div class="flex gap-2">
           <!-- Bulk enroll -->
           <form method="post" action="{{ url_for('course_bulk_enroll', cid=selected_course.id) }}"
-                onsubmit="return confirm('Auto-enroll all {{ selected_course.department }} Year students?')">
+                onsubmit="return confirm('Auto-enroll all {{ selected_course.department }} Year {{ (selected_course.semester + 1) // 2 }} Section {{ selected_course.section }} students into {{ selected_course.name }}?')">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-steel rounded-md transition">
               ⚡ Bulk Enroll
