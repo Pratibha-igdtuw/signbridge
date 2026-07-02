@@ -143,62 +143,62 @@
     }
 
     /* apply theme before render to avoid flash */
-   /* Simple Sidebar Dropdown */
+    /* Simple Sidebar Dropdown */
 
-.sidebar-dropdown {
-    margin: 0;
-}
+    .sidebar-dropdown {
+      margin: 0;
+    }
 
-.sidebar-dropdown summary {
-    list-style: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 14px;
-    color: #cbd5e1;
-    font-size: 15px;
-    font-weight: 500;
-}
+    .sidebar-dropdown summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      color: #cbd5e1;
+      font-size: 15px;
+      font-weight: 500;
+    }
 
-.sidebar-dropdown summary::-webkit-details-marker {
-    display: none;
-}
+    .sidebar-dropdown summary::-webkit-details-marker {
+      display: none;
+    }
 
-.sidebar-dropdown summary:hover {
-    color: #ffffff;
-}
+    .sidebar-dropdown summary:hover {
+      color: #ffffff;
+    }
 
-.sidebar-dropdown .arrow {
-    transition: transform .25s;
-    color: #94a3b8;
-    font-size: 12px;
-}
+    .sidebar-dropdown .arrow {
+      transition: transform .25s;
+      color: #94a3b8;
+      font-size: 12px;
+    }
 
-.sidebar-dropdown[open] .arrow {
-    transform: rotate(90deg);
-}
+    .sidebar-dropdown[open] .arrow {
+      transform: rotate(90deg);
+    }
 
-.sidebar-dropdown .submenu {
-    margin-left: 18px;
-    border-left: 1px solid rgba(255,255,255,.08);
-    padding-left: 12px;
-}
+    .sidebar-dropdown .submenu {
+      margin-left: 18px;
+      border-left: 1px solid rgba(255, 255, 255, .08);
+      padding-left: 12px;
+    }
 
-.sidebar-dropdown .submenu a {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
-    color: #cbd5e1;
-    border-radius: 6px;
-    text-decoration: none;
-}
+    .sidebar-dropdown .submenu a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      color: #cbd5e1;
+      border-radius: 6px;
+      text-decoration: none;
+    }
 
-.sidebar-dropdown .submenu a:hover {
-    color: white;
-    background: transparent;
-}
+    .sidebar-dropdown .submenu a:hover {
+      color: white;
+      background: transparent;
+    }
   </style>
   <script>
       (function () {
@@ -238,7 +238,7 @@
         ADMIN NAVIGATION — Full system access
         ============================================================ #}
         {% if user.role == 'admin' %}
-        <details class="sidebar-dropdown" >
+        <details class="sidebar-dropdown">
 
           <summary>
             <span class="flex items-center gap-2">
@@ -257,14 +257,14 @@
           </div>
 
         </details>
-        <details class="sidebar-dropdown" >
+        <details class="sidebar-dropdown">
 
           <summary>
             <span class="flex items-center gap-2">
               🎓 Academics
             </span>
 
-           <span class="arrow">⌄</span>
+            <span class="arrow">⌄</span>
           </summary>
 
           <div class="submenu">
@@ -298,7 +298,7 @@
               📢 Communication
             </span>
 
-           <span class="arrow">⌄</span>
+            <span class="arrow">⌄</span>
           </summary>
 
           <div class="submenu">
@@ -385,48 +385,124 @@
         FACULTY NAVIGATION — Teaching & academic management only
         ============================================================ #}
         {% elif user.role == 'faculty' %}
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pb-1">Overview</div>
-        {{ nav('dashboard', 'Dashboard', '📊') }}
-        {{ nav('student_analytics', 'Analytics', '📈') }}
+        <details class="sidebar-dropdown" >
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Academics</div>
-        {{ nav('courses', 'My Courses', '📚') }}
-        {{ nav('students', 'My Students', '👥') }}
-        {{ nav('attendance', 'Attendance', '📅') }}
-        {{ nav('attendance_bulk_mark', 'Bulk Attendance', '✅') }}
-        {{ nav('assignments', 'Assignments', '📝') }}
-        {{ nav('results', 'Results', '📊') }}
-        {{ nav('timetable', 'Timetable', '🗒️') }}
-        {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
-        {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
+          <summary>
+            <span class="flex items-center gap-2">
+              📋 Overview
+            </span>
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Communication</div>
-        {{ nav('notices', 'Notices', '📢') }}
-        {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
-        {{ nav('grievances', 'Grievances', '📨') }}
-        {{ nav('leaves', 'Leave Applications', '🏖️') }}
+            <span class="arrow">⌄</span>
+          </summary>
 
+          <div class="submenu">
+
+            {{ nav('dashboard', 'Dashboard', '📊') }}
+
+            {{ nav('student_analytics', 'Analytics', '📈') }}
+
+          </div>
+
+        </details>
+        <details class="sidebar-dropdown" >
+
+          <summary>
+            <span class="flex items-center gap-2">
+              🎓 Academics
+            </span>
+
+            <span class="arrow">⌄</span>
+          </summary>
+
+          <div class="submenu">
+            {{ nav('courses', 'My Courses', '📚') }}
+            {{ nav('students', 'My Students', '👥') }}
+            {{ nav('attendance', 'Attendance', '📅') }}
+            {{ nav('attendance_bulk_mark', 'Bulk Attendance', '✅') }}
+            {{ nav('assignments', 'Assignments', '📝') }}
+            {{ nav('results', 'Results', '📊') }}
+            {{ nav('timetable', 'Timetable', '🗒️') }}
+            {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
+            {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
+          </div>
+
+        </details>
+        <details class="sidebar-dropdown" >
+
+          <summary>
+            <span class="flex items-center gap-2">
+              📢 Communication
+            </span>
+
+            <span class="arrow">⌄</span>
+          </summary>
+
+          <div class="submenu">
+            {{ nav('notices', 'Notices', '📢') }}
+            {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
+            {{ nav('grievances', 'Grievances', '📨') }}
+            {{ nav('leaves', 'Leave Applications', '🏖️') }}
+          </div>
+
+        </details>
         {# ============================================================
         STUDENT NAVIGATION — Personal academic view only
         ============================================================ #}
         {% elif user.role == 'student' %}
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pb-1">My Academics</div>
-        {{ nav('student_analytics', 'My Analytics', '📈') }}
-        {{ nav('attendance', 'My Attendance', '📅') }}
-        {{ nav('assignments', 'Assignments', '📝') }}
-        {{ nav('results', 'My Results', '📊') }}
-        {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
-        {{ nav('timetable', 'Class Timetable', '🗒️') }}
-        {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
+        <details class="sidebar-dropdown" >
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Information</div>
-        {{ nav('notices', 'Notices', '📢') }}
-        {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
-        {{ nav('fee_status', 'Fee Status', '💰') }}
+          <summary>
+            <span class="flex items-center gap-2">
+              🎓 My Academics
+            </span>
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Support</div>
-        {{ nav('grievances', 'Grievances', '📨') }}
-        {{ nav('leaves', 'Leave Applications', '🏖️') }}
+            <span class="arrow">⌄</span>
+          </summary>
+
+          <div class="submenu">
+            {{ nav('student_analytics', 'My Analytics', '📈') }}
+            {{ nav('attendance', 'My Attendance', '📅') }}
+            {{ nav('assignments', 'Assignments', '📝') }}
+            {{ nav('results', 'My Results', '📊') }}
+            {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
+            {{ nav('timetable', 'Class Timetable', '🗒️') }}
+            {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
+          </div>
+
+        </details>
+        <details class="sidebar-dropdown" >
+
+          <summary>
+            <span class="flex items-center gap-2">
+              Information
+            </span>
+
+            <span class="arrow">⌄</span>
+          </summary>
+
+          <div class="submenu">
+            {{ nav('notices', 'Notices', '📢') }}
+            {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
+            {{ nav('fee_status', 'Fee Status', '💰') }}
+          </div>
+
+        </details>
+        <details class="sidebar-dropdown" >
+
+          <summary>
+            <span class="flex items-center gap-2">
+              Support
+            </span>
+
+            <span class="arrow">⌄</span>
+          </summary>
+
+          <div class="submenu">
+            {{ nav('grievances', 'Grievances', '📨') }}
+            {{ nav('leaves', 'Leave Applications', '🏖️') }}
+          </div>
+
+        </details>
         {% endif %}
       </nav>
 
