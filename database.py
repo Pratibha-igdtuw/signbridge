@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS students (
     email        TEXT NOT NULL,
     department   TEXT NOT NULL,
     year         INTEGER NOT NULL,
+    section      TEXT NOT NULL DEFAULT 'A',
     cgpa         REAL,
     phone        TEXT,
     created_by   INTEGER REFERENCES users(id),
@@ -495,6 +496,14 @@ def migrate_db():
     # 3. Add is_late to homework_submissions
     try:
         cur.execute("ALTER TABLE homework_submissions ADD COLUMN is_late INTEGER DEFAULT 0")
+    except Exception:
+        pass
+
+    # 3b. Add section to students (enables section-aware bulk enrollment —
+    # previously "Bulk Enroll" matched dept+year only and swept in every
+    # section, not just the one the course was created for)
+    try:
+        cur.execute("ALTER TABLE students ADD COLUMN section TEXT NOT NULL DEFAULT 'A'")
     except Exception:
         pass
 

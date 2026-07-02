@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,15 +9,17 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
-      theme: { extend: {
-        fontFamily: { mono: ['ui-monospace','SFMono-Regular','Menlo','monospace'] },
-        colors: {
-          ink:   '#0f172a',
-          steel: '#334155',
-          signal:'#0d9488',
-          alert: '#b45309',
+      theme: {
+        extend: {
+          fontFamily: { mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'] },
+          colors: {
+            ink: '#0f172a',
+            steel: '#334155',
+            signal: '#0d9488',
+            alert: '#b45309',
+          }
         }
-      }}
+      }
     }
   </script>
   <style>
@@ -27,45 +30,200 @@
     @keyframes pulse-badge { 0%,100%{opacity:1} 50%{opacity:.6} }
     .badge-pulse { animation: pulse-badge 2s ease-in-out infinite; }
     .nav-active { background: rgba(255,255,255,0.1); color: #fff; }
+
+    body {
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .eyebrow {
+      letter-spacing: .18em;
+    }
+
+    table.evidence td,
+    table.evidence th {
+      font-variant-numeric: tabular-nums;
+    }
+
+    @keyframes pulse-badge {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .6
+      }
+    }
+
+    .badge-pulse {
+      animation: pulse-badge 2s ease-in-out infinite;
+    }
+
+    .nav-active {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+
     /* Session countdown */
     #session-warn { display:none; }
+    /* Every data table in the app shares this class — make it scroll
+       within its own box on narrow screens instead of stretching (and
+       overflowing) the whole page. `overflow-x: auto` here also stops
+       this table from forcing its parent flex/grid column wider than
+       the viewport (an item's automatic min-size collapses to 0 once
+       it has non-visible overflow). */
+    table.evidence { display: block; overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
   </style>
   <!-- Dark mode CSS variables -->
   <style>
-    :root,[data-theme="light"] {
-      --bg-page: #f1f5f9; --bg-sidebar: #0f172a; --bg-card: #ffffff;
-      --text-main: #1e293b; --text-muted: #64748b; --border-col: #e2e8f0;
-      --header-bg: #ffffff; --table-row-alt: #f8fafc;
+    :root,
+    [data-theme="light"] {
+      --bg-page: #f1f5f9;
+      --bg-sidebar: #0f172a;
+      --bg-card: #ffffff;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --border-col: #e2e8f0;
+      --header-bg: #ffffff;
+      --table-row-alt: #f8fafc;
     }
+
     [data-theme="dark"] {
-      --bg-page: #0f172a; --bg-sidebar: #020617; --bg-card: #1e293b;
-      --text-main: #e2e8f0; --text-muted: #94a3b8; --border-col: #334155;
-      --header-bg: #1e293b; --table-row-alt: #162032;
+      --bg-page: #0f172a;
+      --bg-sidebar: #020617;
+      --bg-card: #1e293b;
+      --text-main: #e2e8f0;
+      --text-muted: #94a3b8;
+      --border-col: #334155;
+      --header-bg: #1e293b;
+      --table-row-alt: #162032;
     }
-    body { background-color: var(--bg-page); color: var(--text-main); }
-    .dark-card { background: var(--bg-card); border-color: var(--border-col); }
-    .dark-header { background: var(--bg-header, var(--header-bg)); border-color: var(--border-col); }
-    [data-theme="dark"] .bg-white { background-color: var(--bg-card) !important; }
-    [data-theme="dark"] .bg-slate-100 { background-color: var(--bg-page) !important; }
-    [data-theme="dark"] .bg-slate-50 { background-color: #162032 !important; }
-    [data-theme="dark"] .border-slate-200 { border-color: var(--border-col) !important; }
-    [data-theme="dark"] .text-slate-800 { color: var(--text-main) !important; }
-    [data-theme="dark"] .text-slate-600 { color: var(--text-muted) !important; }
-    [data-theme="dark"] .text-slate-500 { color: var(--text-muted) !important; }
-    [data-theme="dark"] .text-ink { color: #e2e8f0 !important; }
-    [data-theme="dark"] header { background: var(--header-bg) !important; }
+
+    body {
+      background-color: var(--bg-page);
+      color: var(--text-main);
+    }
+
+    .dark-card {
+      background: var(--bg-card);
+      border-color: var(--border-col);
+    }
+
+    .dark-header {
+      background: var(--bg-header, var(--header-bg));
+      border-color: var(--border-col);
+    }
+
+    [data-theme="dark"] .bg-white {
+      background-color: var(--bg-card) !important;
+    }
+
+    [data-theme="dark"] .bg-slate-100 {
+      background-color: var(--bg-page) !important;
+    }
+
+    [data-theme="dark"] .bg-slate-50 {
+      background-color: #162032 !important;
+    }
+
+    [data-theme="dark"] .border-slate-200 {
+      border-color: var(--border-col) !important;
+    }
+
+    [data-theme="dark"] .text-slate-800 {
+      color: var(--text-main) !important;
+    }
+
+    [data-theme="dark"] .text-slate-600 {
+      color: var(--text-muted) !important;
+    }
+
+    [data-theme="dark"] .text-slate-500 {
+      color: var(--text-muted) !important;
+    }
+
+    [data-theme="dark"] .text-ink {
+      color: #e2e8f0 !important;
+    }
+
+    [data-theme="dark"] header {
+      background: var(--header-bg) !important;
+    }
+
     [data-theme="dark"] table tr:nth-child(even) td,
-    [data-theme="dark"] table tr:nth-child(even) { background: var(--table-row-alt) !important; }
+    [data-theme="dark"] table tr:nth-child(even) {
+      background: var(--table-row-alt) !important;
+    }
+
     /* apply theme before render to avoid flash */
+    /* Simple Sidebar Dropdown */
+
+    .sidebar-dropdown {
+      margin: 0;
+    }
+
+    .sidebar-dropdown summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      color: #cbd5e1;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .sidebar-dropdown summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .sidebar-dropdown summary:hover {
+      color: #ffffff;
+    }
+
+    .sidebar-dropdown .arrow {
+      transition: transform .25s;
+      color: #94a3b8;
+      font-size: 12px;
+    }
+
+    .sidebar-dropdown[open] .arrow {
+      transform: rotate(90deg);
+    }
+
+    .sidebar-dropdown .submenu {
+      margin-left: 18px;
+      border-left: 1px solid rgba(255, 255, 255, .08);
+      padding-left: 12px;
+    }
+
+    .sidebar-dropdown .submenu a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      color: #cbd5e1;
+      border-radius: 6px;
+      text-decoration: none;
+    }
+
+    .sidebar-dropdown .submenu a:hover {
+      color: white;
+      background: transparent;
+    }
   </style>
   <script>
-    (function(){
-      var t = localStorage.getItem('sms-theme') || 'light';
-      document.documentElement.setAttribute('data-theme', t);
-    })();
+      (function () {
+        var t = localStorage.getItem('sms-theme') || 'light';
+        document.documentElement.setAttribute('data-theme', t);
+      })();
   </script>
   <script src="{{ url_for('static', filename='js/ui.js') }}" defer></script>
 </head>
+
 <body class="bg-slate-100 text-slate-800 min-h-screen">
 <div id="toast-container" class="fixed top-4 right-4 z-[100] flex flex-col gap-2 w-80 max-w-[90vw]"></div>
 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -79,20 +237,33 @@
 <script src="{{ url_for('static', filename='js/modal.js') }}" defer></script>
 {% if user %}
 <div class="flex min-h-screen">
-  <!-- Sidebar -->
-  <aside class="w-60 shrink-0 bg-ink text-slate-300 flex flex-col">
-    <div class="px-5 py-5 border-b border-white/10">
-      <div class="eyebrow text-[10px] uppercase text-signal font-semibold">IDon Portal</div>
-      <div class="text-white font-semibold text-lg leading-tight mt-1">Secure&nbsp;SMS</div>
-      <div class="mt-1">
-        {% if user.role == 'admin' %}
-          <span class="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full font-semibold">ADMIN</span>
-        {% elif user.role == 'faculty' %}
-          <span class="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-semibold">FACULTY</span>
-        {% else %}
-          <span class="text-[10px] bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded-full font-semibold">STUDENT</span>
-        {% endif %}
+  <!-- Mobile/tablet backdrop (click to close sidebar) -->
+  <div id="sidebar-overlay" onclick="closeSidebar()"
+       class="fixed inset-0 bg-black/40 z-30 hidden lg:hidden"></div>
+
+  <!-- Sidebar: off-canvas drawer on phone/tablet, static column on large screens -->
+  <aside id="sidebar"
+         class="w-64 sm:w-60 shrink-0 bg-ink text-slate-300 flex flex-col
+                fixed inset-y-0 left-0 z-40 -translate-x-full transition-transform duration-200 ease-out
+                lg:static lg:translate-x-0 lg:z-auto overflow-y-auto">
+    <div class="px-5 py-5 border-b border-white/10 flex items-start justify-between gap-2">
+      <div>
+        <div class="eyebrow text-[10px] uppercase text-signal font-semibold">IDon Portal</div>
+        <div class="text-white font-semibold text-lg leading-tight mt-1">Secure&nbsp;SMS</div>
+        <div class="mt-1">
+          {% if user.role == 'admin' %}
+            <span class="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full font-semibold">ADMIN</span>
+          {% elif user.role == 'faculty' %}
+            <span class="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-semibold">FACULTY</span>
+          {% else %}
+            <span class="text-[10px] bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded-full font-semibold">STUDENT</span>
+          {% endif %}
+        </div>
       </div>
+      <button onclick="closeSidebar()" aria-label="Close menu"
+              class="lg:hidden w-8 h-8 shrink-0 rounded-md flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition">
+        ✕
+      </button>
     </div>
     <nav class="flex-1 px-3 py-4 space-y-1 text-sm">
       {% macro nav(endpoint, label, icon='') %}
@@ -103,104 +274,470 @@
         </a>
       {% endmacro %}
 
+<<<<<<< HEAD
+        {# ============================================================
+        ADMIN NAVIGATION — Full system access
+        ============================================================ #}
+        {% if user.role == 'admin' %}
+        <details class="sidebar-dropdown">
+=======
       {# ============================================================
-         ADMIN NAVIGATION — Full system access
-         ============================================================ #}
+      ADMIN NAVIGATION — Full system access
+      ============================================================ #}
       {% if user.role == 'admin' %}
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pb-1">Overview</div>
-        {{ nav('dashboard', 'Dashboard', '📊') }}
-        {{ nav('student_analytics', 'Analytics', '📈') }}
+      <details class="sidebar-dropdown" >
+>>>>>>> b6cdbd1ceefd1669eac4a922f902c75f880ce59d
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Academics</div>
-        {{ nav('students', 'Student Records', '👥') }}
-        {{ nav('attendance', 'Attendance', '📅') }}
-        {{ nav('attendance_bulk_mark', 'Bulk Attendance', '✅') }}
-        {{ nav('assignments', 'Assignments', '📝') }}
-        {{ nav('results', 'Results', '📊') }}
-        {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
-        {{ nav('timetable', 'Timetable', '🗒️') }}
-        {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
-        {{ nav('syllabus.admin_index', 'Manage Syllabus', '⚙️') }}
+        <summary>
+          <span class="flex items-center gap-2">
+            📋 Overview
+          </span>
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Communication</div>
-        {{ nav('notices', 'Notices', '📢') }}
-        {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
-        {{ nav('grievances', 'Grievances', '📨') }}
-        {{ nav('leaves', 'Leave Applications', '🏖️') }}
+          <span class="arrow">⌄</span>
+        </summary>
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Finance & Users</div>
-        {{ nav('fee_status', 'Fee Status', '💰') }}
-        {{ nav('courses', 'Courses & Enrollment', '📚') }}
-        {{ nav('bulk_upload_students', 'Bulk Student Upload', '📥') }}
-        {{ nav('files', 'File Manager', '📁') }}
-        {{ nav('users_list', 'User Accounts', '🛡️') }}
-        <a href="{{ url_for('pending_users') }}"
-           class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
+        <div class="submenu">
+
+          {{ nav('dashboard', 'Dashboard', '📊') }}
+
+          {{ nav('student_analytics', 'Analytics', '📈') }}
+
+ 
+          </div>
+
+        </details>
+        <details class="sidebar-dropdown">
+
+          <summary>
+            <span class="flex items-center gap-2">
+              🎓 Academics
+            </span>
+
+            <span class="arrow">⌄</span>
+          </summary>
+
+          <div class="submenu">
+
+            {{ nav('students', 'Student Records', '👥') }}
+
+            {{ nav('attendance', 'Attendance', '📅') }}
+
+            {{ nav('attendance_bulk_mark', 'Bulk Attendance', '✅') }}
+
+            {{ nav('assignments', 'Assignments', '📝') }}
+
+            {{ nav('results', 'Results', '📊') }}
+
+            {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
+
+            {{ nav('timetable', 'Timetable', '🗒️') }}
+
+            {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
+
+            {{ nav('syllabus.admin_index', 'Manage Syllabus', '⚙️') }}
+
+          </div>
+
+        </details>
+
+        <details class="sidebar-dropdown">
+
+          <summary>
+            <span class="flex items-center gap-2">
+              📢 Communication
+            </span>
+
+            <span class="arrow">⌄</span>
+          </summary>
+
+          <div class="submenu">
+
+            {{ nav('notices', 'Notices', '📢') }}
+
+            {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
+
+            {{ nav('grievances', 'Grievances', '📨') }}
+
+            {{ nav('leaves', 'Leave Applications', '🏖️') }}
+
+          </div>
+
+        </details>
+
+        <details class="sidebar-dropdown">
+
+          <summary>
+            <span class="flex items-center gap-2">
+              💰 Finance & Users
+            </span>
+
+            <span class="arrow">⌄</span>
+          </summary>
+
+          <div class="submenu">
+
+            {{ nav('fee_status', 'Fee Status', '💰') }}
+
+            {{ nav('courses', 'Courses & Enrollment', '📚') }}
+
+            {{ nav('bulk_upload_students', 'Bulk Student Upload', '📥') }}
+
+            {{ nav('files', 'File Manager', '📁') }}
+
+            {{ nav('users_list', 'User Accounts', '🛡️') }}
+
+            <a href="{{ url_for('pending_users') }}" class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
                   {{ 'nav-active' if request.endpoint == 'pending_users' else '' }}">
-          <span class="flex items-center gap-2">⏳ Pending Approvals</span>
-          {% if pending_count > 0 %}
-          <span class="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">{{ pending_count }}</span>
-          {% endif %}
-        </a>
+              <span class="flex items-center gap-2">⏳ Pending Approvals</span>
+              {% if pending_count > 0 %}
+              <span
+                class="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">{{
+                pending_count }}</span>
+              {% endif %}
+            </a>
+          </div>
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Forensics</div>
-        {{ nav('audit_activity', 'Activity Logs', '📋') }}
-        {{ nav('audit_logins', 'Login History', '🔐') }}
-        {{ nav('audit_files', 'File Access', '🗂️') }}
-        <a href="{{ url_for('audit_alerts') }}"
-           class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
+        </details>
+        <details class="sidebar-dropdown">
+
+          <summary>
+            <span class="flex items-center gap-2">
+              🔐 Forensics
+            </span>
+
+            <span class="arrow">⌄</span>
+          </summary>
+
+          <div class="submenu">
+
+            {{ nav('audit_activity', 'Activity Logs', '📋') }}
+
+            {{ nav('audit_logins', 'Login History', '🔐') }}
+
+            {{ nav('audit_files', 'File Access', '🗂️') }}
+
+            {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
+
+
+            <a href="{{ url_for('audit_alerts') }}" class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
                   {{ 'nav-active' if request.endpoint == 'audit_alerts' else '' }}">
-          <span class="flex items-center gap-2">⚠️ Injection Alerts</span>
-          <span id="alert-badge" class="hidden badge-pulse bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center"></span>
-        </a>
+              <span class="flex items-center gap-2">⚠️ Injection Alerts</span>
+              <span id="alert-badge"
+                class="hidden badge-pulse bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center"></span>
+            </a>
+          </div>
+
+        </details>
         {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
 
+        {# ============================================================
+        FACULTY NAVIGATION — Teaching & academic management only
+        ============================================================ #}
+        {% elif user.role == 'faculty' %}
+        <details class="sidebar-dropdown" >
+
+          <summary>
+            <span class="flex items-center gap-2">
+              📋 Overview
+            </span>
+
+            <span class="arrow">⌄</span>
+          </summary>
+
+          <div class="submenu">
+
+            {{ nav('dashboard', 'Dashboard', '📊') }}
+
+            {{ nav('student_analytics', 'Analytics', '📈') }}
+
+          </div>
+
+        </details>
+        <details class="sidebar-dropdown" >
+
+          <summary>
+            <span class="flex items-center gap-2">
+              🎓 Academics
+            </span>
+
+            <span class="arrow">⌄</span>
+          </summary>
+
+          <div class="submenu">
+            {{ nav('courses', 'My Courses', '📚') }}
+            {{ nav('students', 'My Students', '👥') }}
+            {{ nav('attendance', 'Attendance', '📅') }}
+            {{ nav('attendance_bulk_mark', 'Bulk Attendance', '✅') }}
+            {{ nav('assignments', 'Assignments', '📝') }}
+            {{ nav('results', 'Results', '📊') }}
+            {{ nav('timetable', 'Timetable', '🗒️') }}
+            {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
+            {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
+          </div>
+
+        </details>
+        <details class="sidebar-dropdown" >
+
+          <summary>
+            <span class="flex items-center gap-2">
+              📢 Communication
+            </span>
+
+            <span class="arrow">⌄</span>
+          </summary>
+
+          <div class="submenu">
+            {{ nav('notices', 'Notices', '📢') }}
+            {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
+            {{ nav('grievances', 'Grievances', '📨') }}
+            {{ nav('leaves', 'Leave Applications', '🏖️') }}
+          </div>
+
+        </details>
+        {# ============================================================
+        STUDENT NAVIGATION — Personal academic view only
+        ============================================================ #}
+        {% elif user.role == 'student' %}
+        <details class="sidebar-dropdown" >
+
+          <summary>
+            <span class="flex items-center gap-2">
+              🎓 My Academics
+            </span>
+
+            <span class="arrow">⌄</span>
+          </summary>
+
+          <div class="submenu">
+            {{ nav('student_analytics', 'My Analytics', '📈') }}
+            {{ nav('attendance', 'My Attendance', '📅') }}
+            {{ nav('assignments', 'Assignments', '📝') }}
+            {{ nav('results', 'My Results', '📊') }}
+            {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
+            {{ nav('timetable', 'Class Timetable', '🗒️') }}
+            {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
+          </div>
+
+        </details>
+        <details class="sidebar-dropdown" >
+
+          <summary>
+            <span class="flex items-center gap-2">
+              Information
+            </span>
+
+            <span class="arrow">⌄</span>
+          </summary>
+
+          <div class="submenu">
+            {{ nav('notices', 'Notices', '📢') }}
+            {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
+            {{ nav('fee_status', 'Fee Status', '💰') }}
+          </div>
+
+        </details>
+        <details class="sidebar-dropdown" >
+
+          <summary>
+            <span class="flex items-center gap-2">
+              Support
+            </span>
+
+            <span class="arrow">⌄</span>
+          </summary>
+
+          <div class="submenu">
+            {{ nav('grievances', 'Grievances', '📨') }}
+            {{ nav('leaves', 'Leave Applications', '🏖️') }}
+          </div>
+
+        </details>
+        {% endif %}
+      </nav>
+
+      <!-- Session countdown + user info -->
+      <div class="px-4 py-4 border-t border-white/10 text-xs">
+        <div id="session-warn" class="mb-2 px-2 py-1.5 bg-yellow-500/20 text-yellow-300 rounded text-[11px]">
+          ⏱ Session expires in <span id="session-countdown"></span>
+
+
+        </div>
+
+      </details>
+      <details class="sidebar-dropdown" >
+
+        <summary>
+          <span class="flex items-center gap-2">
+            🎓 Academics
+          </span>
+
+         <span class="arrow">⌄</span>
+        </summary>
+
+        <div class="submenu">
+
+          {{ nav('students', 'Student Records', '👥') }}
+
+          {{ nav('attendance', 'Attendance', '📅') }}
+
+          {{ nav('attendance_bulk_mark', 'Bulk Attendance', '✅') }}
+
+          {{ nav('assignments', 'Assignments', '📝') }}
+
+          {{ nav('results', 'Results', '📊') }}
+
+          {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
+
+          {{ nav('timetable', 'Timetable', '🗒️') }}
+
+          {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
+
+          {{ nav('syllabus.admin_index', 'Manage Syllabus', '⚙️') }}
+
+        </div>
+
+      </details>
+
+      <details class="sidebar-dropdown">
+
+        <summary>
+          <span class="flex items-center gap-2">
+            📢 Communication
+          </span>
+
+         <span class="arrow">⌄</span>
+        </summary>
+
+        <div class="submenu">
+
+          {{ nav('notices', 'Notices', '📢') }}
+
+          {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
+
+          {{ nav('grievances', 'Grievances', '📨') }}
+
+          {{ nav('leaves', 'Leave Applications', '🏖️') }}
+
+        </div>
+
+      </details>
+
+      <details class="sidebar-dropdown">
+
+        <summary>
+          <span class="flex items-center gap-2">
+            💰 Finance & Users
+          </span>
+
+          <span class="arrow">⌄</span>
+        </summary>
+
+        <div class="submenu">
+
+          {{ nav('fee_status', 'Fee Status', '💰') }}
+
+          {{ nav('courses', 'Courses & Enrollment', '📚') }}
+
+          {{ nav('bulk_upload_students', 'Bulk Student Upload', '📥') }}
+
+          {{ nav('files', 'File Manager', '📁') }}
+
+          {{ nav('users_list', 'User Accounts', '🛡️') }}
+
+          <a href="{{ url_for('pending_users') }}" class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
+                {{ 'nav-active' if request.endpoint == 'pending_users' else '' }}">
+            <span class="flex items-center gap-2">⏳ Pending Approvals</span>
+            {% if pending_count > 0 %}
+            <span
+              class="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">{{
+              pending_count }}</span>
+            {% endif %}
+          </a>
+        </div>
+
+      </details>
+      <details class="sidebar-dropdown">
+
+        <summary>
+          <span class="flex items-center gap-2">
+            🔐 Forensics
+          </span>
+
+          <span class="arrow">⌄</span>
+        </summary>
+
+        <div class="submenu">
+
+          {{ nav('audit_activity', 'Activity Logs', '📋') }}
+
+          {{ nav('audit_logins', 'Login History', '🔐') }}
+
+          {{ nav('audit_files', 'File Access', '🗂️') }}
+
+          {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
+
+
+          <a href="{{ url_for('audit_alerts') }}" class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
+                {{ 'nav-active' if request.endpoint == 'audit_alerts' else '' }}">
+            <span class="flex items-center gap-2">⚠️ Injection Alerts</span>
+            <span id="alert-badge"
+              class="hidden badge-pulse bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center"></span>
+          </a>
+        </div>
+
+      </details>
+
       {# ============================================================
-         FACULTY NAVIGATION — Teaching & academic management only
-         ============================================================ #}
+      FACULTY NAVIGATION — Teaching & academic management only
+      ============================================================ #}
       {% elif user.role == 'faculty' %}
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pb-1">Overview</div>
-        {{ nav('dashboard', 'Dashboard', '📊') }}
-        {{ nav('student_analytics', 'Analytics', '📈') }}
+      <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pb-1">Overview</div>
+      {{ nav('dashboard', 'Dashboard', '📊') }}
+      {{ nav('student_analytics', 'Analytics', '📈') }}
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Academics</div>
-        {{ nav('courses', 'My Courses', '📚') }}
-        {{ nav('students', 'My Students', '👥') }}
-        {{ nav('attendance', 'Attendance', '📅') }}
-        {{ nav('attendance_bulk_mark', 'Bulk Attendance', '✅') }}
-        {{ nav('assignments', 'Assignments', '📝') }}
-        {{ nav('results', 'Results', '📊') }}
-        {{ nav('timetable', 'Timetable', '🗒️') }}
-        {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
-        {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
+      <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Academics</div>
+      {{ nav('courses', 'My Courses', '📚') }}
+      {{ nav('students', 'My Students', '👥') }}
+      {{ nav('attendance', 'Attendance', '📅') }}
+      {{ nav('attendance_bulk_mark', 'Bulk Attendance', '✅') }}
+      {{ nav('assignments', 'Assignments', '📝') }}
+      {{ nav('results', 'Results', '📊') }}
+      {{ nav('timetable', 'Timetable', '🗒️') }}
+      {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
+      {{ nav('materials.index', 'Course Materials', '📚') }}
+      {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
+      {{ nav('faculty_analytics.index', 'Performance Analytics', '📊') }}
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Communication</div>
-        {{ nav('notices', 'Notices', '📢') }}
-        {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
-        {{ nav('grievances', 'Grievances', '📨') }}
-        {{ nav('leaves', 'Leave Applications', '🏖️') }}
+      <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Communication</div>
+      {{ nav('notices', 'Notices', '📢') }}
+      {{ nav('announcements.index', 'Class Announcements', '📢') }}
+      {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
+      {{ nav('grievances', 'Grievances', '📨') }}
+      {{ nav('leaves', 'Leave Applications', '🏖️') }}
 
       {# ============================================================
-         STUDENT NAVIGATION — Personal academic view only
-         ============================================================ #}
+      STUDENT NAVIGATION — Personal academic view only
+      ============================================================ #}
       {% elif user.role == 'student' %}
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pb-1">My Academics</div>
-        {{ nav('student_analytics', 'My Analytics', '📈') }}
-        {{ nav('attendance', 'My Attendance', '📅') }}
-        {{ nav('assignments', 'Assignments', '📝') }}
-        {{ nav('results', 'My Results', '📊') }}
-        {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
-        {{ nav('timetable', 'Class Timetable', '🗒️') }}
-        {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
+      <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pb-1">My Academics</div>
+      {{ nav('student_analytics', 'My Analytics', '📈') }}
+      {{ nav('attendance', 'My Attendance', '📅') }}
+      {{ nav('assignments', 'Assignments', '📝') }}
+      {{ nav('results', 'My Results', '📊') }}
+      {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
+      {{ nav('timetable', 'Class Timetable', '🗒️') }}
+      {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
+      {{ nav('materials.index', 'Course Materials', '📚') }}
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Information</div>
-        {{ nav('notices', 'Notices', '📢') }}
-        {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
-        {{ nav('fee_status', 'Fee Status', '💰') }}
+      <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Information</div>
+      {{ nav('notices', 'Notices', '📢') }}
+      {{ nav('announcements.index', 'Class Announcements', '📢') }}
+      {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
+      {{ nav('fee_status', 'Fee Status', '💰') }}
 
-        <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Support</div>
-        {{ nav('grievances', 'Grievances', '📨') }}
-        {{ nav('leaves', 'Leave Applications', '🏖️') }}
+      <div class="eyebrow text-[10px] uppercase text-slate-500 px-3 pt-4 pb-1">Support</div>
+      {{ nav('grievances', 'Grievances', '📨') }}
+      {{ nav('leaves', 'Leave Applications', '🏖️') }}
       {% endif %}
     </nav>
 
@@ -223,16 +760,29 @@
 
   <!-- Main -->
   <div class="flex-1 flex flex-col min-w-0">
+<<<<<<< HEAD
     <header class="bg-white border-b border-slate-200 px-8 py-4">
       <div class="max-w-[1400px] mx-auto flex items-center justify-between">
       <h1 class="text-xl font-semibold text-ink">{% block heading %}{% endblock %}</h1>
       <div class="flex items-center gap-3">
+=======
+    <header class="bg-white border-b border-slate-200 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <button onclick="openSidebar()" aria-label="Open menu"
+                class="lg:hidden w-9 h-9 shrink-0 rounded-md flex items-center justify-center text-slate-500 hover:text-ink hover:bg-slate-100 transition">
+          ☰
+        </button>
+        <h1 class="text-lg sm:text-xl font-semibold text-ink truncate">{% block heading %}{% endblock %}</h1>
+      </div>
+      <div class="flex items-center gap-3 shrink-0">
+>>>>>>> 08c56c8b2d7b915df53cecb6a9e6a6354d1d3dec
         {% if user and user.role == 'admin' and pending_count > 0 %}
         <a href="{{ url_for('pending_users') }}"
-           class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-800 text-xs font-medium rounded-full hover:bg-amber-200 transition">
+           class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-800 text-xs font-medium rounded-full hover:bg-amber-200 transition">
           <span>⏳</span> {{ pending_count }} pending approval{{ 's' if pending_count != 1 else '' }}
         </a>
         {% endif %}
+<<<<<<< HEAD
         <div class="relative">
           <button id="notif-bell-btn" title="Notifications" onclick="toggleNotifDropdown()"
                   class="relative w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition text-slate-500 hover:text-slate-800">
@@ -252,14 +802,30 @@
         </div>
         <button id="theme-toggle" title="Toggle dark mode"
                 onclick="toggleTheme()"
+=======
+        <button id="theme-toggle" title="Toggle dark mode" onclick="toggleTheme()"
+>>>>>>> 08c56c8b2d7b915df53cecb6a9e6a6354d1d3dec
                 class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition text-slate-500 hover:text-slate-800">
           <span id="theme-icon">🌙</span>
         </button>
       </div>
       </div>
     </header>
+<<<<<<< HEAD
     <main class="flex-1 px-8 py-6">
       <div class="max-w-[1400px] mx-auto">
+=======
+    <main class="flex-1 px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, msg in messages %}
+        <div class="mb-3 px-4 py-2.5 rounded-md text-sm border
+                      {{ 'bg-teal-50 border-teal-200 text-teal-800' if category=='success'
+                         else 'bg-red-50 border-red-200 text-red-800' }}">
+          {{ msg }}
+        </div>
+        {% endfor %}
+      {% endwith %}
+>>>>>>> 08c56c8b2d7b915df53cecb6a9e6a6354d1d3dec
       {% block content %}{% endblock %}
       </div>
     </main>
@@ -279,7 +845,7 @@
         if (count > 0) { badge.textContent = count > 99 ? '99+' : count; badge.classList.remove('hidden'); }
         else { badge.classList.add('hidden'); }
       }
-    } catch(e) {}
+    } catch (e) { }
   }
   refreshAlertBadge();
   setInterval(refreshAlertBadge, 30000);
@@ -288,7 +854,7 @@
 
 <!-- Session idle countdown (warn at 3 min remaining of 20 min) -->
 <script>
-  (function() {
+  (function () {
     const TIMEOUT_MS = {{ config.SESSION_TIMEOUT_SECONDS }} * 1000;
     const WARN_AT_MS = 3 * 60 * 1000;
     let lastActivity = Date.now();
@@ -296,14 +862,14 @@
     let countEl = document.getElementById('session-countdown');
 
     function resetTimer() { lastActivity = Date.now(); }
-    ['click','keydown','mousemove','touchstart'].forEach(e => document.addEventListener(e, resetTimer, {passive:true}));
+    ['click', 'keydown', 'mousemove', 'touchstart'].forEach(e => document.addEventListener(e, resetTimer, { passive: true }));
 
     function fmt(ms) {
-      let s = Math.floor(ms/1000);
-      return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+      let s = Math.floor(ms / 1000);
+      return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
     }
 
-    setInterval(function() {
+    setInterval(function () {
       let elapsed = Date.now() - lastActivity;
       let remaining = TIMEOUT_MS - elapsed;
       if (remaining <= 0) {
@@ -319,7 +885,7 @@
 </script>
 
 {% else %}
-  {% block auth %}{% endblock %}
+{% block auth %}{% endblock %}
 {% endif %}
 <script>
   function toggleTheme() {
@@ -336,6 +902,32 @@
     var icon = document.getElementById('theme-icon');
     if (icon) icon.textContent = t === 'dark' ? '☀️' : '🌙';
   })();
+
+  // Responsive sidebar (off-canvas drawer on phone/tablet, static on lg+)
+  function openSidebar() {
+    var sb = document.getElementById('sidebar');
+    var ov = document.getElementById('sidebar-overlay');
+    if (sb) sb.classList.remove('-translate-x-full');
+    if (ov) ov.classList.remove('hidden');
+  }
+  function closeSidebar() {
+    var sb = document.getElementById('sidebar');
+    var ov = document.getElementById('sidebar-overlay');
+    if (sb) sb.classList.add('-translate-x-full');
+    if (ov) ov.classList.add('hidden');
+  }
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeSidebar();
+  });
+  // If the viewport grows into the desktop breakpoint while the drawer
+  // is open, drop the mobile overlay so it doesn't linger behind it.
+  window.addEventListener('resize', function() {
+    if (window.innerWidth >= 1024) {
+      var ov = document.getElementById('sidebar-overlay');
+      if (ov) ov.classList.add('hidden');
+    }
+  });
 </script>
 </body>
+
 </html>

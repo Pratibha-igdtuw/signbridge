@@ -58,6 +58,7 @@
         {{ th('full_name','Name') }}
         {{ th('department','Dept') }}
         {{ th('year','Year') }}
+        {{ th('section','Sec') }}
         {{ th('cgpa','CGPA') }}
         <th class="px-4 py-3 font-semibold text-right">Actions</th>
       </tr>
@@ -69,6 +70,7 @@
           <td class="px-4 py-3 font-medium text-ink">{{ s.full_name }}<div class="text-xs text-slate-400 font-normal">{{ s.email }}</div></td>
           <td class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-slate-100 text-xs">{{ s.department }}</span></td>
           <td class="px-4 py-3">{{ s.year }}</td>
+          <td class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-slate-100 text-xs">{{ s.section }}</span></td>
           <td class="px-4 py-3 font-mono">{{ '%.2f'|format(s.cgpa) if s.cgpa is not none else '—' }}</td>
           <td class="px-4 py-3 text-right">
             {% if user.role in ['admin','faculty'] %}
