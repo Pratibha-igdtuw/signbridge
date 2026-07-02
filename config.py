@@ -11,7 +11,10 @@ class Config:
 
     DB_PATH = os.path.join(os.path.dirname(__file__), "instance", "sms.db")
     UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
-    MAX_CONTENT_LENGTH = 5 * 1024 * 1024
+    # Raised from 5MB -> 20MB to accommodate Course Materials uploads
+    # (PPT/PPTX decks can exceed 5MB). Per-module limits still apply on
+    # top of this global Flask request-body cap (see course_materials.py).
+    MAX_CONTENT_LENGTH = 20 * 1024 * 1024
     ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "docx", "csv", "txt"}
 
     SESSION_COOKIE_HTTPONLY = True

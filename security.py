@@ -19,7 +19,7 @@ import re
 # against an allow-list rather than passed as a "?" parameter.
 # ----------------------------------------------------------------------------
 ALLOWED_SORT_COLUMNS = {
-    "roll_number", "full_name", "department", "year", "cgpa", "created_at",
+    "roll_number", "full_name", "department", "year", "section", "cgpa", "created_at",
 }
 ALLOWED_SORT_DIRECTIONS = {"ASC", "DESC"}
 ALLOWED_DEPARTMENTS = {"CSE", "ME", "ECE", "CE", "EE", "IT", "AIML"}
@@ -62,6 +62,7 @@ _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _USERNAME = re.compile(r"^[A-Za-z0-9_]{3,30}$")
 _PHONE = re.compile(r"^[0-9]{10}$")
 _NAME = re.compile(r"^[A-Za-z .'-]{2,60}$")
+_SECTION = re.compile(r"^[A-Za-z][A-Za-z0-9]?$")
 
 
 def validate_student(form):
@@ -72,6 +73,7 @@ def validate_student(form):
     email = (form.get("email") or "").strip()
     dept = (form.get("department") or "").strip().upper()
     year = (form.get("year") or "").strip()
+    section = (form.get("section") or "A").strip().upper()
     cgpa = (form.get("cgpa") or "").strip()
     phone = (form.get("phone") or "").strip()
 
@@ -83,6 +85,8 @@ def validate_student(form):
         errors.append("Email is not valid.")
     if dept not in ALLOWED_DEPARTMENTS:
         errors.append(f"Department must be one of {', '.join(sorted(ALLOWED_DEPARTMENTS))}.")
+    if not _SECTION.match(section):
+        errors.append("Section must be 1-2 letters/digits (e.g. A, B, C1).")
     try:
         year_i = int(year)
         if year_i < 1 or year_i > 5:
@@ -102,7 +106,8 @@ def validate_student(form):
 
     cleaned = {
         "roll_number": roll, "full_name": name, "email": email,
-        "department": dept, "year": year_i, "cgpa": cgpa_f, "phone": phone,
+        "department": dept, "year": year_i, "section": section,
+        "cgpa": cgpa_f, "phone": phone,
     }
     return cleaned, errors
 

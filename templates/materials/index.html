@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}Course Materials{% endblock %}
+{% block heading %}📚 Course Materials{% endblock %}
+{% block content %}
+
+<style>
+  @keyframes fadeInUp { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: translateY(0); } }
+  .material-card { animation: fadeInUp .25s ease both; transition: box-shadow .15s ease, transform .15s ease; }
+  .material-card:hover { box-shadow: 0 4px 16px rgba(15,23,42,.08); transform: translateY(-1px); }
+</style>
+
+{% if student_locked %}
+<div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-5 text-sm">
+  Your academic profile is incomplete. Please contact your administrator so
+  your enrolled courses can be linked to your account.
+</div>
+{% else %}
+
+{% if user.role == 'faculty' and courses %}
+<!-- Upload form -->
+<div class="bg-white rounded-lg border border-slate-200 p-5 mb-6">
+  <h2 class="text-sm font-semibold text-ink mb-4">Upload New Material</h2>
+  <form method="post" action="{{ url_for('materials.upload') }}" enctype="multipart/form-data"
+        id="upload-form" class="grid grid-cols-2 gap-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Course <span class="text-red-500">*</span></label>
+      <select name="course_id" required
+              class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+        {% for c in courses %}
+        <option value="{{ c.id }}" {{ 'selected' if course_filter == c.id else '' }}>
+          {{ c.name }} · {{ c.code }} · Sem{{ c.semester }} {{ c.section }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Material Type <span class="text-red-500">*</span></label>
+      <select name="material_type" required
+              class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+        {% for t in material_types %}
+        <option value="{{ t }}">{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-span-2">
+      <label class="block text-xs font-medium text-slate-500 mb-1">Material Title <span class="text-red-500">*</span></label>
+      <input name="title" required placeholder="e.g. Unit 3 — Normalization Lecture Notes"
+             class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+    </div>
+    <div class="col-span-2">
+      <label class="block text-xs font-medium text-slate-500 mb-1">Description (optional)</label>
+      <textarea name="description" rows="2" placeholder="Brief description…"
+                class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-signal focus:ring-1 focus:ring-signal outline-none"></textarea>
+    </div>
+    <div class="col-span-2">
+      <label class="block text-xs font-medium text-slate-500 mb-1">Upload File <span class="text-red-500">*</span>
+        <span class="text-slate-400 font-normal">(PDF, PPT, PPTX — max 20MB)</span>
+      </label>
+      <input name="file" type="file" required accept=".pdf,.ppt,.pptx" id="material-file"
+             class="w-full text-sm file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border-0
+                    file:bg-signal file:text-white file:text-sm file:font-medium
+                    hover:file:bg-teal-700 file:cursor-pointer">
+    </div>
+    <div class="col-span-2">
+      <div id="upload-progress-wrap" class="hidden mb-3">
+        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+          <div id="upload-progress-bar" class="bg-signal h-2 rounded-full" style="width:0%"></div>
+        </div>
+        <div id="upload-progress-label" class="text-xs text-slate-500 mt-1">Uploading…</div>
+      </div>
+      <button type="submit" id="upload-submit-btn"
+              class="bg-signal hover:bg-teal-700 text-white text-sm font-medium px-5 py-2 rounded-md transition">
+        📤 Upload Material
+      </button>
+    </div>
+  </form>
+</div>
+<script>
+  (function() {
+    var form = document.getElementById('upload-form');
+    if (!form) return;
+    form.addEventListener('submit', function() {
+      document.getElementById('upload-progress-wrap').classList.remove('hidden');
+      document.getElementById('upload-submit-btn').disabled = true;
+      var bar = document.getElementById('upload-progress-bar');
+      var pct = 0;
+      var timer = setInterval(function() {
+        pct = Math.min(pct + 12, 90);
+        bar.style.width = pct + '%';
+      }, 150);
+      window.addEventListener('beforeunload', function() { clearInterval(timer); });
+    });
+  })();
+</script>
+{% elif user.role == 'faculty' and not courses %}
+<div class="bg-slate-50 border border-slate-200 rounded-lg p-5 text-sm text-slate-500 mb-6">
+  You are not currently assigned to any courses. Contact an administrator to get assigned.
+</div>
+{% endif %}
+
+<!-- Filters -->
+<form method="get" class="flex flex-wrap gap-3 items-end mb-5">
+  <div>
+    <label class="block text-xs font-medium text-slate-500 mb-1">Course</label>
+    <select name="course_id" onchange="this.form.submit()"
+            class="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none">
+      <option value="">All courses</option>
+      {% for c in courses %}
+      <option value="{{ c.id }}" {{ 'selected' if course_filter == c.id else '' }}>
+        {{ c.name }} · {{ c.code }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs font-medium text-slate-500 mb-1">Type</label>
+    <select name="type" onchange="this.form.submit()"
+            class="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none">
+      <option value="">All types</option>
+      {% for t in material_types %}
+      <option value="{{ t }}" {{ 'selected' if type_filter == t else '' }}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="flex-1 min-w-[200px]">
+    <label class="block text-xs font-medium text-slate-500 mb-1">Search</label>
+    <input name="q" value="{{ q }}" placeholder="Search title or description…"
+           class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+  </div>
+  <button class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium px-4 py-2 rounded-md transition">
+    Filter
+  </button>
+</form>
+
+<!-- Material grid -->
+{% if materials %}
+<div class="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+  {% for m in materials %}
+  <div class="material-card bg-white rounded-lg border border-slate-200 p-4 flex flex-col">
+    <div class="flex items-start justify-between gap-2">
+      <span class="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-signal/10 text-signal">
+        {{ m.material_type }}
+      </span>
+      <span class="text-[10px] text-slate-400 uppercase font-mono">{{ m.file_ext }}</span>
+    </div>
+    <div class="font-medium text-sm text-ink mt-2">{{ m.title }}</div>
+    <div class="text-xs text-slate-400 mt-0.5">{{ m.course_name }} · {{ m.course_code }} · Sem{{ m.course_semester }}</div>
+    {% if m.description %}
+    <p class="text-xs text-slate-500 mt-2 line-clamp-3">{{ m.description }}</p>
+    {% endif %}
+    <div class="text-[11px] text-slate-400 mt-3">
+      Uploaded by {{ m.uploader_name or 'Unknown' }} · v{{ m.version }} · {{ m.created_at }}
+    </div>
+    <div class="mt-3 flex flex-wrap gap-2">
+      {% if m.file_ext == 'pdf' %}
+      <a href="{{ url_for('materials.preview', material_id=m.id) }}" target="_blank"
+         class="text-xs px-3 py-1.5 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 transition">👁️ Preview</a>
+      {% endif %}
+      <a href="{{ url_for('materials.download', material_id=m.id) }}"
+         class="text-xs px-3 py-1.5 rounded-md bg-signal text-white hover:bg-teal-700 transition">⬇️ Download</a>
+
+      {% if user.role == 'admin' or (user.role == 'faculty' and m.uploaded_by == user.id) %}
+      <button type="button" onclick="document.getElementById('replace-{{ m.id }}').classList.toggle('hidden')"
+              class="text-xs px-3 py-1.5 rounded-md bg-amber-50 text-amber-700 hover:bg-amber-100 transition">🔁 Replace</button>
+      <form method="post" action="{{ url_for('materials.delete', material_id=m.id) }}"
+            onsubmit="return confirm('Delete this material? This cannot be undone.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="text-xs px-3 py-1.5 rounded-md bg-red-50 text-red-700 hover:bg-red-100 transition">🗑️ Delete</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if user.role == 'admin' or (user.role == 'faculty' and m.uploaded_by == user.id) %}
+    <form id="replace-{{ m.id }}" method="post" action="{{ url_for('materials.replace', material_id=m.id) }}"
+          enctype="multipart/form-data" class="hidden mt-3 pt-3 border-t border-slate-100 flex items-center gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="file" name="file" required accept=".pdf,.ppt,.pptx" class="text-xs flex-1">
+      <button class="text-xs px-3 py-1.5 rounded-md bg-signal text-white hover:bg-teal-700 transition">Upload</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-lg border border-dashed border-slate-300 p-10 text-center">
+  <div class="text-3xl mb-2">📭</div>
+  <div class="text-sm font-medium text-ink">No materials found</div>
+  <div class="text-xs text-slate-400 mt-1">
+    {% if user.role == 'student' %}Your faculty haven't uploaded anything here yet.
+    {% else %}Try adjusting your filters, or upload the first resource above.{% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

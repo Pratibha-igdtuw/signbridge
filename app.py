@@ -39,6 +39,9 @@ from auth import (login_required, role_required, jwt_required, current_user,
                   issue_jwt)
 from utils.logger import setup_logger
 from syllabus import syllabus_bp, init_syllabus_db
+from course_materials import materials_bp, init_materials_db
+from class_announcements import announcements_bp, init_announcements_db
+from faculty_analytics import faculty_analytics_bp
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -93,6 +96,14 @@ db.seed_timetable()
 
 app.register_blueprint(syllabus_bp)
 init_syllabus_db()
+
+# ── Faculty Module Enhancements: Course Materials, Class Announcements, ──
+# ── Performance Analytics — modular additions, do not touch existing DB ──
+app.register_blueprint(materials_bp)
+init_materials_db()
+app.register_blueprint(announcements_bp)
+init_announcements_db()
+app.register_blueprint(faculty_analytics_bp)
 
 
 # Error handlers
@@ -527,11 +538,26 @@ def attendance():
         """, (sid,))
         low_subjects = [r for r in att_data if r["pct"] < 75]
 
+    pinned_announcements = []
+    if u["role"] == "student" and selected_student:
+        pinned_announcements = query_all("""
+            SELECT a.title, a.description, a.priority, a.created_at,
+                   c.name course_name, c.code course_code
+            FROM class_announcements a
+            JOIN courses c ON c.id = a.course_id
+            WHERE a.status='active'
+              AND a.course_id IN (SELECT course_id FROM enrollments WHERE student_id=?)
+              AND a.priority IN ('urgent','important')
+            ORDER BY CASE a.priority WHEN 'urgent' THEN 0 ELSE 1 END, a.created_at DESC
+            LIMIT 3
+        """, (selected_student["id"],))
+
     return render_template("attendance.html", students=students,
                            selected_student=selected_student,
                            att_data=att_data, low_subjects=low_subjects,
                            sid=int(sid) if sid else None,
-                           my_courses=my_courses, course_filter=course_filter)
+                           my_courses=my_courses, course_filter=course_filter,
+                           pinned_announcements=pinned_announcements)
 
 
 @app.route("/attendance/mark", methods=["POST"])
@@ -880,10 +906,10 @@ def student_new():
             for e in errors: flash(e, "error")
             return render_template("student_form.html", form=request.form, mode="new")
         sid = execute(
-            "INSERT INTO students (roll_number, full_name, email, department, year, cgpa, phone, created_by) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO students (roll_number, full_name, email, department, year, section, cgpa, phone, created_by) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (cleaned["roll_number"], cleaned["full_name"], cleaned["email"],
-             cleaned["department"], cleaned["year"], cleaned["cgpa"],
+             cleaned["department"], cleaned["year"], cleaned["section"], cleaned["cgpa"],
              cleaned["phone"], session["user_id"]),
         )
         fz.log_activity(request, current_user(), "create", "students", f"roll={cleaned['roll_number']}")
@@ -907,9 +933,10 @@ def student_edit(sid):
             return render_template("student_form.html", form=request.form, mode="edit", sid=sid)
         execute(
             "UPDATE students SET roll_number=?, full_name=?, email=?, department=?, "
-            "year=?, cgpa=?, phone=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            "year=?, section=?, cgpa=?, phone=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
             (cleaned["roll_number"], cleaned["full_name"], cleaned["email"],
-             cleaned["department"], cleaned["year"], cleaned["cgpa"], cleaned["phone"], sid),
+             cleaned["department"], cleaned["year"], cleaned["section"], cleaned["cgpa"],
+             cleaned["phone"], sid),
         )
         fz.log_activity(request, current_user(), "update", "students", f"id={sid}")
         flash("Student updated.", "success")
@@ -1497,6 +1524,7 @@ def bulk_upload_students():
             dept  = row.get("department", "")
             year  = row.get("year", "1")
             phone = row.get("phone", "")
+            section = (row.get("section", "") or "A").upper()[:2]
 
             if not all([roll, name, email, dept]):
                 results_log.append({"roll": roll or "?", "name": name or "?",
@@ -1544,9 +1572,9 @@ def bulk_upload_students():
             )
             # Create student record
             execute(
-                "INSERT INTO students (roll_number, full_name, email, department, year, phone, created_by) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (roll, name, email, dept, year_int, phone, session["user_id"])
+                "INSERT INTO students (roll_number, full_name, email, department, year, section, phone, created_by) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (roll, name, email, dept, year_int, section, phone, session["user_id"])
             )
             results_log.append({"roll": roll, "name": name, "status": "created",
                                  "msg": f"username={username} pw=Student@123"})
@@ -1566,11 +1594,11 @@ def bulk_upload_template():
     import csv, io
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["roll_number", "full_name", "email", "department", "year", "phone"])
-    w.writerow(["22BT1CSE001", "Namita Singh",  "namita001btcse@igdtuw.ac.in",  "CSE", "3", "9876543210"])
-    w.writerow(["22BT1CSE002", "Priya Sharma",  "priya002btcse@igdtuw.ac.in",   "CSE", "3", "9876543211"])
-    w.writerow(["22BT1IT003",  "Anjali Verma",  "anjali003btit@igdtuw.ac.in",   "IT",  "3", "9876543212"])
-    w.writerow(["21BT1ECE004", "Sneha Gupta",   "sneha004btece@igdtuw.ac.in",   "ECE", "4", "9876543213"])
+    w.writerow(["roll_number", "full_name", "email", "department", "year", "section", "phone"])
+    w.writerow(["22BT1CSE001", "Namita Singh",  "namita001btcse@igdtuw.ac.in",  "CSE", "3", "A", "9876543210"])
+    w.writerow(["22BT1CSE002", "Priya Sharma",  "priya002btcse@igdtuw.ac.in",   "CSE", "3", "A", "9876543211"])
+    w.writerow(["22BT1IT003",  "Anjali Verma",  "anjali003btit@igdtuw.ac.in",   "IT",  "3", "B", "9876543212"])
+    w.writerow(["21BT1ECE004", "Sneha Gupta",   "sneha004btece@igdtuw.ac.in",   "ECE", "4", "A", "9876543213"])
     from flask import Response
     return Response(buf.getvalue(), headers={
         "Content-Disposition": "attachment; filename=student_upload_template.csv",
@@ -1655,17 +1683,18 @@ def course_create():
         execute("INSERT OR IGNORE INTO course_faculty (course_id, faculty_id) VALUES (?,?)",
                 (cid, int(faculty_id)))
 
-    # Auto-enroll matching students (same dept + semester range)
+    # Auto-enroll matching students (same dept + year + section)
     year = (int(sem) + 1) // 2
     enrolled = query_all(
-        "SELECT id FROM students WHERE department=? AND year=?", (dept, year)
+        "SELECT id FROM students WHERE department=? AND year=? AND section=?", (dept, year, section)
     )
     for s in enrolled:
         execute("INSERT OR IGNORE INTO enrollments (course_id, student_id) VALUES (?,?)",
                 (cid, s["id"]))
 
     fz.log_activity(request, current_user(), "create_course", "courses", f"code={code}")
-    flash(f"Course '{name}' created and {len(enrolled)} students auto-enrolled.", "success")
+    flash(f"Course '{name}' created and {len(enrolled)} students "
+          f"({dept} Year {year} Sec {section}) auto-enrolled.", "success")
     return redirect(url_for("courses"))
 
 
@@ -1723,13 +1752,13 @@ def course_delete(cid):
 @app.route("/courses/<int:cid>/bulk-enroll", methods=["POST"])
 @role_required("admin")
 def course_bulk_enroll(cid):
-    """Enroll all students from a dept+year into a course."""
+    """Enroll all students from a dept+year+section into a course."""
     course = query_one("SELECT * FROM courses WHERE id=?", (cid,))
     if not course: abort(404)
     year = (course["semester"] + 1) // 2
     students = query_all(
-        "SELECT id FROM students WHERE department=? AND year=?",
-        (course["department"], year)
+        "SELECT id FROM students WHERE department=? AND year=? AND section=?",
+        (course["department"], year, course["section"])
     )
     count = 0
     for s in students:
@@ -1740,8 +1769,10 @@ def course_bulk_enroll(cid):
         except Exception:
             pass
     fz.log_activity(request, current_user(), "bulk_enroll", "courses",
-                    f"course={cid} count={count}")
-    flash(f"{count} students bulk-enrolled into {course['name']}.", "success")
+                    f"course={cid} dept={course['department']} year={year} "
+                    f"section={course['section']} count={count}")
+    flash(f"{count} students bulk-enrolled into {course['name']} "
+          f"({course['department']} Year {year} Sec {course['section']}).", "success")
     return redirect(url_for("courses", course_id=cid))
 
 # ============================================================================

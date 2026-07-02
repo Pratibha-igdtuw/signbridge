@@ -30,7 +30,7 @@
                     focus:border-signal focus:ring-1 focus:ring-signal outline-none">
     </div>
 
-    <div class="grid grid-cols-3 gap-4">
+    <div class="grid grid-cols-4 gap-4">
       <div>
         <label class="block text-sm font-medium text-steel mb-1">Department</label>
         <select name="department"
@@ -45,6 +45,12 @@
         <label class="block text-sm font-medium text-steel mb-1">Year</label>
         <input name="year" type="number" min="1" max="5" value="{{ form.year or '' }}" required
                class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                      focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-steel mb-1">Section</label>
+        <input name="section" value="{{ form.section or 'A' }}" maxlength="2" placeholder="A"
+               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm uppercase
                       focus:border-signal focus:ring-1 focus:ring-signal outline-none">
       </div>
       <div>

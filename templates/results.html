@@ -5,7 +5,7 @@
 
 <div class="grid lg:grid-cols-3 gap-6">
   <!-- Left: controls + post result form -->
-  <div class="space-y-5">
+  <div class="space-y-5 min-w-0">
 
     {% if user.role in ('admin','faculty') %}
     <!-- Student selector -->
@@ -131,7 +131,7 @@
   </div>
 
   <!-- Right: marksheet table -->
-  <div class="lg:col-span-2">
+  <div class="lg:col-span-2 min-w-0">
     {% if selected_student %}
     <div class="bg-white rounded-lg border border-slate-200 p-5">
       <div class="flex items-center justify-between mb-4">
