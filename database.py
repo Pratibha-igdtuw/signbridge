@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash   TEXT NOT NULL,
     role            TEXT NOT NULL CHECK(role IN ('admin','faculty','student')),
     full_name       TEXT NOT NULL,
+    otp_code TEXT,
+    otp_expiry DATETIME,
     contact_no      TEXT,
     branch          TEXT,
     university      TEXT,
