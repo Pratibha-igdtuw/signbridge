@@ -271,8 +271,8 @@
           {{ nav('results', 'Results', '📊') }}
           {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
           {{ nav('timetable', 'Timetable', '🗒️') }}
-          {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
-          {{ nav('syllabus.admin_index', 'Manage Syllabus', '⚙️') }}
+          <a href="/syllabus" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'syllabus_index' else '' }}"><span>📚</span>Scheme & Syllabus</a>
+          <a href="/syllabus/manage" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'syllabus_admin' else '' }}"><span>⚙️</span>Manage Syllabus</a>
         </div>
       </details>
 
@@ -300,6 +300,7 @@
           {{ nav('bulk_upload_students', 'Bulk Student Upload', '📥') }}
           {{ nav('files', 'File Manager', '📁') }}
           {{ nav('users_list', 'User Accounts', '🛡️') }}
+          {% if has_endpoint('pending_users') %}
           <a href="{{ url_for('pending_users') }}" class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
                 {{ 'nav-active' if request.endpoint == 'pending_users' else '' }}">
             <span class="flex items-center gap-2">⏳ Pending Approvals</span>
@@ -307,6 +308,7 @@
             <span class="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">{{ pending_count }}</span>
             {% endif %}
           </a>
+          {% endif %}
         </div>
       </details>
 
@@ -356,10 +358,10 @@
           {{ nav('assignments', 'Assignments', '📝') }}
           {{ nav('results', 'Results', '📊') }}
           {{ nav('timetable', 'Timetable', '🗒️') }}
-          {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
-          {{ nav('materials.index', 'Course Materials', '📚') }}
+          <a href="/syllabus" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'syllabus_index' else '' }}"><span>📚</span>Scheme & Syllabus</a>
+          <a href="/materials" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'materials_index' else '' }}"><span>📚</span>Course Materials</a>
           {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
-          {{ nav('faculty_analytics.index', 'Performance Analytics', '📊') }}
+          <a href="/faculty-analytics" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'faculty_analytics_index' else '' }}"><span>📊</span>Performance Analytics</a>
         </div>
       </details>
 
@@ -370,7 +372,7 @@
         </summary>
         <div class="submenu">
           {{ nav('notices', 'Notices', '📢') }}
-          {{ nav('announcements.index', 'Class Announcements', '📢') }}
+          <a href="/announcements" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'announcements_index' else '' }}"><span>📢</span>Class Announcements</a>
           {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
           {{ nav('grievances', 'Grievances', '📨') }}
           {{ nav('leaves', 'Leave Applications', '🏖️') }}
@@ -393,8 +395,8 @@
           {{ nav('results', 'My Results', '📊') }}
           {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
           {{ nav('timetable', 'Class Timetable', '🗒️') }}
-          {{ nav('syllabus.index', 'Scheme & Syllabus', '📚') }}
-          {{ nav('materials.index', 'Course Materials', '📚') }}
+          <a href="/syllabus" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'syllabus_index' else '' }}"><span>📚</span>Scheme & Syllabus</a>
+          <a href="/materials" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'materials_index' else '' }}"><span>📚</span>Course Materials</a>
         </div>
       </details>
 
@@ -405,7 +407,7 @@
         </summary>
         <div class="submenu">
           {{ nav('notices', 'Notices', '📢') }}
-          {{ nav('announcements.index', 'Class Announcements', '📢') }}
+          <a href="/announcements" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'announcements_index' else '' }}"><span>📢</span>Class Announcements</a>
           {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
           {{ nav('fee_status', 'Fee Status', '💰') }}
         </div>
@@ -433,8 +435,10 @@
       <div class="text-slate-400 capitalize">{{ user.role }}</div>
       <div class="flex gap-3 mt-2">
         <a href="{{ url_for('profile') }}" class="text-signal hover:text-teal-300">Profile</a>
+        {% if has_endpoint('twofa_setup') %}
         <span class="text-slate-600">·</span>
         <a href="{{ url_for('twofa_setup') }}" class="text-signal hover:text-teal-300">2FA</a>
+        {% endif %}
         <span class="text-slate-600">·</span>
         <a href="{{ url_for('logout') }}" class="text-signal hover:text-teal-300">Sign out →</a>
       </div>
@@ -452,7 +456,7 @@
         <h1 class="text-lg sm:text-xl font-semibold text-ink truncate">{% block heading %}{% endblock %}</h1>
       </div>
       <div class="flex items-center gap-3 shrink-0">
-        {% if user and user.role == 'admin' and pending_count > 0 %}
+        {% if user and user.role == 'admin' and pending_count > 0 and has_endpoint('pending_users') %}
         <a href="{{ url_for('pending_users') }}"
            class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-800 text-xs font-medium rounded-full hover:bg-amber-200 transition">
           <span>⏳</span> {{ pending_count }} pending approval{{ 's' if pending_count != 1 else '' }}
@@ -472,7 +476,9 @@
             <div id="notif-dropdown-list" class="max-h-80 overflow-y-auto divide-y divide-slate-100">
               <div class="px-4 py-6 text-center text-sm text-slate-400">Loading…</div>
             </div>
+            {% if has_endpoint('notifications_page') %}
             <a href="{{ url_for('notifications_page') }}" class="block text-center text-xs text-signal hover:underline py-2 border-t border-slate-100">View all</a>
+            {% endif %}
           </div>
         </div>
         <button id="theme-toggle" title="Toggle dark mode" onclick="toggleTheme()"
