@@ -1,145 +1,413 @@
 {% extends "base.html" %}
-{% block title %}Bulk Attendance{% endblock %}
+
+{% block title %}Bulk Attendance Marking{% endblock %}
 {% block heading %}Bulk Attendance Marking{% endblock %}
+
 {% block content %}
 
-<div class="mb-4">
-  <p class="text-sm text-slate-500">
-    Select a course, set the date and subject, check <strong>Mark All Present</strong> then individually
-    override any absent students — one submit marks the entire class.
-  </p>
-</div>
+<style>
+  .sem-btn[aria-pressed="true"] {
+    background-color: #0f766e; /* signal */
+    color: #fff;
+    border-color: #0f766e;
+  }
+  .course-card {
+    transition: box-shadow .15s ease, border-color .15s ease, transform .1s ease;
+  }
+  .course-card:hover {
+    box-shadow: 0 2px 10px rgba(15, 23, 42, .08);
+    transform: translateY(-1px);
+  }
+  .course-card[aria-pressed="true"] {
+    border-color: #0f766e;
+    background-color: #f0fdfa;
+    box-shadow: 0 0 0 2px rgba(15, 118, 110, .25);
+  }
+  .course-card:focus-visible,
+  .sem-btn:focus-visible,
+  .mark-btn:focus-visible {
+    outline: 2px solid #0f766e;
+    outline-offset: 2px;
+  }
+  .student-row.present { background-color: #f0fdf4; border-color: #86efac; }
+  .student-row.absent  { background-color: #fef2f2; border-color: #fca5a5; }
+  details.sem-group > summary { list-style: none; cursor: pointer; }
+  details.sem-group > summary::-webkit-details-marker { display: none; }
+  details.sem-group[open] .chev { transform: rotate(90deg); }
+  .chev { transition: transform .15s ease; }
+</style>
 
-{# Course filter pills #}
-{% if my_courses %}
-<div class="mb-5 flex flex-wrap gap-2 items-center">
-  <span class="text-xs font-semibold text-slate-500 eyebrow uppercase">Course:</span>
-  <a href="{{ url_for('attendance_bulk_mark') }}"
-     class="px-3 py-1.5 rounded-md text-xs font-medium transition
-            {{ 'bg-signal text-white' if not course_filter else 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
-    All
-  </a>
-  {% for c in my_courses %}
-  <a href="{{ url_for('attendance_bulk_mark', course_id=c.id) }}"
-     class="px-3 py-1.5 rounded-md text-xs font-medium transition
-            {{ 'bg-signal text-white' if course_filter == c.id else 'bg-white border border-slate-200 text-slate-600 hover:border-signal' }}">
-    {{ c.name }} · Sem{{ c.semester }} {{ c.section }}
-  </a>
-  {% endfor %}
-</div>
-{% endif %}
+<div class="max-w-6xl">
 
-{% if course_filter and students %}
-<form method="post" action="{{ url_for('attendance_bulk_mark', course_id=course_filter) }}"
-      id="bulk-form">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <input type="hidden" name="course_id" value="{{ course_filter }}">
+  <!-- Instructions -->
+  <div class="mb-6 p-4 bg-teal-50 border border-teal-200 rounded-lg text-sm text-teal-900">
+    Pick a semester, then a course. Set the date and subject, mark everyone present,
+    and override any absences individually — one submit records the whole class.
+  </div>
 
-  <div class="bg-white rounded-lg border border-slate-200 p-5">
-    {# Header controls #}
-    <div class="grid sm:grid-cols-3 gap-4 mb-5 pb-5 border-b border-slate-100">
+  <!-- Date / Subject / Search -->
+  <div class="bg-white rounded-lg border border-slate-200 p-5 mb-6 sticky top-20 z-40">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div>
-        <label class="block text-xs font-medium text-slate-500 mb-1">Subject</label>
-        <input name="subject" required placeholder="e.g. Mathematics"
-               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
-                      focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+        <label for="attendanceDate" class="block text-xs font-semibold text-slate-500 eyebrow uppercase mb-2">Date</label>
+        <input type="date" id="attendanceDate"
+               class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-signal focus:border-signal"
+               value="{{ today }}">
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-500 mb-1">Date</label>
-        <input name="date" type="date" required value="{{ today }}"
-               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
-                      focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+        <label for="subjectInput" class="block text-xs font-semibold text-slate-500 eyebrow uppercase mb-2">Subject / Topic</label>
+        <input type="text" id="subjectInput" placeholder="e.g., Lecture 5"
+               class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-signal focus:border-signal">
       </div>
-      <div class="flex items-end">
-        <label class="flex items-center gap-2 cursor-pointer select-none">
-          <input type="checkbox" name="mark_all_present" id="mark-all-cb"
-                 class="w-4 h-4 accent-teal-600" onchange="toggleMarkAll(this.checked)">
-          <span class="text-sm font-semibold text-slate-700">✅ Mark All Present</span>
-        </label>
+      <div>
+        <label for="studentSearch" class="block text-xs font-semibold text-slate-500 eyebrow uppercase mb-2">Search Students</label>
+        <input type="text" id="studentSearch" placeholder="Name or roll number..."
+               class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-signal focus:border-signal">
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 1: Semester -->
+  <div class="mb-6">
+    <h2 class="text-xs font-semibold text-slate-500 eyebrow uppercase mb-3">Step 1 — Semester</h2>
+    <div id="semTabs" class="flex gap-2 flex-wrap" role="tablist" aria-label="Filter courses by semester">
+      <button class="sem-btn px-4 py-2 text-sm font-medium rounded-md border border-slate-300 text-slate-600 bg-white hover:border-signal"
+              data-sem="all" role="tab" aria-pressed="true">All Semesters</button>
+      <!-- semester buttons injected here -->
+    </div>
+  </div>
+
+  <!-- Step 2: Courses -->
+  <div class="mb-6">
+    <h2 class="text-xs font-semibold text-slate-500 eyebrow uppercase mb-3">Step 2 — Course</h2>
+    <div id="coursesContainer" aria-live="polite"></div>
+    <p id="noCoursesMsg" class="hidden text-sm text-slate-400 py-6 text-center">No courses in this semester.</p>
+  </div>
+
+  <!-- Step 3: Students (hidden until a course is chosen) -->
+  <div id="studentsSection" class="hidden bg-white rounded-lg border border-slate-200 p-6">
+    <h2 class="text-xs font-semibold text-slate-500 eyebrow uppercase mb-3">Step 3 — Mark Attendance</h2>
+
+    <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
+      <div>
+        <h3 class="text-lg font-bold text-ink"><span id="selectedCourseName"></span></h3>
+        <p class="text-sm text-slate-500"><span id="selectedCourseInfo"></span></p>
+      </div>
+      <div class="text-right">
+        <div class="text-2xl font-bold text-signal"><span id="studentCount">0</span></div>
+        <div class="text-xs text-slate-500">Students</div>
       </div>
     </div>
 
-    {# Student rows #}
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm evidence">
-        <thead>
-          <tr class="border-b border-slate-200">
-            <th class="text-left py-2 font-medium text-slate-500 text-xs">Roll No</th>
-            <th class="text-left py-2 font-medium text-slate-500 text-xs">Name</th>
-            <th class="text-center py-2 font-medium text-slate-500 text-xs w-28">Status</th>
-            <th class="text-center py-2 font-medium text-slate-500 text-xs w-20" id="override-col" style="display:none">
-              Mark Absent
-            </th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100" id="student-rows">
-          {% for s in students %}
-          <tr data-sid="{{ s.id }}">
-            <input type="hidden" name="student_ids" value="{{ s.id }}">
-            <td class="py-2.5 font-mono text-xs text-slate-500">{{ s.roll_number }}</td>
-            <td class="py-2.5 font-medium text-steel">{{ s.full_name }}</td>
-            <td class="py-2.5 text-center individual-status-cell">
-              <select name="status_{{ s.id }}"
-                      class="rounded-md border border-slate-300 px-2 py-1 text-xs
-                             focus:border-signal focus:ring-1 focus:ring-signal outline-none status-sel">
-                <option value="present">✅ Present</option>
-                <option value="absent">❌ Absent</option>
-              </select>
-            </td>
-            <td class="py-2.5 text-center override-cell" style="display:none">
-              <input type="checkbox" name="override_{{ s.id }}"
-                     class="w-4 h-4 accent-red-500 override-cb"
-                     onchange="highlightRow(this)">
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <!-- Bulk Actions -->
+    <div class="bg-slate-50 rounded-lg p-4 mb-6">
+      <div class="flex items-center justify-between flex-wrap gap-4">
+        <div class="flex gap-5">
+          <label class="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+            <input type="checkbox" id="markAllPresent" class="w-4 h-4 text-green-600 focus-visible:outline-2 focus-visible:outline-signal">
+            Mark All Present
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+            <input type="checkbox" id="markAllAbsent" class="w-4 h-4 text-red-600 focus-visible:outline-2 focus-visible:outline-signal">
+            Mark All Absent
+          </label>
+        </div>
+        <span class="text-sm font-semibold text-slate-700" aria-live="polite">
+          ✓ Present: <span id="presentCount" class="text-green-600">0</span> ·
+          ✕ Absent: <span id="absentCount" class="text-red-600">0</span>
+        </span>
+      </div>
     </div>
 
-    <div class="mt-5 flex items-center justify-between">
-      <span class="text-xs text-slate-400">{{ students|length }} students in this course</span>
-      <button type="submit"
-              class="bg-signal hover:bg-teal-700 text-white text-sm font-semibold px-6 py-2 rounded-md transition">
+    <!-- Students List -->
+    <div id="studentsList" class="space-y-2 max-h-96 overflow-y-auto mb-6" role="list"></div>
+
+    <!-- Submit -->
+    <div class="border-t border-slate-100 pt-6 flex gap-3">
+      <button id="submitBtn" class="flex-1 bg-signal hover:bg-teal-700 text-white px-6 py-2.5 rounded-md text-sm font-semibold transition">
         Submit Attendance
+      </button>
+      <button id="resetBtn" class="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-md text-sm font-semibold hover:bg-slate-50">
+        Reset
       </button>
     </div>
   </div>
-</form>
-
-{% elif course_filter %}
-<div class="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-400 text-sm">
-  No students enrolled in this course yet.
 </div>
-{% else %}
-<div class="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-400 text-sm">
-  Select a course above to load the student list.
-</div>
-{% endif %}
 
 <script>
-function toggleMarkAll(checked) {
-  const statusCells = document.querySelectorAll('.individual-status-cell');
-  const overrideCells = document.querySelectorAll('.override-cell');
-  const overrideCol = document.getElementById('override-col');
+let allCourses = {};       // { semesterNumber: [course, ...] }
+let selectedCourse = null;
+let selectedStudents = {};
+let allStudents = [];
+let currentSemFilter = 'all';
 
-  if (checked) {
-    statusCells.forEach(td => td.style.display = 'none');
-    overrideCells.forEach(td => td.style.display = '');
-    overrideCol.style.display = '';
-    // Reset all override checkboxes
-    document.querySelectorAll('.override-cb').forEach(cb => { cb.checked = false; });
-    document.querySelectorAll('#student-rows tr').forEach(r => r.classList.remove('bg-red-50'));
-  } else {
-    statusCells.forEach(td => td.style.display = '');
-    overrideCells.forEach(td => td.style.display = 'none');
-    overrideCol.style.display = 'none';
+document.addEventListener('DOMContentLoaded', loadCourses);
+
+async function loadCourses() {
+  try {
+    const res = await fetch('/api/courses/by-semester');
+    allCourses = await res.json();
+    buildSemesterTabs();
+    renderCourses();
+  } catch (err) {
+    console.error('Error loading courses:', err);
+    document.getElementById('coursesContainer').innerHTML =
+      '<p class="text-red-600 text-sm">Could not load courses. Please refresh.</p>';
   }
 }
 
-function highlightRow(cb) {
-  const row = cb.closest('tr');
-  row.classList.toggle('bg-red-50', cb.checked);
+function buildSemesterTabs() {
+  const tabsWrap = document.getElementById('semTabs');
+  const semesters = Object.keys(allCourses).sort((a, b) => parseInt(a) - parseInt(b));
+  semesters.forEach(sem => {
+    const btn = document.createElement('button');
+    btn.className = 'sem-btn px-4 py-2 text-sm font-medium rounded-md border border-slate-300 text-slate-600 bg-white hover:border-signal';
+    btn.dataset.sem = sem;
+    btn.setAttribute('role', 'tab');
+    btn.setAttribute('aria-pressed', 'false');
+    btn.textContent = `Semester ${sem}`;
+    btn.addEventListener('click', () => setSemesterFilter(sem));
+    tabsWrap.appendChild(btn);
+  });
+  document.querySelectorAll('.sem-btn').forEach(b => {
+    if (b.dataset.sem === 'all') {
+      b.addEventListener('click', () => setSemesterFilter('all'));
+    }
+  });
+}
+
+function setSemesterFilter(sem) {
+  currentSemFilter = sem;
+  document.querySelectorAll('.sem-btn').forEach(b => {
+    b.setAttribute('aria-pressed', b.dataset.sem === sem ? 'true' : 'false');
+  });
+  renderCourses();
+}
+
+function renderCourses() {
+  const container = document.getElementById('coursesContainer');
+  const noCoursesMsg = document.getElementById('noCoursesMsg');
+  container.innerHTML = '';
+
+  const semesters = Object.keys(allCourses).sort((a, b) => parseInt(a) - parseInt(b));
+  const semestersToShow = currentSemFilter === 'all' ? semesters : semesters.filter(s => s === currentSemFilter);
+
+  let anyCourses = false;
+
+  semestersToShow.forEach(sem => {
+    const courses = allCourses[sem] || [];
+    if (!courses.length) return;
+    anyCourses = true;
+
+    if (currentSemFilter === 'all') {
+      // Collapsible group per semester so "All" doesn't dump everything at once
+      const details = document.createElement('details');
+      details.className = 'sem-group mb-4 bg-white border border-slate-200 rounded-lg';
+      details.open = sem === semesters[0];
+      details.innerHTML = `
+        <summary class="flex items-center justify-between px-4 py-3 select-none">
+          <span class="text-sm font-semibold text-ink">Semester ${sem}
+            <span class="text-slate-400 font-normal">· ${courses.length} course${courses.length === 1 ? '' : 's'}</span>
+          </span>
+          <span class="chev text-slate-400">▸</span>
+        </summary>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4 pt-0" id="grid-sem-${sem}"></div>
+      `;
+      container.appendChild(details);
+      fillCourseGrid(document.getElementById(`grid-sem-${sem}`), courses);
+    } else {
+      const wrap = document.createElement('div');
+      wrap.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3';
+      container.appendChild(wrap);
+      fillCourseGrid(wrap, courses);
+    }
+  });
+
+  noCoursesMsg.classList.toggle('hidden', anyCourses);
+}
+
+function fillCourseGrid(gridEl, courses) {
+  courses.forEach(course => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'course-card text-left border rounded-lg p-4 bg-white border-slate-200';
+    card.setAttribute('aria-pressed', selectedCourse && selectedCourse.id === course.id ? 'true' : 'false');
+    card.innerHTML = `
+      <h4 class="font-semibold text-ink text-sm mb-1">${escapeHtml(course.name)}</h4>
+      <p class="text-xs text-slate-500 font-mono mb-2">${escapeHtml(course.code)}</p>
+      <p class="text-xs text-slate-500">${escapeHtml(course.subject)}</p>
+      <p class="text-xs text-slate-400 mt-1">${course.enrolled_count} enrolled · Sec ${escapeHtml(course.section)}</p>
+    `;
+    card.addEventListener('click', () => selectCourse(course, card));
+    gridEl.appendChild(card);
+  });
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str ?? '';
+  return d.innerHTML;
+}
+
+async function selectCourse(course, cardEl) {
+  selectedCourse = course;
+  selectedStudents = {};
+
+  document.querySelectorAll('.course-card').forEach(c => c.setAttribute('aria-pressed', 'false'));
+  cardEl.setAttribute('aria-pressed', 'true');
+
+  document.getElementById('selectedCourseName').textContent = course.name;
+  document.getElementById('selectedCourseInfo').textContent =
+    `${course.code} · ${course.subject} · Semester ${course.semester} · Sec ${course.section}`;
+  document.getElementById('studentsSection').classList.remove('hidden');
+  document.getElementById('studentsSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  try {
+    const res = await fetch(`/api/students/in-course/${course.id}`);
+    allStudents = await res.json();
+    displayStudents(allStudents);
+    document.getElementById('studentCount').textContent = allStudents.length;
+    updateCounts();
+  } catch (err) {
+    console.error('Error loading students:', err);
+  }
+}
+
+function displayStudents(students, filtered = null) {
+  const list = document.getElementById('studentsList');
+  list.innerHTML = '';
+  const toDisplay = filtered || students;
+
+  toDisplay.forEach(student => {
+    const status = selectedStudents[student.id] || null;
+    const row = document.createElement('div');
+    row.className = 'student-row border rounded-lg p-3 bg-white flex justify-between items-center' + (status ? ` ${status}` : '');
+    row.id = `student-${student.id}`;
+    row.setAttribute('role', 'listitem');
+    row.innerHTML = `
+      <div class="flex-1 min-w-0">
+        <p class="font-medium text-ink text-sm truncate">${escapeHtml(student.full_name)}</p>
+        <p class="text-xs text-slate-500 font-mono">${escapeHtml(student.roll_number)}</p>
+      </div>
+      <div class="flex gap-2 shrink-0">
+        <button type="button" class="mark-btn w-10 h-10 rounded-md font-bold text-sm transition
+                ${status === 'present' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200'}"
+                aria-pressed="${status === 'present'}"
+                aria-label="Mark ${escapeHtml(student.full_name)} present"
+                onclick="markAttendance(${student.id}, 'present')">✓</button>
+        <button type="button" class="mark-btn w-10 h-10 rounded-md font-bold text-sm transition
+                ${status === 'absent' ? 'bg-red-600 text-white' : 'bg-red-100 text-red-700 hover:bg-red-200'}"
+                aria-pressed="${status === 'absent'}"
+                aria-label="Mark ${escapeHtml(student.full_name)} absent"
+                onclick="markAttendance(${student.id}, 'absent')">✕</button>
+      </div>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function markAttendance(studentId, status) {
+  selectedStudents[studentId] = status;
+  const row = document.getElementById(`student-${studentId}`);
+  row.classList.remove('present', 'absent');
+  row.classList.add(status);
+  row.querySelectorAll('.mark-btn').forEach(btn => {
+    const isPresentBtn = btn.getAttribute('aria-label').includes('present');
+    const active = (isPresentBtn && status === 'present') || (!isPresentBtn && status === 'absent');
+    btn.setAttribute('aria-pressed', String(active));
+    btn.className = `mark-btn w-10 h-10 rounded-md font-bold text-sm transition ${
+      isPresentBtn
+        ? (active ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200')
+        : (active ? 'bg-red-600 text-white' : 'bg-red-100 text-red-700 hover:bg-red-200')
+    }`;
+  });
+  updateCounts();
+}
+
+function updateCounts() {
+  const present = Object.values(selectedStudents).filter(s => s === 'present').length;
+  const absent = Object.values(selectedStudents).filter(s => s === 'absent').length;
+  document.getElementById('presentCount').textContent = present;
+  document.getElementById('absentCount').textContent = absent;
+}
+
+document.getElementById('markAllPresent').addEventListener('change', (e) => {
+  if (e.target.checked) {
+    document.getElementById('markAllAbsent').checked = false;
+    allStudents.forEach(s => markAttendance(s.id, 'present'));
+  }
+});
+
+document.getElementById('markAllAbsent').addEventListener('change', (e) => {
+  if (e.target.checked) {
+    document.getElementById('markAllPresent').checked = false;
+    allStudents.forEach(s => markAttendance(s.id, 'absent'));
+  }
+});
+
+document.getElementById('studentSearch').addEventListener('keyup', (e) => {
+  const query = e.target.value.toLowerCase();
+  const filtered = allStudents.filter(s =>
+    s.full_name.toLowerCase().includes(query) ||
+    s.roll_number.toLowerCase().includes(query)
+  );
+  displayStudents(allStudents, filtered);
+});
+
+document.getElementById('submitBtn').addEventListener('click', async () => {
+  const date = document.getElementById('attendanceDate').value;
+  const subject = document.getElementById('subjectInput').value.trim();
+
+  if (!date) { alert('Please select a date'); return; }
+  if (!subject) { alert('Please enter a subject/topic'); return; }
+  if (Object.keys(selectedStudents).length === 0) { alert('Please mark at least one student'); return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+
+  try {
+    const res = await fetch('/api/attendance/bulk-mark', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        course_id: selectedCourse.id,
+        subject: subject,
+        date: date,
+        attendance: selectedStudents
+      })
+    });
+    if (res.ok) {
+      const result = await res.json();
+      alert(`Attendance marked for ${result.count} students!`);
+      document.getElementById('subjectInput').value = '';
+      document.getElementById('markAllPresent').checked = false;
+      document.getElementById('markAllAbsent').checked = false;
+      selectedStudents = {};
+      displayStudents(allStudents);
+      updateCounts();
+    } else {
+      alert('Something went wrong submitting attendance.');
+    }
+  } catch (err) {
+    alert('Error submitting attendance');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Submit Attendance';
+  }
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  selectedStudents = {};
+  document.getElementById('markAllPresent').checked = false;
+  document.getElementById('markAllAbsent').checked = false;
+  displayStudents(allStudents);
+  updateCounts();
+});
+
+if (!document.getElementById('attendanceDate').value) {
+  document.getElementById('attendanceDate').value = new Date().toISOString().split('T')[0];
 }
 </script>
+
 {% endblock %}

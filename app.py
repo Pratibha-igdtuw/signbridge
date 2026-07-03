@@ -20,6 +20,8 @@ import pyotp
 import qrcode
 import io
 import base64
+from attendance_routes import attendance_bp
+
 
 from flask import (Flask, render_template, request, redirect, url_for, session,
                    flash, jsonify, Response, abort, send_file)
@@ -29,6 +31,7 @@ from flask_limiter.util import get_remote_address
 from flask_mail import Mail
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
+
 
 from config import Config
 import database as db
@@ -45,6 +48,7 @@ from faculty_analytics import faculty_analytics_bp
 
 app = Flask(__name__)
 app.config.from_object(Config)
+app.register_blueprint(attendance_bp)
 csrf = CSRFProtect(app)
 mail = Mail(app)
 
@@ -87,6 +91,7 @@ db.init_db()
 db.migrate_db()
 _conn = db.get_connection()
 db.migrate_v3(_conn)
+db.migrate_v4(_conn)
 _conn.close()
 db.seed()
 db.seed_extras()
@@ -141,7 +146,7 @@ def index():
     if not u:
         return redirect(url_for("login"))
     if u["role"] == "student":
-        return redirect(url_for("attendance"))
+        return redirect(url_for("attendence"))
     return redirect(url_for("dashboard"))
 
 
@@ -268,7 +273,7 @@ def login():
             if not user["profile_complete"]:
                 return redirect(url_for("profile_setup"))
             if user["role"] == "student":
-                return redirect(url_for("attendance"))
+                return redirect(url_for("attendence"))
             return redirect(url_for("dashboard"))
 
         uid = user["id"] if user else None
@@ -475,6 +480,51 @@ def api_alert_count():
 
 
 # ============================================================================
+# In-app Notification Center
+# ============================================================================
+@app.route("/notifications")
+@login_required
+def notifications_page():
+    uid = session["user_id"]
+    rows = query_all(
+        "SELECT id, message, link, is_read, created_at FROM notifications "
+        "WHERE user_id=? ORDER BY id DESC LIMIT 100",
+        (uid,),
+    )
+    return render_template("notifications.html", notifications=rows)
+
+
+@app.route("/api/notifications")
+@login_required
+def api_notifications():
+    uid = session["user_id"]
+    rows = query_all(
+        "SELECT id, message, link, is_read, created_at FROM notifications "
+        "WHERE user_id=? ORDER BY id DESC LIMIT 20",
+        (uid,),
+    )
+    unread = query_one("SELECT COUNT(*) c FROM notifications WHERE user_id=? AND is_read=0", (uid,))["c"]
+    return jsonify({
+        "unread_count": unread,
+        "notifications": [dict(r) for r in rows],
+    })
+
+
+@app.route("/notifications/<int:nid>/read", methods=["POST"])
+@login_required
+def notification_mark_read(nid):
+    execute("UPDATE notifications SET is_read=1 WHERE id=? AND user_id=?", (nid, session["user_id"]))
+    return jsonify({"ok": True})
+
+
+@app.route("/notifications/read-all", methods=["POST"])
+@login_required
+def notifications_read_all():
+    execute("UPDATE notifications SET is_read=1 WHERE user_id=?", (session["user_id"],))
+    return jsonify({"ok": True})
+
+
+# ============================================================================
 # Attendance
 # ============================================================================
 @app.route("/attendance")
@@ -576,10 +626,40 @@ def attendance_mark():
             "VALUES (?, ?, ?, ?, ?)",
             (int(student_id), subject, date_val, status, session["user_id"])
         )
+        _check_low_attendance_notify(int(student_id), subject)
         flash("Attendance marked.", "success")
     except Exception as e:
         flash(f"Error: {e}", "error")
     return redirect(url_for("attendance", student_id=student_id))
+
+
+def _check_low_attendance_notify(student_id, subject):
+    """After marking attendance, notify the student (in-app + email) if their
+    percentage in this subject has dropped below 75%. Best-effort only."""
+    try:
+        row = query_one(
+            "SELECT COUNT(*) total, SUM(CASE WHEN status='present' THEN 1 ELSE 0 END) present "
+            "FROM attendance WHERE student_id=? AND subject=?",
+            (student_id, subject),
+        )
+        if not row or not row["total"]:
+            return
+        pct = round((row["present"] or 0) * 100.0 / row["total"], 1)
+        if pct >= 75:
+            return
+        stu = query_one("SELECT user_id, email, full_name FROM students WHERE id=?", (student_id,))
+        if not stu:
+            return
+        if stu["user_id"]:
+            db.create_notification(
+                stu["user_id"],
+                f"Low attendance alert: {subject} is at {pct}% (below 75%).",
+                url_for("attendance"),
+            )
+        from utils.mailer import notify_low_attendance
+        notify_low_attendance(stu["email"], stu["full_name"], subject, pct)
+    except Exception:
+        pass
 
 
 # ============================================================================
@@ -1147,11 +1227,21 @@ def notice_create():
     if not title or not body:
         flash("Title and body are required.", "error")
         return redirect(url_for("notices"))
-    execute(
+    nid = execute(
         "INSERT INTO notices (title, body, category, target_role, posted_by, is_pinned) VALUES (?,?,?,?,?,?)",
         (title, body, category, target_role, session["user_id"], is_pinned)
     )
     fz.log_activity(request, current_user(), "create", "notices", f"title={title}")
+    try:
+        if target_role == "all":
+            target_users = query_all("SELECT id, email FROM users WHERE status='active'")
+        else:
+            target_users = query_all("SELECT id, email FROM users WHERE role=? AND status='active'", (target_role,))
+        db.notify_users([u["id"] for u in target_users], f"New notice: {title}", url_for("notices"))
+        from utils.mailer import notify_new_notice
+        notify_new_notice([u["email"] for u in target_users], title, body)
+    except Exception:
+        pass
     flash("Notice posted.", "success")
     return redirect(url_for("notices"))
 
@@ -1410,6 +1500,19 @@ def fee_update():
         (int(student_id), int(semester), fee_type, amt, paid, due_date, status, remarks, session["user_id"])
     )
     fz.log_activity(request, current_user(), "update_fee", "fees", f"student={student_id}")
+    try:
+        stu = query_one("SELECT user_id, email, full_name FROM students WHERE id=?", (int(student_id),))
+        if stu and stu["user_id"]:
+            db.create_notification(
+                stu["user_id"],
+                f"Your {fee_type} fee for Semester {semester} is now {status}.",
+                url_for("fee_status"),
+            )
+        if stu:
+            from utils.mailer import notify_fee_update
+            notify_fee_update(stu["email"], stu["full_name"], semester, fee_type, status)
+    except Exception:
+        pass
     flash("Fee record updated.", "success")
     return redirect(url_for("fee_status", student_id=student_id))
 
@@ -1471,6 +1574,20 @@ def grievance_respond(gid):
         (response, status, session["user_id"], gid)
     )
     fz.log_activity(request, current_user(), "respond_grievance", "grievances", f"id={gid} status={status}")
+    try:
+        g_row = query_one("SELECT student_id, subject FROM grievances WHERE id=?", (gid,))
+        if g_row:
+            db.create_notification(
+                g_row["student_id"],
+                f"Your grievance \"{g_row['subject']}\" received a response.",
+                url_for("grievances"),
+            )
+            stu_user = query_one("SELECT email, full_name FROM users WHERE id=?", (g_row["student_id"],))
+            if stu_user:
+                from utils.mailer import notify_grievance_response
+                notify_grievance_response(stu_user["email"], stu_user["full_name"], response)
+    except Exception:
+        pass
     flash("Response submitted.", "success")
     return redirect(url_for("grievances"))
 
@@ -1894,6 +2011,60 @@ def api_token():
     return jsonify({"error": "Invalid credentials"}), 401
 
 
+@app.route("/api/students/search")
+@login_required
+def api_students_live_search():
+    """JSON live-search endpoint backing the debounced search box on
+    templates/students.html. Role-aware: admins see everyone, faculty see
+    only students in their own courses (optionally one course)."""
+    u = current_user()
+    if u["role"] not in ("admin", "faculty"):
+        return jsonify({"error": "Forbidden"}), 403
+
+    q = (request.args.get("q") or "").strip()
+    if fz.guard_input(request, u, "students.live_search", q):
+        return jsonify({"results": [], "error": "Search input rejected."})
+    course_filter = request.args.get("course_id") or None
+
+    if u["role"] == "admin":
+        if q:
+            rows = query_all(
+                "SELECT id, roll_number, full_name, email, department, year, cgpa "
+                "FROM students WHERE roll_number LIKE ? OR full_name LIKE ? OR email LIKE ? "
+                "ORDER BY roll_number LIMIT 50",
+                (f"%{q}%", f"%{q}%", f"%{q}%"),
+            )
+        else:
+            rows = query_all(
+                "SELECT id, roll_number, full_name, email, department, year, cgpa "
+                "FROM students ORDER BY roll_number LIMIT 50"
+            )
+    else:  # faculty
+        params = [u["id"]]
+        sql = (
+            "SELECT DISTINCT s.id, s.roll_number, s.full_name, s.email, s.department, s.year, s.cgpa "
+            "FROM students s JOIN enrollments e ON e.student_id=s.id "
+            "JOIN course_faculty cf ON cf.course_id=e.course_id "
+            "WHERE cf.faculty_id=?"
+        )
+        if course_filter:
+            sql += " AND e.course_id=?"
+            params.append(int(course_filter))
+        if q:
+            sql += " AND (s.roll_number LIKE ? OR s.full_name LIKE ?)"
+            params += [f"%{q}%", f"%{q}%"]
+        sql += " ORDER BY s.roll_number LIMIT 50"
+        rows = query_all(sql, params)
+
+    can_edit = u["role"] in ("admin", "faculty")
+    can_delete = u["role"] == "admin"
+    return jsonify({
+        "results": [dict(r) for r in rows],
+        "can_edit": can_edit,
+        "can_delete": can_delete,
+    })
+
+
 @app.route("/api/students", methods=["GET"])
 @csrf.exempt
 @jwt_required("admin", "faculty")
@@ -1969,6 +2140,7 @@ def attendance_bulk_mark():
                     "VALUES (?, ?, ?, ?, ?)",
                     (int(sid), subject, date_val, status, u["id"])
                 )
+                _check_low_attendance_notify(int(sid), subject)
                 count += 1
             except Exception:
                 pass
@@ -2247,6 +2419,16 @@ def student_analytics():
             pct = r["pct"] or 0
             heatmap[r["date"]] = "high" if pct >= 75 else ("mid" if pct >= 50 else "low")
 
+    # Subject-wise attendance breakdown (for the horizontal bar chart)
+    subject_breakdown = []
+    if student:
+        subject_breakdown = query_all("""
+            SELECT subject,
+                   ROUND(100.0 * SUM(CASE WHEN status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+            FROM attendance WHERE student_id = ?
+            GROUP BY subject ORDER BY subject
+        """, (student["id"],))
+
     fz.log_activity(request, u, "view", "analytics")
     return render_template("student_analytics.html",
                            student=student,
@@ -2254,6 +2436,7 @@ def student_analytics():
                            sgpa_progression=sgpa_progression,
                            pending_assignments=pending_assignments,
                            leave_count=leave_count,
+                           subject_breakdown=subject_breakdown,
                            heatmap=heatmap)
 
 
@@ -2332,6 +2515,11 @@ def leave_review(lid):
                 from utils.mailer import notify_leave_reviewed
                 notify_leave_reviewed(stu_user["email"], stu_user["full_name"],
                                       status, remark)
+            db.create_notification(
+                leave_row["student_id"],
+                f"Your leave application ({leave_row['leave_type']}) was {status}.",
+                url_for("leaves"),
+            )
     except Exception:
         pass
     flash(f"Leave application {status}.", "success")
@@ -2593,6 +2781,121 @@ def attendance_export_pdf():
 def api_pending_count():
     count = query_one("SELECT COUNT(*) c FROM users WHERE status='pending'")["c"]
     return jsonify({"count": count})
+# ============================================================================
+# NEW: API endpoints for semester-wise course filtering
+# ============================================================================
+
+@app.route("/api/courses/by-semester")
+@role_required("admin", "faculty")
+def api_courses_by_semester():
+    """Return courses organized by semester."""
+    u = current_user()
+    
+    if u["role"] == "faculty":
+        # Faculty sees only their courses
+        courses = query_all("""
+            SELECT c.id, c.name, c.code, c.subject, c.semester, 
+                   c.department, c.section, COUNT(e.id) as enrolled_count
+            FROM courses c
+            LEFT JOIN enrollments e ON e.course_id = c.id
+            JOIN course_faculty cf ON cf.course_id = c.id
+            WHERE cf.faculty_id = ?
+            GROUP BY c.id
+            ORDER BY c.semester ASC, c.name ASC
+        """, (u["id"],))
+    else:
+        # Admin sees all courses
+        courses = query_all("""
+            SELECT c.id, c.name, c.code, c.subject, c.semester, 
+                   c.department, c.section, COUNT(e.id) as enrolled_count
+            FROM courses c
+            LEFT JOIN enrollments e ON e.course_id = c.id
+            GROUP BY c.id
+            ORDER BY c.semester ASC, c.name ASC
+        """)
+    
+    # Organize by semester
+    by_semester = {}
+    for c in courses:
+        sem = c["semester"]
+        if sem not in by_semester:
+            by_semester[sem] = []
+        by_semester[sem].append(dict(c))
+    
+    return jsonify(by_semester)
+
+
+@app.route("/api/students/in-course/<int:course_id>")
+@role_required("admin", "faculty")
+def api_students_in_course(course_id):
+    """Return all students enrolled in a specific course."""
+    u = current_user()
+    
+    # Verify access (faculty can only see their own courses)
+    if u["role"] == "faculty":
+        authorized = query_one(
+            "SELECT id FROM course_faculty WHERE course_id=? AND faculty_id=?",
+            (course_id, u["id"])
+        )
+        if not authorized:
+            return jsonify({"error": "Access denied"}), 403
+    
+    students = query_all("""
+        SELECT s.id, s.roll_number, s.full_name, s.email, 
+               s.department, s.year, s.cgpa
+        FROM students s
+        JOIN enrollments e ON e.student_id = s.id
+        WHERE e.course_id = ?
+        ORDER BY s.roll_number
+    """, (course_id,))
+    
+    return jsonify([dict(s) for s in students])
+
+
+@app.route("/api/attendance/bulk-mark", methods=["POST"])
+@role_required("admin", "faculty")
+def api_attendance_bulk_mark():
+    """Bulk mark attendance via JSON API."""
+    u = current_user()
+    data = request.get_json(silent=True) or {}
+    
+    course_id = data.get("course_id")
+    subject = (data.get("subject") or "").strip()
+    date_val = (data.get("date") or "").strip()
+    attendance = data.get("attendance", {})  # {student_id: "present"|"absent"}
+    
+    if not all([course_id, subject, date_val, attendance]):
+        return jsonify({"error": "Missing required fields"}), 400
+    
+    # Verify faculty owns this course (if faculty)
+    if u["role"] == "faculty":
+        authorized = query_one(
+            "SELECT id FROM course_faculty WHERE course_id=? AND faculty_id=?",
+            (course_id, u["id"])
+        )
+        if not authorized:
+            return jsonify({"error": "Access denied"}), 403
+    
+    count = 0
+    for student_id_str, status in attendance.items():
+        if status not in ("present", "absent"):
+            continue
+        try:
+            student_id = int(student_id_str)
+            execute(
+                "INSERT OR REPLACE INTO attendance (student_id, subject, date, status, marked_by) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (student_id, subject, date_val, status, u["id"])
+            )
+            _check_low_attendance_notify(student_id, subject)
+            count += 1
+        except Exception:
+            pass
+    
+    fz.log_activity(request, u, "bulk_attendance_api", "attendance",
+                    f"subject={subject} date={date_val} count={count}")
+    
+    return jsonify({"success": True, "count": count})
 
 
 if __name__ == "__main__":
