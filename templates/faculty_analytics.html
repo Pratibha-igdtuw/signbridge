@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block heading %}Performance Analytics{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+  <div class="dark-card border rounded-lg p-6">
+    <h2 class="text-2xl font-bold mb-4">📊 Faculty Performance Analytics</h2>
+    <p class="text-slate-600 dark:text-slate-400 mb-4">
+      View detailed performance metrics, student engagement, and course analytics.
+    </p>
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="bg-slate-50 dark:bg-slate-900 rounded p-4">
+        <div class="text-sm text-slate-600 dark:text-slate-400">Total Courses</div>
+        <div class="text-3xl font-bold text-ink dark:text-slate-100">—</div>
+      </div>
+      <div class="bg-slate-50 dark:bg-slate-900 rounded p-4">
+        <div class="text-sm text-slate-600 dark:text-slate-400">Total Students</div>
+        <div class="text-3xl font-bold text-ink dark:text-slate-100">—</div>
+      </div>
+      <div class="bg-slate-50 dark:bg-slate-900 rounded p-4">
+        <div class="text-sm text-slate-600 dark:text-slate-400">Avg Attendance</div>
+        <div class="text-3xl font-bold text-signal">—</div>
+      </div>
+    </div>
+
+    <div class="bg-slate-50 dark:bg-slate-900 rounded p-4 text-sm text-slate-600 dark:text-slate-400">
+      Analytics dashboard with detailed performance charts coming soon.
+    </div>
+  </div>
+</div>
+{% endblock %}

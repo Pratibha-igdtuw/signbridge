@@ -20,6 +20,11 @@ New features over base:
 """
 import os
 import uuid
+import io
+import base64
+
+import pyotp
+import qrcode
 
 from flask import (Flask, render_template, request, redirect, url_for, session,
                    flash, jsonify, Response, abort)
@@ -178,10 +183,22 @@ def login():
 
         if user and not user["is_active"]:
             fz.log_login(request, user["id"], username, "locked", user["role"])
-            flash("Account is locked. Contact an administrator.", "error")
+            flash("Account is locked.", "error")
             return render_template("login.html")
 
+        # ✅ SUCCESS LOGIN BLOCK
         if user and check_password_hash(user["password_hash"], password):
+
+            # If the user has TOTP 2FA enabled, don't log them in yet —
+            # stash their id and send them to the authenticator-code step.
+            totp_enabled = user["totp_enabled"] if "totp_enabled" in user.keys() else 0
+            if totp_enabled:
+                session.clear()
+                session["pending_2fa_user_id"] = user["id"]
+                session["pending_2fa_username"] = user["username"]
+                return redirect(url_for("verify_2fa"))
+
+            # No 2FA — log the user in directly
             session.clear()
             session.permanent = True
             session["user_id"] = user["id"]
@@ -191,31 +208,23 @@ def login():
             fz.log_login(request, user["id"], username, "success", user["role"])
             fz.log_activity(request, dict(user), "login", "auth")
             flash(f"Welcome back, {user['full_name']}.", "success")
-            # Redirect to profile setup if not complete
             if not user["profile_complete"]:
                 return redirect(url_for("profile_setup"))
             if user["role"] == "student":
                 return redirect(url_for("attendance"))
             return redirect(url_for("dashboard"))
 
+        # ❌ FAILED LOGIN
         uid = user["id"] if user else None
         fz.log_login(request, uid, username, "failed", user["role"] if user else None)
 
-        if user:
-            recent_failures = _count_recent_failures(username)
-            if recent_failures >= Config.MAX_FAILED_LOGINS:
-                execute("UPDATE users SET is_active = 0 WHERE id = ?", (user["id"],))
-                fz.log_activity(request, dict(user), "account_locked", "auth",
-                                f"auto-locked after {recent_failures} failed attempts")
-                flash("Too many failed attempts. Account locked. Contact an administrator.", "error")
-                return render_template("login.html")
-
         flash("Invalid credentials.", "error")
+        return render_template("login.html")
+
     return render_template("login.html")
 
 
 @app.route("/logout")
-@login_required
 def logout():
     fz.log_activity(request, current_user(), "logout", "auth")
     session.clear()
@@ -231,17 +240,20 @@ def logout():
 def profile_setup():
     user = current_user()
     if request.method == "POST":
-        full_name   = (request.form.get("full_name") or "").strip()
-        email       = (request.form.get("email") or "").strip()
-        contact_no  = (request.form.get("contact_no") or "").strip()
-        branch      = (request.form.get("branch") or "").strip()
-        university  = (request.form.get("university") or "").strip()
-        year        = request.form.get("year") or None
+        full_name  = (request.form.get("full_name") or "").strip()
+        email      = (request.form.get("email") or "").strip()
+        contact_no = (request.form.get("contact_no") or "").strip()
+        branch     = (request.form.get("branch") or "").strip()
+        university = (request.form.get("university") or "").strip()
+        year       = request.form.get("year") or None
         errors = []
-        if not full_name: errors.append("Full name is required.")
-        if not email:     errors.append("Email is required.")
+        if not full_name:
+            errors.append("Full name is required.")
+        if not email:
+            errors.append("Email is required.")
         if errors:
-            for e in errors: flash(e, "error")
+            for e in errors:
+                flash(e, "error")
             return render_template("profile_setup.html", user=user, form=request.form)
         execute(
             "UPDATE users SET full_name=?, email=?, contact_no=?, branch=?, "
@@ -533,6 +545,98 @@ def _allowed_file_safe(file_storage):
     except ImportError:
         pass  # python-magic not available, fall back to extension check
     return True, None
+@app.route("/verify-2fa", methods=["GET", "POST"])
+def verify_2fa():
+    if "pending_2fa_user_id" not in session:
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        code = (request.form.get("code") or "").strip()
+        uid = session["pending_2fa_user_id"]
+        user = query_one("SELECT * FROM users WHERE id = ?", (uid,))
+
+        if not user:
+            session.pop("pending_2fa_user_id", None)
+            session.pop("pending_2fa_username", None)
+            return redirect(url_for("login"))
+
+        totp = pyotp.TOTP(user["totp_secret"])
+        if totp.verify(code, valid_window=1):
+            session.pop("pending_2fa_user_id", None)
+            session.pop("pending_2fa_username", None)
+
+            # FINAL LOGIN
+            session.clear()
+            session.permanent = True
+            session["user_id"] = user["id"]
+            session["username"] = user["username"]
+            session["role"] = user["role"]
+            session["full_name"] = user["full_name"]
+
+            fz.log_login(request, user["id"], user["username"], "success", user["role"])
+            fz.log_activity(request, dict(user), "login_2fa", "auth")
+            flash(f"Welcome back, {user['full_name']}.", "success")
+
+            if not user["profile_complete"]:
+                return redirect(url_for("profile_setup"))
+
+            if user["role"] == "student":
+                return redirect(url_for("attendance"))
+
+            return redirect(url_for("dashboard"))
+
+        else:
+            flash("Invalid 2FA code. Please try again.", "error")
+
+    return render_template("verify_2fa.html")
+
+
+@app.route("/profile/2fa/setup", methods=["GET", "POST"])
+@login_required
+def twofa_setup():
+    u = current_user()
+    user_db = query_one("SELECT * FROM users WHERE id = ?", (u["id"],))
+    totp_enabled = user_db["totp_enabled"] if "totp_enabled" in user_db.keys() else 0
+
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "enable":
+            secret = request.form.get("secret", "").strip()
+            code = request.form.get("code", "").strip()
+            if not secret:
+                flash("Session expired. Please start 2FA setup again.", "error")
+                return redirect(url_for("twofa_setup"))
+            totp = pyotp.TOTP(secret)
+            if totp.verify(code, valid_window=1):
+                execute("UPDATE users SET totp_secret=?, totp_enabled=1 WHERE id=?",
+                        (secret, u["id"]))
+                fz.log_activity(request, current_user(), "2fa_enabled", "auth")
+                flash("Two-factor authentication enabled!", "success")
+                return redirect(url_for("twofa_setup"))
+            else:
+                flash("Invalid code. Please try again.", "error")
+                return redirect(url_for("twofa_setup"))
+        elif action == "disable":
+            execute("UPDATE users SET totp_secret=NULL, totp_enabled=0 WHERE id=?", (u["id"],))
+            fz.log_activity(request, current_user(), "2fa_disabled", "auth")
+            flash("Two-factor authentication disabled.", "success")
+            return redirect(url_for("twofa_setup"))
+
+    # GET — generate a new secret + QR code for scanning
+    secret = pyotp.random_base32()
+    issuer = "IDon Portal"
+    totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(
+        name=user_db["email"] or user_db["username"],
+        issuer_name=issuer,
+    )
+    img = qrcode.make(totp_uri)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    qr_b64 = base64.b64encode(buf.getvalue()).decode()
+
+    return render_template("twofa_setup.html",
+                           secret=secret, qr_b64=qr_b64,
+                           totp_enabled=totp_enabled)
 
 
 @app.route("/assignments")
