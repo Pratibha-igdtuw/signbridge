@@ -289,16 +289,19 @@ def seed():
     if query_one("SELECT id FROM users WHERE username = ?", ("admin",)):
         return
 
+    # branch is used for faculty to scope them to a single department, so
+    # course assignment (see seed_igdtuw_data.py) doesn't hand one faculty
+    # member every course in the university.
     accounts = [
-        ("admin",   "admin@igdtuw.edu",   "Admin@123",   "admin",   "System Administrator"),
-        ("faculty", "faculty@igdtuw.edu", "Faculty@123", "faculty", "Dr. Priya Sharma"),
-        ("student", "student@igdtuw.edu", "Student@123", "student", "Rohan Verma"),
+        ("admin",   "admin@igdtuw.edu",   "Admin@123",   "admin",   "System Administrator", None),
+        ("faculty", "faculty@igdtuw.edu", "Faculty@123", "faculty", "Dr. Priya Sharma",      "CSE"),
+        ("student", "student@igdtuw.edu", "Student@123", "student", "Rohan Verma",           None),
     ]
-    for username, email, pw, role, name in accounts:
+    for username, email, pw, role, name, branch in accounts:
         execute(
-            "INSERT INTO users (username, email, password_hash, role, full_name, profile_complete) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (username, email, generate_password_hash(pw), role, name, 1),
+            "INSERT INTO users (username, email, password_hash, role, full_name, branch, profile_complete) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (username, email, generate_password_hash(pw), role, name, branch, 1),
         )
 
     sample_students = [

@@ -173,6 +173,48 @@ def generate_students_for_course(dept, year, count=60):
         })
     return students
 
+DEPT_FACULTY_ACCOUNTS = {
+    # dept_code: (username, email, full_name)
+    # "CSE" is intentionally omitted -- the default "faculty" account
+    # (Dr. Priya Sharma) created in database.py:seed() already covers CSE.
+    "ECE":   ("faculty_ece",  "faculty.ece@igdtuw.ac.in",  "Dr. Neha Kapoor"),
+    "IT":    ("faculty_it",   "faculty.it@igdtuw.ac.in",   "Dr. Ritu Malhotra"),
+    "AI&ML": ("faculty_aiml", "faculty.aiml@igdtuw.ac.in", "Dr. Ananya Rao"),
+    "MAE":   ("faculty_mae",  "faculty.mae@igdtuw.ac.in",  "Dr. Sunita Verma"),
+    "MAC":   ("faculty_mac",  "faculty.mac@igdtuw.ac.in",  "Dr. Kavita Iyer"),
+}
+DEFAULT_FACULTY_PASSWORD = "Faculty@123"
+
+
+def seed_department_faculty():
+    """Ensure every department has its own faculty account.
+
+    Without this, all courses across every department end up assigned to
+    whichever single faculty account exists (see seed_departments_and_courses
+    below), which lets one faculty member post announcements / see records
+    for courses far outside their department.
+    """
+    from werkzeug.security import generate_password_hash
+
+    # Scope the original demo account (created in database.py:seed()) to CSE
+    # if it isn't already tagged with a department.
+    execute("UPDATE users SET branch='CSE' WHERE username='faculty' AND role='faculty' "
+            "AND (branch IS NULL OR branch = '')")
+
+    created = 0
+    for dept_code, (username, email, full_name) in DEPT_FACULTY_ACCOUNTS.items():
+        if query_one("SELECT id FROM users WHERE username=?", (username,)):
+            continue
+        execute(
+            "INSERT INTO users (username, email, password_hash, role, full_name, branch, profile_complete) "
+            "VALUES (?,?,?,?,?,?,1)",
+            (username, email, generate_password_hash(DEFAULT_FACULTY_PASSWORD), "faculty", full_name, dept_code)
+        )
+        created += 1
+    if created:
+        print(f"  ✅ Created {created} department-scoped faculty accounts (password: {DEFAULT_FACULTY_PASSWORD})")
+
+
 def seed_departments_and_courses():
     """Seed all departments, courses, and proper course structure.
 
@@ -181,7 +223,7 @@ def seed_departments_and_courses():
     'database is locked' errors during seeding.
     """
     admin = query_one("SELECT id FROM users WHERE role='admin' LIMIT 1")
-    faculty_users = query_all("SELECT id FROM users WHERE role='faculty'")
+    faculty_users = query_all("SELECT id, branch FROM users WHERE role='faculty'")
 
     if not admin or not faculty_users:
         print("❌ Admin or Faculty users not found. Seed default users first!")
@@ -189,6 +231,15 @@ def seed_departments_and_courses():
 
     admin_id = admin["id"]
     faculty_ids = [f["id"] for f in faculty_users]
+
+    # Group faculty by their department so each course is assigned to a
+    # faculty member who actually teaches in that department, instead of a
+    # random faculty member from anywhere in the university.
+    faculty_by_dept = {}
+    for f in faculty_users:
+        if f["branch"]:
+            faculty_by_dept.setdefault(f["branch"], []).append(f["id"])
+
     courses_created = 0
 
     conn = get_connection()
@@ -217,8 +268,11 @@ def seed_departments_and_courses():
                     )
                     course_id = cur.lastrowid
 
-                    # Assign faculty to course
-                    faculty_id = random.choice(faculty_ids)
+                    # Assign faculty to course -- prefer a faculty member
+                    # from the same department; only fall back to "anyone"
+                    # if that department has no dedicated faculty account.
+                    dept_pool = faculty_by_dept.get(dept_code, faculty_ids)
+                    faculty_id = random.choice(dept_pool)
                     cur.execute(
                         "INSERT INTO course_faculty (course_id, faculty_id) VALUES (?,?)",
                         (course_id, faculty_id)
@@ -372,13 +426,16 @@ if __name__ == "__main__":
     print("IGDTUW 2026-27 CURRICULUM & STUDENT DATA SEEDING")
     print("=" * 70)
 
-    print("\n[1/3] Seeding departments and courses...")
+    print("\n[1/4] Seeding department-scoped faculty accounts...")
+    seed_department_faculty()
+
+    print("\n[2/4] Seeding departments and courses...")
     seed_departments_and_courses()
 
-    print("\n[2/3] Generating 60 students per course...")
+    print("\n[3/4] Generating 60 students per course...")
     seed_60_students_per_course()
 
-    print("\n[3/3] Seeding sample attendance...")
+    print("\n[4/4] Seeding sample attendance...")
     seed_sample_attendance()
 
     print("\n" + "=" * 70)

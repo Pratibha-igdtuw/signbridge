@@ -3,10 +3,30 @@ Configuration for the Secure Student Management System v3 Enhanced.
 """
 import os
 
+# FLASK_ENV controls whether hardcoded dev fallbacks are allowed.
+# Set FLASK_ENV=production on any real/deployed server.
+_ENV = os.environ.get("FLASK_ENV", "development")
+_IS_PRODUCTION = _ENV == "production"
+
+_DEV_SECRET_KEY = "change-me-in-production-7f3a9c1e"
+_DEV_JWT_SECRET = "change-me-jwt-2b8d4f6a"
+
+
+def _require_env(var_name, dev_fallback):
+    value = os.environ.get(var_name)
+    if value:
+        return value
+    if _IS_PRODUCTION:
+        raise RuntimeError(
+            f"{var_name} is not set. Refusing to start with a hardcoded fallback "
+            f"secret in production. Set the {var_name} environment variable."
+        )
+    return dev_fallback
+
 
 class Config:
-    SECRET_KEY = os.environ.get("SMS_SECRET_KEY", "change-me-in-production-7f3a9c1e")
-    JWT_SECRET = os.environ.get("SMS_JWT_SECRET", "change-me-jwt-2b8d4f6a")
+    SECRET_KEY = _require_env("SMS_SECRET_KEY", _DEV_SECRET_KEY)
+    JWT_SECRET = _require_env("SMS_JWT_SECRET", _DEV_JWT_SECRET)
     JWT_EXPIRY_MINUTES = 60
 
     DB_PATH = os.path.join(os.path.dirname(__file__), "instance", "sms.db")

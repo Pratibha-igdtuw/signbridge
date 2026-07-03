@@ -73,7 +73,8 @@ def validate_student(form):
     email = (form.get("email") or "").strip()
     dept = (form.get("department") or "").strip().upper()
     year = (form.get("year") or "").strip()
-    section = (form.get("section") or "A").strip().upper()
+    section = (form.get("section") or "").strip().upper()
+    semester = (form.get("semester") or "").strip()
     cgpa = (form.get("cgpa") or "").strip()
     phone = (form.get("phone") or "").strip()
 
@@ -85,7 +86,9 @@ def validate_student(form):
         errors.append("Email is not valid.")
     if dept not in ALLOWED_DEPARTMENTS:
         errors.append(f"Department must be one of {', '.join(sorted(ALLOWED_DEPARTMENTS))}.")
-    if not _SECTION.match(section):
+    if not section:
+        errors.append("Section is required.")
+    elif not _SECTION.match(section):
         errors.append("Section must be 1-2 letters/digits (e.g. A, B, C1).")
     try:
         year_i = int(year)
@@ -94,6 +97,22 @@ def validate_student(form):
     except ValueError:
         year_i = None
         errors.append("Year must be a number.")
+
+    # Semester is required and must belong to the given year (two semesters per year).
+    semester_i = None
+    if not semester:
+        errors.append("Semester is required.")
+    else:
+        try:
+            semester_i = int(semester)
+            if year_i is not None:
+                derived_sem = (year_i * 2) - 1
+                if semester_i not in (derived_sem, derived_sem + 1):
+                    errors.append(f"Semester must be {derived_sem} or {derived_sem + 1} for year {year_i}.")
+        except ValueError:
+            semester_i = None
+            errors.append("Semester must be a number.")
+
     try:
         cgpa_f = float(cgpa) if cgpa else None
         if cgpa_f is not None and not (0 <= cgpa_f <= 10):
@@ -107,7 +126,7 @@ def validate_student(form):
     cleaned = {
         "roll_number": roll, "full_name": name, "email": email,
         "department": dept, "year": year_i, "section": section,
-        "cgpa": cgpa_f, "phone": phone,
+        "semester": semester_i, "cgpa": cgpa_f, "phone": phone,
     }
     return cleaned, errors
 

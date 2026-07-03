@@ -41,11 +41,13 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
-            <tr><td class="px-3 py-2 font-mono">roll_number</td><td class="px-3 py-2 text-red-500">Yes</td><td class="px-3 py-2 text-slate-500">22BT1CSE001</td></tr>
-            <tr><td class="px-3 py-2 font-mono">full_name</td>  <td class="px-3 py-2 text-red-500">Yes</td><td class="px-3 py-2 text-slate-500">Namita Singh</td></tr>
-            <tr><td class="px-3 py-2 font-mono">email</td>      <td class="px-3 py-2 text-red-500">Yes</td><td class="px-3 py-2 text-slate-500">namita118btcse@igdtuw.ac.in</td></tr>
+            <tr><td class="px-3 py-2 font-mono">roll_number</td><td class="px-3 py-2 text-red-500">Yes</td><td class="px-3 py-2 text-slate-500">22BT1CS001</td></tr>
+            <tr><td class="px-3 py-2 font-mono">full_name</td>  <td class="px-3 py-2 text-red-500">Yes</td><td class="px-3 py-2 text-slate-500">Student One</td></tr>
+            <tr><td class="px-3 py-2 font-mono">email</td>      <td class="px-3 py-2 text-red-500">Yes</td><td class="px-3 py-2 text-slate-500">xyz001btcse@igdtuw.ac.in</td></tr>
             <tr><td class="px-3 py-2 font-mono">department</td> <td class="px-3 py-2 text-red-500">Yes</td><td class="px-3 py-2 text-slate-500">CSE</td></tr>
             <tr><td class="px-3 py-2 font-mono">year</td>       <td class="px-3 py-2 text-red-500">Yes</td><td class="px-3 py-2 text-slate-500">3</td></tr>
+            <tr><td class="px-3 py-2 font-mono">section</td>    <td class="px-3 py-2 text-red-500">Yes</td><td class="px-3 py-2 text-slate-500">A, B, C…</td></tr>
+            <tr><td class="px-3 py-2 font-mono">semester</td>   <td class="px-3 py-2 text-red-500">Yes</td><td class="px-3 py-2 text-slate-500">5 or 6 (for year 3)</td></tr>
             <tr><td class="px-3 py-2 font-mono">phone</td>      <td class="px-3 py-2 text-slate-400">No</td><td class="px-3 py-2 text-slate-500">9876543210</td></tr>
           </tbody>
         </table>
@@ -53,6 +55,16 @@
       <div class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700">
         ⚠ Email must be <strong>@igdtuw.ac.in</strong>. Rows with other domains will be rejected.
         Duplicate emails or roll numbers are automatically skipped.
+      </div>
+      <div class="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-md text-xs text-slate-500">
+        ℹ <strong>roll_number</strong> convention: <span class="font-mono">YY</span> (admission year) +
+        <span class="font-mono">BT1</span> + 2-letter department code + 3-digit number, e.g.
+        <span class="font-mono">22BT1CS001</span> for CSE, <span class="font-mono">22BT1EC001</span> for ECE.
+        Keeping department codes at 2 letters (CS, EC, CE, EE, ME, IT, AI) keeps every roll number the same length.
+        <strong>section</strong> is required — every row must specify one (A, B, C…), rows left blank are
+        rejected as errors rather than silently defaulted.
+        <strong>semester</strong> is required — it must be one of the two semesters belonging to the given
+        year (e.g. year 3 → semester 5 or 6); rows with a missing or mismatched semester are rejected.
       </div>
       <a href="{{ url_for('bulk_upload_template') }}"
          class="mt-4 inline-flex items-center gap-2 text-sm text-signal hover:underline font-medium">

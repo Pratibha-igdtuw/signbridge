@@ -42,6 +42,76 @@
   {% endif %}
 </div>
 
+{% if user.role == 'admin' %}
+<form id="bulk-delete-form" method="post" action="{{ url_for('student_bulk_delete') }}"
+      onsubmit="return confirm('Delete ' + document.querySelectorAll('.student-check:checked').length + ' selected student(s)? This is logged and cannot be undone.');">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div id="bulk-bar" class="hidden mb-3 flex items-center justify-between gap-3 bg-red-50 border border-red-200 rounded-md px-4 py-2.5">
+    <span class="text-sm text-red-700"><span id="bulk-count">0</span> student(s) selected</span>
+    <div class="flex items-center gap-3">
+      <button type="button" onclick="clearStudentSelection()" class="text-xs text-slate-500 hover:text-steel">Clear selection</button>
+      <button type="submit" class="bg-red-600 hover:bg-red-700 text-white rounded-md px-4 py-1.5 text-sm font-medium transition">
+        Delete selected
+      </button>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+    <table class="w-full text-sm evidence">
+      <thead class="bg-slate-50 text-left text-xs uppercase eyebrow text-slate-400">
+        <tr>
+          <th class="px-4 py-3 font-semibold w-8">
+            <input type="checkbox" id="select-all-students" onchange="toggleAllStudents(this)"
+                   class="rounded border-slate-300 text-signal focus:ring-signal">
+          </th>
+          {% macro th(col, label) %}
+            {% set nd = 'ASC' if (sort==col and dir=='DESC') else 'DESC' %}
+            <th class="px-4 py-3 font-semibold">
+              <a href="{{ url_for('students', q=q, sort=col, dir=nd) }}" class="hover:text-steel">
+                {{ label }}{% if sort==col %} {{ '↓' if dir=='DESC' else '↑' }}{% endif %}
+              </a>
+            </th>
+          {% endmacro %}
+          {{ th('roll_number','Roll No') }}
+          {{ th('full_name','Name') }}
+          {{ th('department','Dept') }}
+          {{ th('year','Year') }}
+          {{ th('section','Sec') }}
+          {{ th('cgpa','CGPA') }}
+          <th class="px-4 py-3 font-semibold text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for s in students %}
+          <tr class="hover:bg-slate-50">
+            <td class="px-4 py-3">
+              <input type="checkbox" name="student_ids" value="{{ s.id }}"
+                     class="student-check rounded border-slate-300 text-signal focus:ring-signal"
+                     onchange="updateBulkBar()">
+            </td>
+            <td class="px-4 py-3 font-mono text-xs text-steel">{{ s.roll_number }}</td>
+            <td class="px-4 py-3 font-medium text-ink">{{ s.full_name }}<div class="text-xs text-slate-400 font-normal">{{ s.email }}</div></td>
+            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-slate-100 text-xs">{{ s.department }}</span></td>
+            <td class="px-4 py-3">{{ s.year }}</td>
+            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-slate-100 text-xs">{{ s.section }}</span></td>
+            <td class="px-4 py-3 font-mono">{{ '%.2f'|format(s.cgpa) if s.cgpa is not none else '—' }}</td>
+            <td class="px-4 py-3 text-right">
+              <a href="{{ url_for('student_edit', sid=s.id) }}" class="text-signal hover:underline text-xs">Edit</a>
+              <a href="#" onclick="event.preventDefault(); deleteSingleStudent('{{ s.id }}','{{ s.roll_number }}');"
+                 class="text-red-600 hover:underline text-xs ml-2">Delete</a>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">
+            {% if q %}No students match “{{ q }}”.{% else %}No students yet. Add the first one.{% endif %}
+          </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>
+{% else %}
 <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
   <table class="w-full text-sm evidence">
     <thead class="bg-slate-50 text-left text-xs uppercase eyebrow text-slate-400">
@@ -76,13 +146,6 @@
             {% if user.role in ['admin','faculty'] %}
               <a href="{{ url_for('student_edit', sid=s.id) }}" class="text-signal hover:underline text-xs">Edit</a>
             {% endif %}
-            {% if user.role == 'admin' %}
-              <form method="post" action="{{ url_for('student_delete', sid=s.id) }}" class="inline"
-                    onsubmit="return confirm('Delete {{ s.roll_number }}? This is logged.');">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button class="text-red-600 hover:underline text-xs ml-2">Delete</button>
-              </form>
-            {% endif %}
           </td>
         </tr>
       {% else %}
@@ -93,5 +156,46 @@
     </tbody>
   </table>
 </div>
+{% endif %}
 <p class="text-xs text-slate-400 mt-3">Showing {{ students|length }} record(s). Searches and sorts use parameterized queries with column whitelisting.</p>
+
+{% if user.role == 'admin' %}
+<!-- Hidden single-delete forms, reused by the row "Delete" link -->
+<form id="single-delete-form" method="post" class="hidden">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+<script>
+function updateBulkBar() {
+  const checked = document.querySelectorAll('.student-check:checked').length;
+  const bar = document.getElementById('bulk-bar');
+  const count = document.getElementById('bulk-count');
+  count.textContent = checked;
+  bar.classList.toggle('hidden', checked === 0);
+
+  const all = document.querySelectorAll('.student-check');
+  const selectAll = document.getElementById('select-all-students');
+  selectAll.checked = all.length > 0 && checked === all.length;
+  selectAll.indeterminate = checked > 0 && checked < all.length;
+}
+
+function toggleAllStudents(source) {
+  document.querySelectorAll('.student-check').forEach(cb => cb.checked = source.checked);
+  updateBulkBar();
+}
+
+function clearStudentSelection() {
+  document.querySelectorAll('.student-check').forEach(cb => cb.checked = false);
+  document.getElementById('select-all-students').checked = false;
+  document.getElementById('select-all-students').indeterminate = false;
+  updateBulkBar();
+}
+
+function deleteSingleStudent(sid, roll) {
+  if (!confirm('Delete ' + roll + '? This is logged.')) return;
+  const form = document.getElementById('single-delete-form');
+  form.action = '/students/' + sid + '/delete';
+  form.submit();
+}
+</script>
+{% endif %}
 {% endblock %}

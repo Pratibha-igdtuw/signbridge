@@ -986,11 +986,12 @@ def student_new():
             for e in errors: flash(e, "error")
             return render_template("student_form.html", form=request.form, mode="new")
         sid = execute(
-            "INSERT INTO students (roll_number, full_name, email, department, year, section, cgpa, phone, created_by) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO students (roll_number, full_name, email, department, year, section, "
+            "current_semester, cgpa, phone, created_by) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (cleaned["roll_number"], cleaned["full_name"], cleaned["email"],
-             cleaned["department"], cleaned["year"], cleaned["section"], cleaned["cgpa"],
-             cleaned["phone"], session["user_id"]),
+             cleaned["department"], cleaned["year"], cleaned["section"], cleaned["semester"],
+             cleaned["cgpa"], cleaned["phone"], session["user_id"]),
         )
         fz.log_activity(request, current_user(), "create", "students", f"roll={cleaned['roll_number']}")
         flash("Student added.", "success")
@@ -1013,10 +1014,10 @@ def student_edit(sid):
             return render_template("student_form.html", form=request.form, mode="edit", sid=sid)
         execute(
             "UPDATE students SET roll_number=?, full_name=?, email=?, department=?, "
-            "year=?, section=?, cgpa=?, phone=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            "year=?, section=?, current_semester=?, cgpa=?, phone=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
             (cleaned["roll_number"], cleaned["full_name"], cleaned["email"],
-             cleaned["department"], cleaned["year"], cleaned["section"], cleaned["cgpa"],
-             cleaned["phone"], sid),
+             cleaned["department"], cleaned["year"], cleaned["section"], cleaned["semester"],
+             cleaned["cgpa"], cleaned["phone"], sid),
         )
         fz.log_activity(request, current_user(), "update", "students", f"id={sid}")
         flash("Student updated.", "success")
@@ -1032,6 +1033,34 @@ def student_delete(sid):
     execute("DELETE FROM students WHERE id = ?", (sid,))
     fz.log_activity(request, current_user(), "delete", "students", f"id={sid}")
     flash("Student deleted.", "success")
+    return redirect(url_for("students"))
+
+
+@app.route("/students/bulk-delete", methods=["POST"])
+@role_required("admin")
+def student_bulk_delete():
+    raw_ids = request.form.getlist("student_ids")
+    ids = []
+    for raw in raw_ids:
+        if raw.isdigit():
+            ids.append(int(raw))
+    if not ids:
+        flash("No students selected.", "error")
+        return redirect(url_for("students"))
+
+    placeholders = ",".join("?" for _ in ids)
+    rows = query_all(f"SELECT id, roll_number FROM students WHERE id IN ({placeholders})", ids)
+    found_ids = [r["id"] for r in rows]
+    if not found_ids:
+        flash("No matching students found.", "error")
+        return redirect(url_for("students"))
+
+    placeholders = ",".join("?" for _ in found_ids)
+    execute(f"DELETE FROM students WHERE id IN ({placeholders})", found_ids)
+    rolls = ", ".join(r["roll_number"] for r in rows)
+    fz.log_activity(request, current_user(), "bulk_delete", "students",
+                     f"count={len(found_ids)} ids={found_ids} rolls={rolls}")
+    flash(f"Deleted {len(found_ids)} student(s).", "success")
     return redirect(url_for("students"))
 
 
@@ -1619,13 +1648,13 @@ def bulk_upload_students():
         stream = io.StringIO(f.stream.read().decode("utf-8-sig"), newline=None)
         reader = csv.DictReader(stream)
 
-        required_cols = {"roll_number", "full_name", "email", "department", "year"}
+        required_cols = {"roll_number", "full_name", "email", "department", "year", "section", "semester"}
         if not reader.fieldnames or not required_cols.issubset(
             {c.strip().lower() for c in reader.fieldnames}
         ):
             flash(
                 f"CSV must have columns: {', '.join(required_cols)}. "
-                f"Optional: phone, section, semester",
+                f"Optional: phone",
                 "error"
             )
             return redirect(url_for("bulk_upload_students"))
@@ -1641,9 +1670,10 @@ def bulk_upload_students():
             dept  = row.get("department", "")
             year  = row.get("year", "1")
             phone = row.get("phone", "")
-            section = (row.get("section", "") or "A").upper()[:2]
+            section = row.get("section", "").upper()[:2]
+            semester_raw = row.get("semester", "").strip()
 
-            if not all([roll, name, email, dept]):
+            if not all([roll, name, email, dept, section, semester_raw]):
                 results_log.append({"roll": roll or "?", "name": name or "?",
                                      "status": "error", "msg": "Missing required field"})
                 errors += 1
@@ -1673,6 +1703,22 @@ def bulk_upload_students():
             except ValueError:
                 year_int = 1
 
+            # Semester is required — a year has two semesters (e.g. Year 2 -> Sem 3 or 4).
+            # Reject rows where it's missing, non-numeric, or doesn't belong to the given year.
+            derived_sem = (year_int * 2) - 1
+            try:
+                semester_int = int(semester_raw)
+            except ValueError:
+                results_log.append({"roll": roll, "name": name, "status": "error",
+                                     "msg": "Semester must be a number"})
+                errors += 1
+                continue
+            if semester_int not in (derived_sem, derived_sem + 1):
+                results_log.append({"roll": roll, "name": name, "status": "error",
+                                     "msg": f"Semester must be {derived_sem} or {derived_sem + 1} for year {year_int}"})
+                errors += 1
+                continue
+
             # Create user account
             username = roll.lower().replace(" ", "")
             # ensure username unique
@@ -1689,9 +1735,10 @@ def bulk_upload_students():
             )
             # Create student record
             execute(
-                "INSERT INTO students (roll_number, full_name, email, department, year, section, phone, created_by) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (roll, name, email, dept, year_int, section, phone, session["user_id"])
+                "INSERT INTO students (roll_number, full_name, email, department, year, section, "
+                "current_semester, phone, created_by) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (roll, name, email, dept, year_int, section, semester_int, phone, session["user_id"])
             )
             results_log.append({"roll": roll, "name": name, "status": "created",
                                  "msg": f"username={username} pw=Student@123"})
@@ -1711,11 +1758,11 @@ def bulk_upload_template():
     import csv, io
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["roll_number", "full_name", "email", "department", "year", "section", "phone"])
-    w.writerow(["22BT1CSE001", "Namita Singh",  "namita001btcse@igdtuw.ac.in",  "CSE", "3", "A", "9876543210"])
-    w.writerow(["22BT1CSE002", "Priya Sharma",  "priya002btcse@igdtuw.ac.in",   "CSE", "3", "A", "9876543211"])
-    w.writerow(["22BT1IT003",  "Anjali Verma",  "anjali003btit@igdtuw.ac.in",   "IT",  "3", "B", "9876543212"])
-    w.writerow(["21BT1ECE004", "Sneha Gupta",   "sneha004btece@igdtuw.ac.in",   "ECE", "4", "A", "9876543213"])
+    w.writerow(["roll_number", "full_name", "email", "department", "year", "section", "semester", "phone"])
+    w.writerow(["23BT1CS001", "Student One", "xyz001btcse@igdtuw.ac.in", "CSE", "3", "A", "5", "9876543210"])
+    w.writerow(["23BT1CS002", "Student Two", "xyz002btcse@igdtuw.ac.in", "CSE", "3", "B", "5", "9876543211"])
+    w.writerow(["23BT1IT001", "Student Three", "xyz003btit@igdtuw.ac.in", "IT", "3", "B", "6", "9876543212"])
+    w.writerow(["22BT1EC001", "Student Four", "xyz004btece@igdtuw.ac.in", "ECE", "4", "A", "7", "9876543213"])
     from flask import Response
     return Response(buf.getvalue(), headers={
         "Content-Disposition": "attachment; filename=student_upload_template.csv",
@@ -2899,4 +2946,10 @@ def api_attendance_bulk_mark():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="127.0.0.1", port=5000)
+    is_production = os.environ.get("FLASK_ENV", "development") == "production"
+    port = int(os.environ.get("PORT", 5000))
+    app.run(
+        debug=not is_production,
+        host="0.0.0.0" if is_production else "127.0.0.1",
+        port=port,
+    )
