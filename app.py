@@ -506,6 +506,49 @@ def attendance_mark():
     return redirect(url_for("attendance", student_id=student_id))
 
 
+@app.route("/attendance/export/pdf")
+@login_required
+def attendance_export_pdf():
+    try:
+        import weasyprint
+    except ImportError:
+        flash("PDF export is not available. WeasyPrint is not installed.", "error")
+        return redirect(url_for("attendance"))
+
+    u = current_user()
+    student_id = request.args.get("student_id")
+
+    if u["role"] == "student":
+        user_db = query_one("SELECT * FROM users WHERE id=?", (u["id"],))
+        student = (query_one("SELECT * FROM students WHERE user_id=?", (u["id"],)) or
+                   query_one("SELECT * FROM students WHERE email=?", (user_db["email"],)))
+    else:
+        if not student_id:
+            flash("Please specify a student_id.", "error")
+            return redirect(url_for("attendance"))
+        student = query_one("SELECT * FROM students WHERE id=?", (int(student_id),))
+
+    if not student:
+        flash("Student record not found.", "error")
+        return redirect(url_for("attendance"))
+
+    att_data = query_all("""
+        SELECT subject,
+               COUNT(*) total,
+               SUM(CASE WHEN status='present' THEN 1 ELSE 0 END) present,
+               ROUND(100.0 * SUM(CASE WHEN status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+        FROM attendance WHERE student_id = ?
+        GROUP BY subject ORDER BY subject
+    """, (student["id"],))
+
+    html = render_template("pdf_attendance.html", student=student, att_data=att_data)
+    pdf_bytes = weasyprint.HTML(string=html).write_pdf()
+    name = (student["full_name"] or "student").replace(" ", "_")
+    resp = Response(pdf_bytes, mimetype="application/pdf")
+    resp.headers["Content-Disposition"] = f'attachment; filename="attendance_{name}.pdf"'
+    return resp
+
+
 # ============================================================================
 # SGPA Calculator (page only — computation is client-side)
 # ============================================================================
@@ -589,6 +632,62 @@ def verify_2fa():
             flash("Invalid 2FA code. Please try again.", "error")
 
     return render_template("verify_2fa.html")
+
+
+# ── Registration Approval ─────────────────────────────────────────────────────
+@app.route("/users/pending")
+@role_required("admin")
+def pending_users():
+    users = query_all(
+        "SELECT id, username, full_name, email, role, created_at "
+        "FROM users WHERE status='pending' ORDER BY id DESC"
+    )
+    return render_template("pending_users.html", pending_users=users)
+
+
+@app.route("/users/<int:uid>/approve", methods=["POST"])
+@role_required("admin")
+def user_approve(uid):
+    user = query_one("SELECT * FROM users WHERE id=?", (uid,))
+    if not user:
+        abort(404)
+    execute("UPDATE users SET status='active' WHERE id=?", (uid,))
+    fz.log_activity(request, current_user(), "account_approved", "auth",
+                    f"approved user id={uid}")
+    # Notify student
+    try:
+        from utils.mailer import notify_account_approved
+        notify_account_approved(user["email"], user["full_name"])
+    except Exception:
+        pass
+    flash(f"Account '{user['username']}' approved.", "success")
+    return redirect(url_for("users_list"))
+
+
+@app.route("/users/<int:uid>/suspend", methods=["POST"])
+@role_required("admin")
+def user_suspend(uid):
+    user = query_one("SELECT username FROM users WHERE id=?", (uid,))
+    if not user:
+        abort(404)
+    execute("UPDATE users SET status='suspended' WHERE id=?", (uid,))
+    fz.log_activity(request, current_user(), "account_suspended", "auth",
+                    f"suspended user id={uid}")
+    flash(f"Account '{user['username']}' suspended.", "success")
+    return redirect(url_for("users_list"))
+
+
+@app.route("/users/<int:uid>/activate", methods=["POST"])
+@role_required("admin")
+def user_activate(uid):
+    user = query_one("SELECT username FROM users WHERE id=?", (uid,))
+    if not user:
+        abort(404)
+    execute("UPDATE users SET status='active' WHERE id=?", (uid,))
+    fz.log_activity(request, current_user(), "account_activated", "auth",
+                    f"activated user id={uid}")
+    flash(f"Account '{user['username']}' activated.", "success")
+    return redirect(url_for("users_list"))
 
 
 @app.route("/profile/2fa/setup", methods=["GET", "POST"])
@@ -1393,6 +1492,49 @@ def result_delete(rid):
     return redirect(url_for("results"))
 
 
+@app.route("/results/export/pdf")
+@login_required
+def results_export_pdf():
+    try:
+        import weasyprint
+    except ImportError:
+        flash("PDF export is not available. WeasyPrint is not installed.", "error")
+        return redirect(url_for("results"))
+
+    u = current_user()
+    student_id = request.args.get("student_id")
+
+    if u["role"] == "student":
+        user_db = query_one("SELECT * FROM users WHERE id=?", (u["id"],))
+        student = (query_one("SELECT * FROM students WHERE user_id=?", (u["id"],)) or
+                   query_one("SELECT * FROM students WHERE email=?", (user_db["email"],)))
+    else:
+        if not student_id:
+            flash("Please specify a student_id.", "error")
+            return redirect(url_for("results"))
+        student = query_one("SELECT * FROM students WHERE id=?", (int(student_id),))
+
+    if not student:
+        flash("Student record not found.", "error")
+        return redirect(url_for("results"))
+
+    results = query_all(
+        "SELECT * FROM results WHERE student_id=? ORDER BY semester, subject",
+        (student["id"],)
+    )
+    semesters = {}
+    for r in results:
+        semesters.setdefault(r["semester"], []).append(r)
+
+    html = render_template("pdf_marksheet.html", student=student,
+                           semesters=semesters)
+    pdf_bytes = weasyprint.HTML(string=html).write_pdf()
+    name = (student["full_name"] or "student").replace(" ", "_")
+    resp = Response(pdf_bytes, mimetype="application/pdf")
+    resp.headers["Content-Disposition"] = f'attachment; filename="marksheet_{name}.pdf"'
+    return resp
+
+
 # ============================================================================
 # Fee Status
 # ============================================================================
@@ -1858,8 +2000,32 @@ def low_attendance_report():
 
 
 @app.route("/low-attendance/export")
-# ADD THESE 5 SIMPLE ROUTES TO YOUR app.py
-# (Place them AFTER low_attendance_export function, BEFORE admin_create_user function)
+@role_required("admin", "faculty")
+def low_attendance_export():
+    import csv, io
+    low_att = query_all("""
+        SELECT s.full_name, s.roll_number, s.department, s.year, att.subject,
+               SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
+               COUNT(*) AS total,
+               ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+        FROM attendance att
+        JOIN students s ON s.id = att.student_id
+        GROUP BY att.student_id, att.subject
+        HAVING pct < 75
+        ORDER BY pct ASC
+    """)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Student Name", "Roll No", "Department", "Year", "Subject", "Present", "Total", "Attendance %"])
+    for r in low_att:
+        w.writerow([r["full_name"], r["roll_number"], r["department"], r["year"],
+                    r["subject"], r["present"], r["total"], r["pct"]])
+    fz.log_activity(request, current_user(), "export_low_attendance", "attendance")
+    return Response(buf.getvalue(), headers={
+        "Content-Disposition": 'attachment; filename="low_attendance.csv"',
+        "Content-Type": "text/csv",
+    })
+
 
 # ============================================================================
 # Syllabus
@@ -1901,31 +2067,6 @@ def announcements_index():
 @role_required("faculty")
 def faculty_analytics_index():
     return render_template("faculty_analytics_index.html")
-@role_required("admin", "faculty")
-def low_attendance_export():
-    import csv, io
-    low_att = query_all("""
-        SELECT s.full_name, s.roll_number, s.department, s.year, att.subject,
-               SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
-               COUNT(*) AS total,
-               ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
-        FROM attendance att
-        JOIN students s ON s.id = att.student_id
-        GROUP BY att.student_id, att.subject
-        HAVING pct < 75
-        ORDER BY pct ASC
-    """)
-    buf = io.StringIO()
-    w = csv.writer(buf)
-    w.writerow(["Student Name", "Roll No", "Department", "Year", "Subject", "Present", "Total", "Attendance %"])
-    for r in low_att:
-        w.writerow([r["full_name"], r["roll_number"], r["department"], r["year"],
-                    r["subject"], r["present"], r["total"], r["pct"]])
-    fz.log_activity(request, current_user(), "export_low_attendance", "attendance")
-    return Response(buf.getvalue(), headers={
-        "Content-Disposition": 'attachment; filename="low_attendance.csv"',
-        "Content-Type": "text/csv",
-    })
 
 
 # ============================================================================
