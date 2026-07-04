@@ -69,44 +69,11 @@
 </div>
 {% endif %}
 
-<div class="grid lg:grid-cols-3 gap-6">
-  <!-- Course list -->
-  <div class="lg:col-span-1 space-y-2">
-    <h2 class="text-sm font-semibold text-ink mb-3">
-      {% if user.role == 'admin' %}All Courses{% else %}My Assigned Courses{% endif %}
-      <span class="text-slate-400 font-normal">({{ courses|length }})</span>
-    </h2>
-    {% for c in courses %}
-    <a href="{{ url_for('courses', course_id=c.id) }}" class="block bg-white rounded-lg border p-4 hover:border-signal transition
-              {{ 'border-signal ring-1 ring-signal/20' if course_id == c.id else 'border-slate-200' }}">
-      <div class="flex items-start justify-between">
-        <div>
-          <p class="font-medium text-ink text-sm">{{ c.name }}</p>
-          <p class="text-xs text-slate-400 font-mono mt-0.5">{{ c.code }}</p>
-        </div>
-        <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded shrink-0 ml-2">
-          {{ c.enrolled_count }} students
-        </span>
-      </div>
-      <div class="flex gap-2 mt-2 flex-wrap">
-        <span class="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded eyebrow">{{ c.department }}</span>
-        <span class="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded eyebrow">Sem {{ c.semester }}</span>
-        <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded eyebrow">Sec {{ c.section }}</span>
-      </div>
-      {% if user.role == 'admin' and c.faculty_name %}
-      <p class="text-xs text-slate-400 mt-1.5">👩‍🏫 {{ c.faculty_name }}</p>
-      {% endif %}
-    </a>
-    {% else %}
-    <div class="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-400">
-      <p class="text-2xl mb-2">📚</p>
-      <p class="text-sm">No courses yet.</p>
-    </div>
-    {% endfor %}
-  </div>
-
-  <!-- Course detail panel -->
-  <div class="lg:col-span-2">
+<div>
+  <!-- Course detail panel (shown first so selecting a course near the bottom
+       of a long list doesn't require re-scrolling past the whole grid after
+       the page reload) -->
+  <div class="mb-6">
     {% if selected_course %}
     <div class="bg-white rounded-lg border border-slate-200 p-5">
       <!-- Header -->
@@ -224,6 +191,43 @@
       <p class="text-sm">Select a course to view details and manage enrollment.</p>
     </div>
     {% endif %}
+  </div>
+
+  <!-- Course list -->
+  <div>
+    <h2 class="text-sm font-semibold text-ink mb-3">
+      {% if user.role == 'admin' %}All Courses{% else %}My Assigned Courses{% endif %}
+      <span class="text-slate-400 font-normal">({{ courses|length }})</span>
+    </h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    {% for c in courses %}
+    <a href="{{ url_for('courses', course_id=c.id) }}" class="block bg-white rounded-lg border p-4 hover:border-signal transition
+              {{ 'border-signal ring-1 ring-signal/20' if course_id == c.id else 'border-slate-200' }}">
+      <div class="flex items-start justify-between">
+        <div>
+          <p class="font-medium text-ink text-sm">{{ c.name }}</p>
+          <p class="text-xs text-slate-400 font-mono mt-0.5">{{ c.code }}</p>
+        </div>
+        <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded shrink-0 ml-2">
+          {{ c.enrolled_count }} students
+        </span>
+      </div>
+      <div class="flex gap-2 mt-2 flex-wrap">
+        <span class="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded eyebrow">{{ c.department }}</span>
+        <span class="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded eyebrow">Sem {{ c.semester }}</span>
+        <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded eyebrow">Sec {{ c.section }}</span>
+      </div>
+      {% if user.role == 'admin' and c.faculty_name %}
+      <p class="text-xs text-slate-400 mt-1.5">👩‍🏫 {{ c.faculty_name }}</p>
+      {% endif %}
+    </a>
+    {% else %}
+    <div class="col-span-full bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-400">
+      <p class="text-2xl mb-2">📚</p>
+      <p class="text-sm">No courses yet.</p>
+    </div>
+    {% endfor %}
+    </div>
   </div>
 </div>
 <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">

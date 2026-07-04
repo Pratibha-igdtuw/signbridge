@@ -271,8 +271,8 @@
           {{ nav('results', 'Results', '📊') }}
           {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
           {{ nav('timetable', 'Timetable', '🗒️') }}
-          <a href="/syllabus" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'syllabus_index' else '' }}"><span>📚</span>Scheme & Syllabus</a>
-          <a href="/syllabus/manage" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'syllabus_admin' else '' }}"><span>⚙️</span>Manage Syllabus</a>
+          <a href="/syllabus" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'syllabus.index' else '' }}"><span>📚</span>Scheme & Syllabus</a>
+          <a href="/syllabus/admin" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'syllabus.admin_index' else '' }}"><span>⚙️</span>Manage Syllabus</a>
         </div>
       </details>
 
@@ -358,10 +358,10 @@
           {{ nav('assignments', 'Assignments', '📝') }}
           {{ nav('results', 'Results', '📊') }}
           {{ nav('timetable', 'Timetable', '🗒️') }}
-          <a href="/syllabus" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'syllabus_index' else '' }}"><span>📚</span>Scheme & Syllabus</a>
-          <a href="/materials" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'materials_index' else '' }}"><span>📚</span>Course Materials</a>
+          <a href="/syllabus" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'syllabus.index' else '' }}"><span>📚</span>Scheme & Syllabus</a>
+          <a href="/materials" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'materials.index' else '' }}"><span>📚</span>Course Materials</a>
           {{ nav('low_attendance_report', 'Low Attendance', '📉') }}
-          <a href="/faculty-analytics" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'faculty_analytics_index' else '' }}"><span>📊</span>Performance Analytics</a>
+          <a href="/analytics/faculty" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'faculty_analytics.index' else '' }}"><span>📊</span>Performance Analytics</a>
         </div>
       </details>
 
@@ -372,7 +372,7 @@
         </summary>
         <div class="submenu">
           {{ nav('notices', 'Notices', '📢') }}
-          <a href="/announcements" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'announcements_index' else '' }}"><span>📢</span>Class Announcements</a>
+          <a href="/announcements" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'announcements.index' else '' }}"><span>📢</span>Class Announcements</a>
           {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
           {{ nav('grievances', 'Grievances', '📨') }}
           {{ nav('leaves', 'Leave Applications', '🏖️') }}
@@ -395,8 +395,8 @@
           {{ nav('results', 'My Results', '📊') }}
           {{ nav('sgpa', 'SGPA / CGPA Calc', '🎓') }}
           {{ nav('timetable', 'Class Timetable', '🗒️') }}
-          <a href="/syllabus" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'syllabus_index' else '' }}"><span>📚</span>Scheme & Syllabus</a>
-          <a href="/materials" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'materials_index' else '' }}"><span>📚</span>Course Materials</a>
+          <a href="/syllabus" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'syllabus.index' else '' }}"><span>📚</span>Scheme & Syllabus</a>
+          <a href="/materials" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'materials.index' else '' }}"><span>📚</span>Course Materials</a>
         </div>
       </details>
 
@@ -407,7 +407,7 @@
         </summary>
         <div class="submenu">
           {{ nav('notices', 'Notices', '📢') }}
-          <a href="/announcements" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'announcements_index' else '' }}"><span>📢</span>Class Announcements</a>
+          <a href="/announcements" class="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition {{ 'nav-active' if request.endpoint == 'announcements.index' else '' }}"><span>📢</span>Class Announcements</a>
           {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
           {{ nav('fee_status', 'Fee Status', '💰') }}
         </div>

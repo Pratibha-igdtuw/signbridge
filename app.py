@@ -41,10 +41,19 @@ import security as sec
 import forensics as fz
 from auth import (login_required, role_required, jwt_required, current_user,
                   issue_jwt)
+from syllabus import syllabus_bp, init_syllabus_db
+from course_materials import materials_bp, init_materials_db
+from class_announcements import announcements_bp, init_announcements_db
+from faculty_analytics import faculty_analytics_bp
 
 app = Flask(__name__)
 app.config.from_object(Config)
 csrf = CSRFProtect(app)
+
+app.register_blueprint(syllabus_bp)
+app.register_blueprint(materials_bp)
+app.register_blueprint(announcements_bp)
+app.register_blueprint(faculty_analytics_bp)
 
 limiter = Limiter(
     key_func=get_remote_address,
@@ -62,6 +71,9 @@ db.seed_extras()
 db.seed_courses()
 db.backfill_user_id()
 db.seed_timetable()
+init_syllabus_db()
+init_materials_db()
+init_announcements_db()
 
 
 @app.context_processor
@@ -2025,48 +2037,6 @@ def low_attendance_export():
         "Content-Disposition": 'attachment; filename="low_attendance.csv"',
         "Content-Type": "text/csv",
     })
-
-
-# ============================================================================
-# Syllabus
-# ============================================================================
-@app.route("/syllabus", methods=["GET"])
-@login_required
-def syllabus_index():
-    return render_template("syllabus_index.html")
-
-
-@app.route("/syllabus/manage", methods=["GET"])
-@role_required("admin")
-def syllabus_admin():
-    return render_template("syllabus_admin.html")
-
-
-# ============================================================================
-# Course Materials
-# ============================================================================
-@app.route("/materials", methods=["GET"])
-@login_required
-def materials_index():
-    return render_template("materials_index.html")
-
-
-# ============================================================================
-# Announcements
-# ============================================================================
-@app.route("/announcements", methods=["GET"])
-@login_required
-def announcements_index():
-    return render_template("announcements_index.html")
-
-
-# ============================================================================
-# Faculty Analytics
-# ============================================================================
-@app.route("/faculty-analytics", methods=["GET"])
-@role_required("faculty")
-def faculty_analytics_index():
-    return render_template("faculty_analytics_index.html")
 
 
 # ============================================================================
