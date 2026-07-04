@@ -46,8 +46,23 @@ from course_materials import materials_bp, init_materials_db
 from class_announcements import announcements_bp, init_announcements_db
 from faculty_analytics import faculty_analytics_bp
 
+from itsdangerous import URLSafeTimedSerializer
+
+
 app = Flask(__name__)
 app.config.from_object(Config)
+
+from flask_mail import Mail
+
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'yourgmail@gmail.com'
+app.config['MAIL_PASSWORD'] = 'your_app_password'
+
+mail = Mail(app)
+
+serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
 csrf = CSRFProtect(app)
 
 app.register_blueprint(syllabus_bp)
@@ -75,7 +90,25 @@ init_syllabus_db()
 init_materials_db()
 init_announcements_db()
 
+from flask_mail import Message
 
+def send_reset_email(email, link):
+
+    msg = Message(
+        "Reset your password",
+        sender=app.config['MAIL_USERNAME'],
+        recipients=[email]
+    )
+
+    msg.body = f"""
+Click the link below to reset your password:
+
+{link}
+
+This link expires in 30 minutes.
+"""
+
+    mail.send(msg)
 @app.context_processor
 def inject_user():
     u = current_user()
@@ -235,7 +268,64 @@ def login():
 
     return render_template("login.html")
 
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
 
+    if request.method == "POST":
+
+        email = request.form["email"]
+
+        user = query_one(
+            "SELECT * FROM users WHERE email=?",
+            (email,)
+        )
+
+        if user:
+
+            token = serializer.dumps(email, salt="reset-password")
+
+            reset_link = url_for(
+                "reset_password",
+                token=token,
+                _external=True
+            )
+
+            send_reset_email(email, reset_link)
+
+            flash("Password reset email sent.")
+
+        else:
+            flash("Email not found.")
+
+    return render_template("forgot_password.html")
+@app.route("/reset-password/<token>", methods=["GET","POST"])
+def reset_password(token):
+
+    try:
+        email = serializer.loads(
+            token,
+            salt="reset-password",
+            max_age=1800
+        )
+
+    except:
+        flash("Invalid or expired link.")
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+
+        new_password = request.form["password"]
+
+        execute(
+    "UPDATE users SET password_hash=? WHERE email=?",
+    (generate_password_hash(new_password), email)
+)
+
+        flash("Password updated successfully.")
+
+        return redirect(url_for("login"))
+
+    return render_template("reset_password.html")
 @app.route("/logout")
 def logout():
     fz.log_activity(request, current_user(), "logout", "auth")
