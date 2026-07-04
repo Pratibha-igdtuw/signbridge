@@ -10,16 +10,17 @@
     <div class="bg-white rounded-lg border border-slate-200 p-4">
       <h3 class="text-sm font-semibold text-ink mb-3">Select Student</h3>
       <form method="get">
+        <select id="studentSelect" name="student_id" onchange="this.form.submit()"
+          class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
 
-        <input list="studentList" id="studentSearch" placeholder="Search student..."
-          class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-signal outline-none">
+          <option value="">Search Student...</option>
 
-        <datalist id="studentList">
           {% for s in students %}
-          <option value="{{ s.full_name }}"></option>
+          <option value="{{ s.id }}" {{ 'selected' if sid==s.id else '' }}>
+            {{ s.roll_number }} - {{ s.full_name }}
+          </option>
           {% endfor %}
-        </datalist>
-
+        </select>
       </form>
     </div>
     {% endif %}
@@ -168,4 +169,18 @@
     {% endif %}
   </div>
 </div>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+$(document).ready(function () {
+    $('#studentSelect').select2({
+        placeholder: "Search Student",
+        width: '100%'
+    });
+});
+</script>
 {% endblock %}
