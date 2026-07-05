@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Check your Email{% endblock %}
+
+{% block auth %}
+
+<div class="min-h-screen flex items-center justify-center bg-slate-100">
+
+<div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center">
+
+<div class="text-6xl mb-4">
+✅
+</div>
+
+<h2 class="text-3xl font-bold mb-3">
+
+Check your Email
+
+</h2>
+
+<p class="text-slate-600">
+
+If an account exists with this email address,
+we've sent a password reset link.
+
+</p>
+
+<p class="text-sm text-slate-400 mt-4">
+
+Please check your inbox and spam folder.
+
+</p>
+
+<a
+href="{{ url_for('login') }}"
+class="inline-block mt-8 bg-teal-600 text-white px-6 py-3 rounded-lg">
+
+Back to Login
+
+</a>
+
+</div>
+
+</div>
+
+{% endblock %}

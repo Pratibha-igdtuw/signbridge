@@ -291,7 +291,7 @@ def forgot_password():
 
     if request.method == "POST":
 
-        email = request.form["email"]
+        email = request.form.get("email")
 
         user = query_one(
             "SELECT * FROM users WHERE email=?",
@@ -299,7 +299,6 @@ def forgot_password():
         )
 
         if user:
-
             token = serializer.dumps(email, salt="reset-password")
 
             reset_link = url_for(
@@ -310,10 +309,8 @@ def forgot_password():
 
             send_reset_email(email, reset_link)
 
-            flash("Password reset email sent.")
-
-        else:
-            flash("Email not found.")
+        # Always show the same page
+        return render_template("reset_link_sent.html")
 
     return render_template("forgot_password.html")
 @app.route("/reset-password/<token>", methods=["GET","POST"])
