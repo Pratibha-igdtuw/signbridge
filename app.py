@@ -33,7 +33,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
-
+from datetime import datetime
 from config import Config
 import database as db
 from database import query_all, query_one, execute
@@ -149,8 +149,7 @@ def index():
     if not u:
         return redirect(url_for("login"))
     if u["role"] == "student":
-        return redirect(url_for("attendance"))
-    return redirect(url_for("dashboard"))
+           return redirect(url_for("student_dashboard"))
 
 
 ALLOWED_EMAIL_DOMAIN = "igdtuw.ac.in"
@@ -276,8 +275,7 @@ def login():
             if not user["profile_complete"]:
                 return redirect(url_for("profile_setup"))
             if user["role"] == "student":
-                return redirect(url_for("attendance"))
-            return redirect(url_for("dashboard"))
+                return redirect(url_for("student_dashboard"))
 
         # ❌ FAILED LOGIN
         uid = user["id"] if user else None
@@ -387,8 +385,7 @@ def profile_setup():
         fz.log_activity(request, current_user(), "profile_setup", "auth")
         flash("Profile saved successfully!", "success")
         if user["role"] == "student":
-            return redirect(url_for("attendance"))
-        return redirect(url_for("dashboard"))
+            return redirect(url_for("student_dashboard"))
     return render_template("profile_setup.html", user=user, form={})
 
 
@@ -528,6 +525,54 @@ def dashboard():
                            pinned_notices=pinned_notices, upcoming_exams=upcoming_exams)
 
 
+
+@app.route("/student/dashboard")
+@role_required("student")
+def student_dashboard():
+    u = current_user()
+
+    user = query_one(
+        "SELECT * FROM users WHERE id=?",
+        (u["id"],)
+    )
+
+    student = query_one(
+        "SELECT * FROM students WHERE user_id=?",
+        (u["id"],)
+    )
+
+    if not student:
+        student = query_one(
+            "SELECT * FROM students WHERE email=?",
+            (user["email"],)
+        )
+
+    attendance_pct = 0
+    pending_assignments = 0
+    cgpa = 0
+    fee_status_label = "Pending"
+
+    upcoming_exams = []
+    recent_notices = []
+    tasks = []
+    recent_activity = []
+
+    now_date = datetime.now().strftime("%d %b %Y")
+
+    return render_template(
+        "student_dashboard.html",
+        user=user,
+        student=student,
+        attendance_pct=attendance_pct,
+        pending_assignments=pending_assignments,
+        cgpa=cgpa,
+        fee_status_label=fee_status_label,
+        upcoming_exams=upcoming_exams,
+        recent_notices=recent_notices,
+        tasks=tasks,
+        recent_activity=recent_activity,
+        now_date=now_date
+    )
 @app.route("/api/alert-count")
 @login_required
 def api_alert_count():
@@ -759,9 +804,7 @@ def verify_2fa():
                 return redirect(url_for("profile_setup"))
 
             if user["role"] == "student":
-                return redirect(url_for("attendance"))
-
-            return redirect(url_for("dashboard"))
+                 return redirect(url_for("student_dashboard"))
 
         else:
             flash("Invalid 2FA code. Please try again.", "error")
