@@ -146,10 +146,14 @@ def inject_user():
 @app.route("/")
 def index():
     u = current_user()
+
     if not u:
         return redirect(url_for("login"))
+
     if u["role"] == "student":
-           return redirect(url_for("student_dashboard"))
+        return redirect(url_for("student_dashboard"))
+
+    return redirect(url_for("dashboard"))
 
 
 ALLOWED_EMAIL_DOMAIN = "igdtuw.ac.in"
@@ -183,12 +187,16 @@ def register():
             return render_template("register.html", form=request.form)
 
         uid = execute(
-            "INSERT INTO users (username, email, password_hash, role, full_name, profile_complete) "
-            "VALUES (?, ?, ?, ?, ?, 0)",
-            (cleaned["username"], cleaned["email"],
-             generate_password_hash(cleaned["password"]),
-             cleaned["role"], cleaned["full_name"]),
-        )
+             "INSERT INTO users (username, email, password_hash, role, full_name, profile_complete, status) "
+             "VALUES (?, ?, ?, ?, ?, 0, 'pending')",
+    (
+        cleaned["username"],
+        cleaned["email"],
+        generate_password_hash(cleaned["password"]),
+        cleaned["role"],
+        cleaned["full_name"],
+    ),
+)
 
         # ── Auto-link or create student record ────────────────────────────
         existing_student = query_one(
@@ -206,7 +214,10 @@ def register():
 
         fz.log_activity(request, {"id": uid, "username": cleaned["username"]},
                         "register", "auth", f"role={cleaned['role']}")
-        flash("Account created successfully. Please sign in.", "success")
+        flash(
+            "Registration successful. Your account is awaiting admin approval.",
+             "success",
+)
         return redirect(url_for("login"))
     return render_template("register.html", form={})
 
@@ -273,9 +284,16 @@ def login():
             fz.log_activity(request, dict(user), "login", "auth")
             flash(f"Welcome back, {user['full_name']}.", "success")
             if not user["profile_complete"]:
-                return redirect(url_for("profile_setup"))
+               return redirect(url_for("profile_setup"))
+
             if user["role"] == "student":
                 return redirect(url_for("student_dashboard"))
+            elif user["role"] == "admin":
+                return redirect(url_for("dashboard"))
+            elif user["role"] == "faculty":
+                 return redirect(url_for("dashboard"))
+
+            return redirect(url_for("dashboard"))
 
         # ❌ FAILED LOGIN
         uid = user["id"] if user else None
@@ -801,7 +819,13 @@ def verify_2fa():
                 return redirect(url_for("profile_setup"))
 
             if user["role"] == "student":
-                 return redirect(url_for("student_dashboard"))
+                return redirect(url_for("student_dashboard"))
+            elif user["role"] == "admin":
+                return redirect(url_for("dashboard"))
+            elif user["role"] == "faculty":
+                  return redirect(url_for("dashboard"))
+
+            return redirect(url_for("dashboard"))
 
         else:
             flash("Invalid 2FA code. Please try again.", "error")
@@ -1972,13 +1996,14 @@ def bulk_upload_students():
                 username = f"{base}{suffix}"
                 suffix += 1
 
-            uid = execute(
-                "INSERT INTO users (username, email, password_hash, role, full_name, profile_complete) "
-                "VALUES (?, ?, ?, 'student', ?, 1)",
-                (username, email, default_pw, name)
-            )
+                uid = execute(
+                 "INSERT INTO users (username, email, password_hash, role, full_name, profile_complete, status) "
+                 "VALUES (?, ?, ?, 'student', ?, 1, 'active')",
+                    (username, email, default_pw, name)
+                    )
+            
             # Create student record
-            execute(
+                execute(
                 "INSERT INTO students (roll_number, full_name, email, department, year, section, "
                 "current_semester, phone, created_by) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
