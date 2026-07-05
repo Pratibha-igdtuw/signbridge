@@ -773,10 +773,22 @@ def verify_2fa():
 @app.route("/users/pending")
 @role_required("admin")
 def pending_users():
-    users = query_all(
-        "SELECT id, username, full_name, email, role, created_at "
-        "FROM users WHERE status='pending' ORDER BY id DESC"
-    )
+    try:
+        users = query_all(
+            "SELECT id, username, full_name, email, role, created_at "
+            "FROM users WHERE status='pending' ORDER BY id DESC"
+        )
+    except Exception:
+        # Self-heal: older deployed databases may not have the `status`
+        # column yet (migrate_v3 never ran on them). Add it, mark all
+        # existing accounts active, then retry once.
+        conn = db.get_connection()
+        db.migrate_v3(conn)
+        conn.close()
+        users = query_all(
+            "SELECT id, username, full_name, email, role, created_at "
+            "FROM users WHERE status='pending' ORDER BY id DESC"
+        )
     return render_template("pending_users.html", pending_users=users)
 
 
