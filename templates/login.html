@@ -65,7 +65,16 @@
           </div>
         </div>
         <button class="w-full bg-signal hover:bg-teal-700 text-white font-medium
-                       rounded-md py-2.5 text-sm transition">Sign in</button>
+               rounded-md py-2.5 text-sm transition">
+    Sign in
+</button>
+
+<div class="text-right mt-2">
+    <a href="{{ url_for('forgot_password') }}"
+       class="text-sm text-signal hover:underline">
+        Forgot Password?
+    </a>
+</div>
       </form>
 
       <p class="text-sm text-slate-500 mt-4">
