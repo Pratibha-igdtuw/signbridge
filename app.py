@@ -45,6 +45,8 @@ from syllabus import syllabus_bp, init_syllabus_db
 from course_materials import materials_bp, init_materials_db
 from class_announcements import announcements_bp, init_announcements_db
 from faculty_analytics import faculty_analytics_bp
+from course_common import get_student_record
+from fee_due_notification import check_fee_due_dates
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -66,6 +68,10 @@ os.makedirs(os.path.dirname(Config.DB_PATH), exist_ok=True)
 os.makedirs(Config.UPLOAD_DIR, exist_ok=True)
 db.init_db()
 db.migrate_db()
+_migration_conn = db.get_connection()
+db.migrate_v3(_migration_conn)  # status column, 2FA columns, password-expiry tracking
+db.migrate_v4(_migration_conn)  # notifications table
+_migration_conn.close()
 db.seed()
 db.seed_extras()
 db.seed_courses()
@@ -74,6 +80,10 @@ db.seed_timetable()
 init_syllabus_db()
 init_materials_db()
 init_announcements_db()
+try:
+    check_fee_due_dates(db)
+except Exception:
+    pass  # non-critical — don't block app startup if this fails
 
 
 @app.context_processor
@@ -196,6 +206,16 @@ def login():
         if user and not user["is_active"]:
             fz.log_login(request, user["id"], username, "locked", user["role"])
             flash("Account is locked.", "error")
+            return render_template("login.html")
+
+        status = user["status"] if (user and "status" in user.keys()) else "active"
+        if user and status == "suspended":
+            fz.log_login(request, user["id"], username, "locked", user["role"])
+            flash("This account has been suspended. Contact an administrator.", "error")
+            return render_template("login.html")
+        if user and status == "pending":
+            fz.log_login(request, user["id"], username, "locked", user["role"])
+            flash("This account is awaiting admin approval.", "error")
             return render_template("login.html")
 
         # ✅ SUCCESS LOGIN BLOCK
@@ -341,7 +361,7 @@ def user_unlock(uid):
 @app.route("/users")
 @role_required("admin")
 def users_list():
-    users = query_all("SELECT id, username, full_name, role, email, is_active, created_at FROM users ORDER BY id")
+    users = query_all("SELECT id, username, full_name, role, email, is_active, status, created_at FROM users ORDER BY id")
     return render_template("users.html", all_users=users)
 
 
@@ -458,17 +478,30 @@ def attendance():
         course_filter = request.args.get("course_id") or None
         if course_filter:
             course_filter = int(course_filter)
-            students = query_all(
-                "SELECT s.* FROM students s JOIN enrollments e ON e.student_id=s.id "
-                "WHERE e.course_id=? ORDER BY s.roll_number",
-                (course_filter,)
+            my_assignment = query_one(
+                "SELECT section FROM course_faculty WHERE course_id=? AND faculty_id=?",
+                (course_filter, u["id"])
             )
+            my_section = my_assignment["section"] if my_assignment else None
+            if my_section:
+                students = query_all(
+                    "SELECT s.* FROM students s JOIN enrollments e ON e.student_id=s.id "
+                    "WHERE e.course_id=? AND s.section=? ORDER BY s.roll_number",
+                    (course_filter, my_section)
+                )
+            else:
+                students = query_all(
+                    "SELECT s.* FROM students s JOIN enrollments e ON e.student_id=s.id "
+                    "WHERE e.course_id=? ORDER BY s.roll_number",
+                    (course_filter,)
+                )
         else:
             students = query_all(
                 "SELECT DISTINCT s.* FROM students s "
                 "JOIN enrollments e ON e.student_id=s.id "
                 "JOIN course_faculty cf ON cf.course_id=e.course_id "
-                "WHERE cf.faculty_id=? ORDER BY s.roll_number",
+                "WHERE cf.faculty_id=? AND (cf.section IS NULL OR cf.section=s.section) "
+                "ORDER BY s.roll_number",
                 (u["id"],)
             )
         sid = request.args.get("student_id") or None
@@ -760,15 +793,19 @@ def assignments():
             "LEFT JOIN users u ON a.uploaded_by = u.id ORDER BY a.id DESC"
         )
     else:
-        # Students see assignments for their dept/year
-        user_db = query_one("SELECT branch, year FROM users WHERE id = ?", (u["id"],))
+        # Students see assignments for their dept/year (from their actual
+        # student roster record — not the self-reported, often-unset
+        # users.branch/year fields, which stay NULL for bulk-uploaded students)
+        student_rec = get_student_record(u["id"])
+        dept = student_rec["department"] if student_rec else ""
+        yr = student_rec["year"] if student_rec else 0
         rows = query_all(
             "SELECT a.*, u.full_name uploader_name FROM assignments a "
             "LEFT JOIN users u ON a.uploaded_by = u.id "
             "WHERE (a.department IS NULL OR a.department = ? OR a.department = '') "
             "  AND (a.year IS NULL OR a.year = 0 OR a.year = ?) "
             "ORDER BY a.id DESC",
-            (user_db["branch"] or "", user_db["year"] or 0)
+            (dept or "", yr or 0)
         )
 
     # For each assignment, check if student has submitted
@@ -962,28 +999,31 @@ def students():
         )
         course_filter = request.args.get("course_id") or None
         if course_filter:
-            # Verify this course belongs to this faculty
+            # Verify this course belongs to this faculty, and get their section
             valid = query_one(
-                "SELECT id FROM course_faculty WHERE course_id=? AND faculty_id=?",
+                "SELECT id, section FROM course_faculty WHERE course_id=? AND faculty_id=?",
                 (int(course_filter), u["id"])
             )
             if not valid:
                 flash("You are not assigned to that course.", "error")
                 return redirect(url_for("students"))
+            my_section = valid["section"]
+            sec_clause = "AND s.section=? " if my_section else ""
+            sec_params = [my_section] if my_section else []
             if q:
                 rows = query_all(
                     f"SELECT s.* FROM students s "
                     f"JOIN enrollments e ON e.student_id=s.id "
-                    f"WHERE e.course_id=? AND (s.roll_number LIKE ? OR s.full_name LIKE ?) "
+                    f"WHERE e.course_id=? {sec_clause}AND (s.roll_number LIKE ? OR s.full_name LIKE ?) "
                     f"ORDER BY s.{col} {dir_}",
-                    (int(course_filter), f"%{q}%", f"%{q}%")
+                    (int(course_filter), *sec_params, f"%{q}%", f"%{q}%")
                 )
             else:
                 rows = query_all(
                     f"SELECT s.* FROM students s "
                     f"JOIN enrollments e ON e.student_id=s.id "
-                    f"WHERE e.course_id=? ORDER BY s.{col} {dir_}",
-                    (int(course_filter),)
+                    f"WHERE e.course_id=? {sec_clause}ORDER BY s.{col} {dir_}",
+                    (int(course_filter), *sec_params)
                 )
         else:
             # No course selected — show students across all faculty courses
@@ -992,7 +1032,8 @@ def students():
                     f"SELECT DISTINCT s.* FROM students s "
                     f"JOIN enrollments e ON e.student_id=s.id "
                     f"JOIN course_faculty cf ON cf.course_id=e.course_id "
-                    f"WHERE cf.faculty_id=? AND (s.roll_number LIKE ? OR s.full_name LIKE ?) "
+                    f"WHERE cf.faculty_id=? AND (cf.section IS NULL OR cf.section=s.section) "
+                    f"AND (s.roll_number LIKE ? OR s.full_name LIKE ?) "
                     f"ORDER BY s.{col} {dir_}",
                     (u["id"], f"%{q}%", f"%{q}%")
                 )
@@ -1001,7 +1042,8 @@ def students():
                     f"SELECT DISTINCT s.* FROM students s "
                     f"JOIN enrollments e ON e.student_id=s.id "
                     f"JOIN course_faculty cf ON cf.course_id=e.course_id "
-                    f"WHERE cf.faculty_id=? ORDER BY s.{col} {dir_}",
+                    f"WHERE cf.faculty_id=? AND (cf.section IS NULL OR cf.section=s.section) "
+                    f"ORDER BY s.{col} {dir_}",
                     (u["id"],)
                 )
         course_filter = int(course_filter) if course_filter else None
@@ -1274,16 +1316,24 @@ def notices():
     if u["role"] == "student":
         rows = query_all(
             "SELECT n.*, u.full_name poster FROM notices n LEFT JOIN users u ON n.posted_by = u.id "
-            "WHERE n.target_role IN ('all','student') ORDER BY n.is_pinned DESC, n.id DESC"
+            "WHERE n.target_role IN ('all','student') "
+            "  AND (n.target_user_id IS NULL OR n.target_user_id = ?) "
+            "ORDER BY n.is_pinned DESC, n.id DESC",
+            (u["id"],)
         )
     elif u["role"] == "faculty":
         rows = query_all(
             "SELECT n.*, u.full_name poster FROM notices n LEFT JOIN users u ON n.posted_by = u.id "
-            "WHERE n.target_role IN ('all','faculty') ORDER BY n.is_pinned DESC, n.id DESC"
+            "WHERE n.target_role IN ('all','faculty') "
+            "  AND (n.target_user_id IS NULL OR n.target_user_id = ?) "
+            "ORDER BY n.is_pinned DESC, n.id DESC",
+            (u["id"],)
         )
     else:
         rows = query_all(
-            "SELECT n.*, u.full_name poster FROM notices n LEFT JOIN users u ON n.posted_by = u.id "
+            "SELECT n.*, u.full_name poster, tu.full_name target_name "
+            "FROM notices n LEFT JOIN users u ON n.posted_by = u.id "
+            "LEFT JOIN users tu ON n.target_user_id = tu.id "
             "ORDER BY n.is_pinned DESC, n.id DESC"
         )
     fz.log_activity(request, u, "view", "notices")
@@ -1334,14 +1384,16 @@ def notice_delete(nid):
 def exam_schedule():
     u = current_user()
     if u["role"] == "student":
-        user_db = query_one("SELECT branch, year FROM users WHERE id = ?", (u["id"],))
+        student_rec = get_student_record(u["id"])
+        dept = student_rec["department"] if student_rec else ""
+        yr = student_rec["year"] if student_rec else 0
         rows = query_all(
             "SELECT e.*, us.full_name created_by_name FROM exam_schedule e "
             "LEFT JOIN users us ON e.created_by = us.id "
             "WHERE (e.department IS NULL OR e.department = '' OR e.department = ?) "
             "  AND (e.year IS NULL OR e.year = 0 OR e.year = ?) "
             "ORDER BY e.exam_date ASC, e.exam_time ASC",
-            (user_db["branch"] or "", user_db["year"] or 0)
+            (dept or "", yr or 0)
         )
     else:
         rows = query_all(
@@ -1829,34 +1881,60 @@ def bulk_upload_template():
 @role_required("admin", "faculty")
 def courses():
     u = current_user()
+    q = (request.args.get("q") or "").strip()
     if u["role"] == "admin":
-        all_courses = query_all("""
-            SELECT c.*,
-                   u.full_name faculty_name,
-                   (SELECT COUNT(*) FROM enrollments e WHERE e.course_id=c.id) enrolled_count
-            FROM courses c
-            LEFT JOIN course_faculty cf ON cf.course_id=c.id
-            LEFT JOIN users u ON u.id=cf.faculty_id
-            ORDER BY c.department, c.semester, c.name
-        """)
+        if q:
+            all_courses = query_all("""
+                SELECT c.*,
+                       GROUP_CONCAT(u.full_name || ' (' || COALESCE(cf.section, 'All sections') || ')', ', ') faculty_name,
+                       (SELECT COUNT(*) FROM enrollments e WHERE e.course_id=c.id) enrolled_count
+                FROM courses c
+                LEFT JOIN course_faculty cf ON cf.course_id=c.id
+                LEFT JOIN users u ON u.id=cf.faculty_id
+                WHERE c.name LIKE ? OR c.code LIKE ? OR c.subject LIKE ? OR c.department LIKE ?
+                GROUP BY c.id
+                ORDER BY c.department, c.semester, c.name
+            """, (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"))
+        else:
+            all_courses = query_all("""
+                SELECT c.*,
+                       GROUP_CONCAT(u.full_name || ' (' || COALESCE(cf.section, 'All sections') || ')', ', ') faculty_name,
+                       (SELECT COUNT(*) FROM enrollments e WHERE e.course_id=c.id) enrolled_count
+                FROM courses c
+                LEFT JOIN course_faculty cf ON cf.course_id=c.id
+                LEFT JOIN users u ON u.id=cf.faculty_id
+                GROUP BY c.id
+                ORDER BY c.department, c.semester, c.name
+            """)
         all_faculty = query_all("SELECT id, full_name, username FROM users WHERE role='faculty' ORDER BY full_name")
         all_students = query_all("SELECT id, roll_number, full_name, department, year FROM students ORDER BY roll_number")
     else:
-        all_courses = query_all("""
-            SELECT c.*,
-                   (SELECT COUNT(*) FROM enrollments e WHERE e.course_id=c.id) enrolled_count
-            FROM courses c
-            JOIN course_faculty cf ON cf.course_id=c.id
-            WHERE cf.faculty_id=?
-            ORDER BY c.department, c.semester, c.name
-        """, (u["id"],))
+        if q:
+            all_courses = query_all("""
+                SELECT c.*,
+                       (SELECT COUNT(*) FROM enrollments e WHERE e.course_id=c.id) enrolled_count
+                FROM courses c
+                JOIN course_faculty cf ON cf.course_id=c.id
+                WHERE cf.faculty_id=? AND (c.name LIKE ? OR c.code LIKE ? OR c.subject LIKE ? OR c.department LIKE ?)
+                ORDER BY c.department, c.semester, c.name
+            """, (u["id"], f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"))
+        else:
+            all_courses = query_all("""
+                SELECT c.*,
+                       (SELECT COUNT(*) FROM enrollments e WHERE e.course_id=c.id) enrolled_count
+                FROM courses c
+                JOIN course_faculty cf ON cf.course_id=c.id
+                WHERE cf.faculty_id=?
+                ORDER BY c.department, c.semester, c.name
+            """, (u["id"],))
         all_faculty = []
         all_students = []
 
-    # For each course, get enrolled students (admin detail view)
+    # For each course, get enrolled students + assigned faculty (admin detail view)
     course_id = request.args.get("course_id") or None
     enrolled_students = []
     selected_course = None
+    assigned_faculty = []
     if course_id:
         selected_course = query_one("SELECT * FROM courses WHERE id=?", (int(course_id),))
         enrolled_students = query_all(
@@ -1864,11 +1942,16 @@ def courses():
             "WHERE e.course_id=? ORDER BY s.roll_number",
             (int(course_id),)
         )
+        assigned_faculty = query_all(
+            "SELECT u.id, u.full_name, cf.section FROM course_faculty cf "
+            "JOIN users u ON u.id=cf.faculty_id WHERE cf.course_id=? ORDER BY cf.section",
+            (int(course_id),)
+        )
     fz.log_activity(request, u, "view", "courses")
     return render_template("courses.html", courses=all_courses, all_faculty=all_faculty,
                            all_students=all_students, enrolled_students=enrolled_students,
-                           selected_course=selected_course,
-                           course_id=int(course_id) if course_id else None)
+                           selected_course=selected_course, assigned_faculty=assigned_faculty,
+                           course_id=int(course_id) if course_id else None, q=q)
 
 
 @app.route("/courses/new", methods=["POST"])
@@ -1879,10 +1962,10 @@ def course_create():
     subject = (request.form.get("subject") or "").strip()
     sem     = request.form.get("semester") or 1
     dept    = (request.form.get("department") or "").strip()
-    section = (request.form.get("section") or "A").strip().upper()
     yr      = (request.form.get("academic_year") or "2024-25").strip()
     credits = request.form.get("credits") or 4
     faculty_id = request.form.get("faculty_id") or None
+    faculty_section = (request.form.get("faculty_section") or "").strip().upper() or None
 
     if not all([name, code, subject, dept]):
         flash("Name, code, subject and department are required.", "error")
@@ -1892,15 +1975,17 @@ def course_create():
         return redirect(url_for("courses"))
 
     cid = execute(
-        "INSERT INTO courses (name, code, subject, semester, department, section, academic_year, credits, created_by) "
-        "VALUES (?,?,?,?,?,?,?,?,?)",
-        (name, code, subject, int(sem), dept, section, yr, int(credits), session["user_id"])
+        "INSERT INTO courses (name, code, subject, semester, department, academic_year, credits, created_by) "
+        "VALUES (?,?,?,?,?,?,?,?)",
+        (name, code, subject, int(sem), dept, yr, int(credits), session["user_id"])
     )
     if faculty_id:
-        execute("INSERT OR IGNORE INTO course_faculty (course_id, faculty_id) VALUES (?,?)",
-                (cid, int(faculty_id)))
+        execute("INSERT OR REPLACE INTO course_faculty (course_id, faculty_id, section) VALUES (?,?,?)",
+                (cid, int(faculty_id), faculty_section))
 
-    # Auto-enroll matching students (same dept + semester range)
+    # Auto-enroll matching students (same dept + semester range, all sections —
+    # a course spans a whole department+semester; sections are handled at the
+    # faculty-assignment level, not per-course)
     year = (int(sem) + 1) // 2
     enrolled = query_all(
         "SELECT id FROM students WHERE department=? AND year=?", (dept, year)
@@ -1918,16 +2003,28 @@ def course_create():
 @role_required("admin")
 def course_assign_faculty(cid):
     faculty_id = request.form.get("faculty_id")
+    section = (request.form.get("section") or "").strip().upper() or None
     if not faculty_id:
         flash("Select a faculty member.", "error")
         return redirect(url_for("courses", course_id=cid))
-    # Remove existing assignment then re-assign
-    execute("DELETE FROM course_faculty WHERE course_id=?", (cid,))
-    execute("INSERT INTO course_faculty (course_id, faculty_id) VALUES (?,?)",
-            (cid, int(faculty_id)))
+    # Upsert this faculty's assignment (keyed on the existing course_id+faculty_id
+    # unique constraint) — does NOT wipe other faculty already assigned to this
+    # course, so different faculty can be assigned to different sections.
+    execute("INSERT OR REPLACE INTO course_faculty (course_id, faculty_id, section) VALUES (?,?,?)",
+            (cid, int(faculty_id), section))
     fz.log_activity(request, current_user(), "assign_faculty", "courses",
-                    f"course={cid} faculty={faculty_id}")
+                    f"course={cid} faculty={faculty_id} section={section}")
     flash("Faculty assigned.", "success")
+    return redirect(url_for("courses", course_id=cid))
+
+
+@app.route("/courses/<int:cid>/unassign-faculty/<int:faculty_id>", methods=["POST"])
+@role_required("admin")
+def course_unassign_faculty(cid, faculty_id):
+    execute("DELETE FROM course_faculty WHERE course_id=? AND faculty_id=?", (cid, faculty_id))
+    fz.log_activity(request, current_user(), "unassign_faculty", "courses",
+                    f"course={cid} faculty={faculty_id}")
+    flash("Faculty removed from course.", "success")
     return redirect(url_for("courses", course_id=cid))
 
 
@@ -1996,8 +2093,8 @@ def course_bulk_enroll(cid):
 @app.route("/low-attendance")
 @role_required("admin", "faculty")
 def low_attendance_report():
-    low_att = query_all("""
-        SELECT s.full_name, s.roll_number, s.department, s.year, att.subject,
+    rows = query_all("""
+        SELECT s.full_name, s.roll_number, s.department, s.year, s.current_semester, att.subject,
                SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
                COUNT(*) AS total,
                ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
@@ -2005,10 +2102,38 @@ def low_attendance_report():
         JOIN students s ON s.id = att.student_id
         GROUP BY att.student_id, att.subject
         HAVING pct < 75
-        ORDER BY pct ASC
+        ORDER BY s.department ASC, s.year ASC, s.current_semester ASC, pct ASC
     """)
+
+    # Build a Branch -> Year -> Semester -> [rows] tree, plus unique-student
+    # counts at each level (a student with 2 low-attendance subjects should
+    # only be counted once, not twice).
+    from collections import OrderedDict
+    tree = OrderedDict()
+    dept_students = {}
+    all_students = set()
+
+    for r in rows:
+        dept = r["department"] or "Unassigned"
+        year = r["year"] or "—"
+        sem  = r["current_semester"] or "—"
+
+        tree.setdefault(dept, OrderedDict())
+        tree[dept].setdefault(year, OrderedDict())
+        tree[dept][year].setdefault(sem, [])
+        tree[dept][year][sem].append(r)
+
+        dept_students.setdefault(dept, set()).add(r["roll_number"])
+        all_students.add(r["roll_number"])
+
+    branches = [
+        {"name": dept, "count": len(dept_students[dept]), "years": years}
+        for dept, years in tree.items()
+    ]
+
     fz.log_activity(request, current_user(), "view_low_attendance", "attendance")
-    return render_template("low_attendance.html", low_att=low_att)
+    return render_template("low_attendance.html", branches=branches,
+                           total_students=len(all_students))
 
 
 @app.route("/low-attendance/export")
@@ -2016,7 +2141,7 @@ def low_attendance_report():
 def low_attendance_export():
     import csv, io
     low_att = query_all("""
-        SELECT s.full_name, s.roll_number, s.department, s.year, att.subject,
+        SELECT s.full_name, s.roll_number, s.department, s.year, s.current_semester, att.subject,
                SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
                COUNT(*) AS total,
                ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
@@ -2024,13 +2149,13 @@ def low_attendance_export():
         JOIN students s ON s.id = att.student_id
         GROUP BY att.student_id, att.subject
         HAVING pct < 75
-        ORDER BY pct ASC
+        ORDER BY s.department ASC, pct ASC
     """)
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["Student Name", "Roll No", "Department", "Year", "Subject", "Present", "Total", "Attendance %"])
+    w.writerow(["Student Name", "Roll No", "Department", "Year", "Semester", "Subject", "Present", "Total", "Attendance %"])
     for r in low_att:
-        w.writerow([r["full_name"], r["roll_number"], r["department"], r["year"],
+        w.writerow([r["full_name"], r["roll_number"], r["department"], r["year"], r["current_semester"],
                     r["subject"], r["present"], r["total"], r["pct"]])
     fz.log_activity(request, current_user(), "export_low_attendance", "attendance")
     return Response(buf.getvalue(), headers={
@@ -2103,6 +2228,9 @@ def api_token():
     username = (data.get("username") or "").strip()
     password = data.get("password") or ""
     user = query_one("SELECT * FROM users WHERE username = ? AND is_active = 1", (username,))
+    status = user["status"] if (user and "status" in user.keys()) else "active"
+    if user and status != "active":
+        return jsonify({"error": "Account is suspended or pending approval"}), 403
     if user and check_password_hash(user["password_hash"], password):
         return jsonify({"access_token": issue_jwt(user), "token_type": "bearer", "role": user["role"]})
     return jsonify({"error": "Invalid credentials"}), 401
@@ -2164,20 +2292,30 @@ def api_courses_by_semester():
 @role_required("admin", "faculty")
 def api_students_in_course(course_id):
     u = current_user()
+    my_section = None
     if u["role"] == "faculty":
         owns = query_one(
-            "SELECT 1 FROM course_faculty WHERE course_id = ? AND faculty_id = ?",
+            "SELECT section FROM course_faculty WHERE course_id = ? AND faculty_id = ?",
             (course_id, u["id"])
         )
         if not owns:
             return jsonify({"error": "Not authorized for this course"}), 403
+        my_section = owns["section"]
 
-    rows = query_all(
-        "SELECT s.id, s.roll_number, s.full_name, s.department, s.year, s.section "
-        "FROM students s JOIN enrollments e ON e.student_id = s.id "
-        "WHERE e.course_id = ? ORDER BY s.roll_number",
-        (course_id,)
-    )
+    if my_section:
+        rows = query_all(
+            "SELECT s.id, s.roll_number, s.full_name, s.department, s.year, s.section "
+            "FROM students s JOIN enrollments e ON e.student_id = s.id "
+            "WHERE e.course_id = ? AND s.section = ? ORDER BY s.roll_number",
+            (course_id, my_section)
+        )
+    else:
+        rows = query_all(
+            "SELECT s.id, s.roll_number, s.full_name, s.department, s.year, s.section "
+            "FROM students s JOIN enrollments e ON e.student_id = s.id "
+            "WHERE e.course_id = ? ORDER BY s.roll_number",
+            (course_id,)
+        )
     return jsonify([dict(r) for r in rows])
 
 
@@ -2350,10 +2488,14 @@ def timetable():
     section = request.args.get("section", "A")
 
     if u["role"] == "student":
-        user_db = query_one("SELECT branch, year FROM users WHERE id = ?", (u["id"],))
-        dept    = user_db["branch"] or dept
-        year    = user_db["year"] or 1
-        sem     = (year - 1) * 2 + 1  # current semester
+        student_rec = get_student_record(u["id"])
+        dept    = (student_rec["department"] if student_rec else None) or dept
+        section = (student_rec["section"] if student_rec else None) or section
+        if student_rec and student_rec["current_semester"]:
+            sem = student_rec["current_semester"]
+        else:
+            year = (student_rec["year"] if student_rec else 1) or 1
+            sem  = (year - 1) * 2 + 1  # fallback if current_semester isn't set
         rows = query_all(
             "SELECT t.*, u.full_name faculty_name FROM timetable t "
             "LEFT JOIN users u ON u.id = t.faculty_id "
@@ -2517,12 +2659,11 @@ def student_analytics():
                 GROUP BY subject ORDER BY subject
             """, (student["id"],))
 
-            user_db2 = query_one("SELECT branch, year FROM users WHERE id = ?", (u["id"],))
             total_asgn = query_one(
                 "SELECT COUNT(*) c FROM assignments "
                 "WHERE (department IS NULL OR department='' OR department=?) "
                 "  AND (year IS NULL OR year=0 OR year=?)",
-                (user_db2["branch"] or "", user_db2["year"] or 0)
+                (student["department"] or "", student["year"] or 0)
             )["c"]
             submitted = query_one(
                 "SELECT COUNT(*) c FROM homework_submissions WHERE student_id=?",
@@ -2580,9 +2721,24 @@ def student_analytics():
             # Filter to students in a specific course
             course_info = query_one("SELECT * FROM courses WHERE id=?", (filter_course,))
             if course_info:
-                filter_label = f"{course_info['name']} ({course_info['code']}) — {course_info['department']} Sem {course_info['semester']} Sec {course_info['section']}"
-            student_filter_sql = "student_id IN (SELECT student_id FROM enrollments WHERE course_id=?)"
-            student_params = [filter_course]
+                filter_label = f"{course_info['name']} ({course_info['code']}) — {course_info['department']} Sem {course_info['semester']}"
+            if u["role"] == "faculty":
+                my_assignment = query_one(
+                    "SELECT section FROM course_faculty WHERE course_id=? AND faculty_id=?",
+                    (filter_course, u["id"])
+                )
+                my_section = my_assignment["section"] if my_assignment else None
+            else:
+                my_section = None
+            if my_section:
+                student_filter_sql = (
+                    "student_id IN (SELECT e.student_id FROM enrollments e "
+                    "JOIN students s ON s.id=e.student_id WHERE e.course_id=? AND s.section=?)"
+                )
+                student_params = [filter_course, my_section]
+            else:
+                student_filter_sql = "student_id IN (SELECT student_id FROM enrollments WHERE course_id=?)"
+                student_params = [filter_course]
         else:
             parts, params = [], []
             if filter_dept:
@@ -2618,8 +2774,10 @@ def student_analytics():
         # Faculty: restrict to own courses unless a course filter is set
         if u["role"] == "faculty" and not filter_course and student_filter_sql == "1=1":
             student_filter_sql = (
-                "student_id IN (SELECT student_id FROM enrollments e "
-                "JOIN course_faculty cf ON cf.course_id=e.course_id WHERE cf.faculty_id=?)"
+                "student_id IN (SELECT e.student_id FROM enrollments e "
+                "JOIN course_faculty cf ON cf.course_id=e.course_id "
+                "JOIN students s ON s.id=e.student_id "
+                "WHERE cf.faculty_id=? AND (cf.section IS NULL OR cf.section=s.section))"
             )
             student_params = [u["id"]]
             filter_label = "My Students (All Courses)"

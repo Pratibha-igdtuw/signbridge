@@ -148,14 +148,15 @@ CREATE TABLE IF NOT EXISTS injection_alerts (
 
 -- Notices & Announcements
 CREATE TABLE IF NOT EXISTS notices (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    title       TEXT NOT NULL,
-    body        TEXT NOT NULL,
-    category    TEXT NOT NULL DEFAULT 'general',
-    target_role TEXT NOT NULL DEFAULT 'all',
-    posted_by   INTEGER REFERENCES users(id),
-    is_pinned   INTEGER NOT NULL DEFAULT 0,
-    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    title          TEXT NOT NULL,
+    body           TEXT NOT NULL,
+    category       TEXT NOT NULL DEFAULT 'general',
+    target_role    TEXT NOT NULL DEFAULT 'all',
+    target_user_id INTEGER REFERENCES users(id),
+    posted_by      INTEGER REFERENCES users(id),
+    is_pinned      INTEGER NOT NULL DEFAULT 0,
+    created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Exam Schedule
@@ -565,6 +566,15 @@ def migrate_db():
         )
     """)
 
+    # Faculty can now be assigned to a specific section of a course
+    # (e.g. Faculty A teaches Section A, Faculty B teaches Section B of the
+    # same subject). NULL means "teaches the whole course" — preserves the
+    # old behavior for every pre-existing course_faculty row.
+    try:
+        cur.execute("ALTER TABLE course_faculty ADD COLUMN section TEXT")
+    except Exception:
+        pass
+
     conn.commit()
     conn.close()
 
@@ -629,6 +639,9 @@ def migrate_v3(conn):
         "ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'",
         # Password expiry tracking
         "ALTER TABLE users ADD COLUMN last_password_change DATETIME DEFAULT CURRENT_TIMESTAMP",
+        # Per-student notice targeting (e.g. individual fee-due reminders should
+        # only reach the one student they're about, not every student)
+        "ALTER TABLE notices ADD COLUMN target_user_id INTEGER REFERENCES users(id)",
     ]:
         try:
             cur.execute(col_sql)

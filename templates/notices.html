@@ -69,6 +69,11 @@
               {{ n.target_role | upper }} ONLY
             </span>
           {% endif %}
+          {% if n.target_user_id %}
+            <span class="text-[10px] bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full font-semibold eyebrow">
+              👤 {{ n.target_name or ('user #' + n.target_user_id|string) }} ONLY
+            </span>
+          {% endif %}
         </div>
         <h3 class="font-semibold text-ink mt-1.5">{{ n.title }}</h3>
         <p class="text-sm text-slate-600 mt-1 leading-relaxed">{{ n.body }}</p>

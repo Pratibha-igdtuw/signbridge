@@ -16,7 +16,7 @@
   <a href="{{ url_for('students', course_id=c.id) }}"
      class="px-3 py-1.5 rounded-md text-xs font-medium transition
             {{ 'bg-signal text-white' if course_filter == c.id else 'bg-white border border-slate-200 text-slate-600 hover:border-signal' }}">
-    {{ c.name }} <span class="opacity-60">· Sem{{ c.semester }} {{ c.section }}</span>
+    {{ c.name }} <span class="opacity-60">· Sem{{ c.semester }}</span>
   </a>
   {% endfor %}
   <a href="{{ url_for('courses') }}" class="ml-auto text-xs text-signal hover:underline">Manage courses →</a>

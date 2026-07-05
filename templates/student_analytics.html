@@ -20,7 +20,7 @@
         <option value="">— All / Use filters below —</option>
         {% for c in all_courses %}
           <option value="{{ c.id }}" {{ 'selected' if filter_course == c.id }}>
-            {{ c.code }} · {{ c.name }} ({{ c.department }} Sem{{ c.semester }} {{c.section}})
+            {{ c.code }} · {{ c.name }} ({{ c.department }} Sem{{ c.semester }})
           </option>
         {% endfor %}
       </select>

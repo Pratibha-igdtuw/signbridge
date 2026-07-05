@@ -14,7 +14,7 @@ def check_fee_due_dates(db, Fee=None, Student=None, User=None, Notification=None
     db parameter is your database module (import database as db).
     """
     try:
-        from database import query_all, execute
+        from database import query_all, query_one, execute
     except ImportError:
         return 0
 
@@ -24,7 +24,7 @@ def check_fee_due_dates(db, Fee=None, Student=None, User=None, Notification=None
 
     # Get all pending/partial fees due within 2 days
     due_fees = query_all(
-        "SELECT f.*, s.full_name student_name, s.email student_email "
+        "SELECT f.*, s.full_name student_name, s.email student_email, s.user_id student_user_id "
         "FROM fee_status f "
         "JOIN students s ON s.id = f.student_id "
         "WHERE f.due_date IS NOT NULL "
@@ -41,12 +41,25 @@ def check_fee_due_dates(db, Fee=None, Student=None, User=None, Notification=None
             if not (0 <= days_left <= 2 and balance > 0):
                 continue
 
-            # Check if we already sent a notice today for this fee
+            # Resolve which user account this student actually is, so the
+            # reminder reaches only them — not every student. Try the direct
+            # user_id link first, then fall back to matching by email.
+            target_user_id = fee["student_user_id"]
+            if not target_user_id and fee["student_email"]:
+                match = query_one("SELECT id FROM users WHERE email = ?", (fee["student_email"],))
+                target_user_id = match["id"] if match else None
+
+            if not target_user_id:
+                # Can't identify a specific account for this student — skip
+                # rather than fall back to broadcasting to every student.
+                continue
+
+            # Check if we already sent a notice today for this exact student+fee
             already = query_all(
                 "SELECT id FROM notices "
-                "WHERE title LIKE ? AND category = 'fee' "
+                "WHERE title LIKE ? AND category = 'fee' AND target_user_id = ? "
                 "AND date(created_at) = date('now')",
-                (f"%Sem {fee['semester']}%{fee['fee_type']}%",)
+                (f"%Sem {fee['semester']}%{fee['fee_type']}%", target_user_id)
             )
             if already:
                 continue
@@ -74,9 +87,9 @@ def check_fee_due_dates(db, Fee=None, Student=None, User=None, Notification=None
 
             execute(
                 "INSERT INTO notices "
-                "(title, body, category, target_role, posted_by, is_pinned) "
-                "VALUES (?, ?, 'fee', 'student', 1, 0)",
-                (title, body)
+                "(title, body, category, target_role, target_user_id, posted_by, is_pinned) "
+                "VALUES (?, ?, 'fee', 'student', ?, 1, 0)",
+                (title, body, target_user_id)
             )
             count += 1
 

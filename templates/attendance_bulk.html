@@ -11,6 +11,11 @@
     color: #fff;
     border-color: #0f766e;
   }
+  .sec-btn[aria-pressed="true"] {
+    background-color: #0f766e; /* signal */
+    color: #fff;
+    border-color: #0f766e;
+  }
   .course-card {
     transition: box-shadow .15s ease, border-color .15s ease, transform .1s ease;
   }
@@ -88,15 +93,21 @@
   <div id="studentsSection" class="hidden bg-white rounded-lg border border-slate-200 p-6">
     <h2 class="text-xs font-semibold text-slate-500 eyebrow uppercase mb-3">Step 3 — Mark Attendance</h2>
 
-    <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
+    <div class="flex justify-between items-center mb-4 pb-4 border-b border-slate-100">
       <div>
         <h3 class="text-lg font-bold text-ink"><span id="selectedCourseName"></span></h3>
         <p class="text-sm text-slate-500"><span id="selectedCourseInfo"></span></p>
       </div>
       <div class="text-right">
         <div class="text-2xl font-bold text-signal"><span id="studentCount">0</span></div>
-        <div class="text-xs text-slate-500">Students</div>
+        <div class="text-xs text-slate-500">Students shown</div>
       </div>
+    </div>
+
+    <!-- Section filter -->
+    <div id="sectionFilterWrap" class="mb-6 hidden">
+      <h2 class="text-xs font-semibold text-slate-500 eyebrow uppercase mb-2">Section</h2>
+      <div id="sectionTabs" class="flex gap-2 flex-wrap" role="tablist" aria-label="Filter students by section"></div>
     </div>
 
     <!-- Bulk Actions -->
@@ -140,6 +151,7 @@ let selectedCourse = null;
 let selectedStudents = {};
 let allStudents = [];
 let currentSemFilter = 'all';
+let currentSectionFilter = 'all';
 
 document.addEventListener('DOMContentLoaded', loadCourses);
 
@@ -236,7 +248,7 @@ function fillCourseGrid(gridEl, courses) {
       <h4 class="font-semibold text-ink text-sm mb-1">${escapeHtml(course.name)}</h4>
       <p class="text-xs text-slate-500 font-mono mb-2">${escapeHtml(course.code)}</p>
       <p class="text-xs text-slate-500">${escapeHtml(course.subject)}</p>
-      <p class="text-xs text-slate-400 mt-1">${course.enrolled_count} enrolled · Sec ${escapeHtml(course.section)}</p>
+      <p class="text-xs text-slate-400 mt-1">${course.enrolled_count} enrolled</p>
     `;
     card.addEventListener('click', () => selectCourse(course, card));
     gridEl.appendChild(card);
@@ -252,25 +264,97 @@ function escapeHtml(str) {
 async function selectCourse(course, cardEl) {
   selectedCourse = course;
   selectedStudents = {};
+  currentSectionFilter = 'all';
 
   document.querySelectorAll('.course-card').forEach(c => c.setAttribute('aria-pressed', 'false'));
   cardEl.setAttribute('aria-pressed', 'true');
 
   document.getElementById('selectedCourseName').textContent = course.name;
   document.getElementById('selectedCourseInfo').textContent =
-    `${course.code} · ${course.subject} · Semester ${course.semester} · Sec ${course.section}`;
+    `${course.code} · ${course.subject} · Semester ${course.semester}`;
   document.getElementById('studentsSection').classList.remove('hidden');
   document.getElementById('studentsSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
   try {
     const res = await fetch(`/api/students/in-course/${course.id}`);
     allStudents = await res.json();
-    displayStudents(allStudents);
-    document.getElementById('studentCount').textContent = allStudents.length;
-    updateCounts();
+    buildSectionTabs();
+    applyFilters();
   } catch (err) {
     console.error('Error loading students:', err);
   }
+}
+
+function buildSectionTabs() {
+  const wrap = document.getElementById('sectionFilterWrap');
+  const tabs = document.getElementById('sectionTabs');
+  const sections = [...new Set(allStudents.map(s => s.section).filter(Boolean))].sort();
+
+  if (sections.length <= 1) {
+    // Only one (or no) section present — nothing meaningful to filter, hide the control.
+    wrap.classList.add('hidden');
+    tabs.innerHTML = '';
+    return;
+  }
+
+  wrap.classList.remove('hidden');
+  tabs.innerHTML = '';
+
+  const allBtn = document.createElement('button');
+  allBtn.className = 'sec-btn px-4 py-1.5 text-sm font-medium rounded-md border border-slate-300 text-slate-600 bg-white hover:border-signal';
+  allBtn.textContent = `All Sections (${allStudents.length})`;
+  allBtn.setAttribute('role', 'tab');
+  allBtn.setAttribute('aria-pressed', 'true');
+  allBtn.addEventListener('click', () => setSectionFilter('all'));
+  tabs.appendChild(allBtn);
+
+  sections.forEach(sec => {
+    const count = allStudents.filter(s => s.section === sec).length;
+    const btn = document.createElement('button');
+    btn.className = 'sec-btn px-4 py-1.5 text-sm font-medium rounded-md border border-slate-300 text-slate-600 bg-white hover:border-signal';
+    btn.textContent = `Section ${sec} (${count})`;
+    btn.setAttribute('role', 'tab');
+    btn.setAttribute('aria-pressed', 'false');
+    btn.addEventListener('click', () => setSectionFilter(sec));
+    tabs.appendChild(btn);
+  });
+}
+
+function setSectionFilter(sec) {
+  currentSectionFilter = sec;
+  document.querySelectorAll('.sec-btn').forEach(b => b.setAttribute('aria-pressed', 'false'));
+  const btns = document.querySelectorAll('.sec-btn');
+  btns.forEach(b => {
+    const isAll = sec === 'all' && b.textContent.startsWith('All Sections');
+    const isThis = b.textContent.startsWith(`Section ${sec}`);
+    if (isAll || isThis) b.setAttribute('aria-pressed', 'true');
+  });
+  document.getElementById('markAllPresent').checked = false;
+  document.getElementById('markAllAbsent').checked = false;
+  applyFilters();
+}
+
+function getSectionScopedStudents() {
+  if (currentSectionFilter === 'all') return allStudents;
+  return allStudents.filter(s => s.section === currentSectionFilter);
+}
+
+function getVisibleStudents() {
+  const query = document.getElementById('studentSearch').value.toLowerCase();
+  const sectionScoped = getSectionScopedStudents();
+  return query
+    ? sectionScoped.filter(s =>
+        s.full_name.toLowerCase().includes(query) ||
+        s.roll_number.toLowerCase().includes(query))
+    : sectionScoped;
+}
+
+function applyFilters() {
+  const sectionScoped = getSectionScopedStudents();
+  const filtered = getVisibleStudents();
+  displayStudents(sectionScoped, filtered);
+  document.getElementById('studentCount').textContent = filtered.length;
+  updateCounts();
 }
 
 function displayStudents(students, filtered = null) {
@@ -334,24 +418,19 @@ function updateCounts() {
 document.getElementById('markAllPresent').addEventListener('change', (e) => {
   if (e.target.checked) {
     document.getElementById('markAllAbsent').checked = false;
-    allStudents.forEach(s => markAttendance(s.id, 'present'));
+    getVisibleStudents().forEach(s => markAttendance(s.id, 'present'));
   }
 });
 
 document.getElementById('markAllAbsent').addEventListener('change', (e) => {
   if (e.target.checked) {
     document.getElementById('markAllPresent').checked = false;
-    allStudents.forEach(s => markAttendance(s.id, 'absent'));
+    getVisibleStudents().forEach(s => markAttendance(s.id, 'absent'));
   }
 });
 
-document.getElementById('studentSearch').addEventListener('keyup', (e) => {
-  const query = e.target.value.toLowerCase();
-  const filtered = allStudents.filter(s =>
-    s.full_name.toLowerCase().includes(query) ||
-    s.roll_number.toLowerCase().includes(query)
-  );
-  displayStudents(allStudents, filtered);
+document.getElementById('studentSearch').addEventListener('keyup', () => {
+  applyFilters();
 });
 
 document.getElementById('submitBtn').addEventListener('click', async () => {
@@ -384,7 +463,7 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
       document.getElementById('markAllPresent').checked = false;
       document.getElementById('markAllAbsent').checked = false;
       selectedStudents = {};
-      displayStudents(allStudents);
+      applyFilters();
       updateCounts();
     } else {
       alert('Something went wrong submitting attendance.');
@@ -401,7 +480,7 @@ document.getElementById('resetBtn').addEventListener('click', () => {
   selectedStudents = {};
   document.getElementById('markAllPresent').checked = false;
   document.getElementById('markAllAbsent').checked = false;
-  displayStudents(allStudents);
+  applyFilters();
   updateCounts();
 });
 
