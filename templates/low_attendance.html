@@ -27,7 +27,17 @@
         <span class="text-slate-400 text-xs transition-transform group-open:rotate-90 inline-block">▶</span>
         <span class="font-semibold text-ink">{{ branch.name }}</span>
       </span>
-      <span class="text-xs text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">{{ branch.count }} student{{ '' if branch.count == 1 else 's' }}</span>
+      <span class="flex items-center gap-2.5">
+        <span class="text-xs text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">{{ branch.count }} student{{ '' if branch.count == 1 else 's' }}</span>
+        <form method="post" action="{{ url_for('low_attendance_notify_branch', dept=branch.name) }}"
+              onsubmit="event.stopPropagation(); return confirm('Send a low-attendance alert email to every student listed under {{ branch.name }}?')"
+              onclick="event.stopPropagation()">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="text-xs px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-md transition">
+            ✉ Notify All
+          </button>
+        </form>
+      </span>
     </summary>
 
     <div class="border-t border-slate-100 px-5 py-4 space-y-5">
@@ -49,6 +59,7 @@
                     <th class="px-4 py-2.5 font-semibold">Subject</th>
                     <th class="px-4 py-2.5 font-semibold text-right">Attendance %</th>
                     <th class="px-4 py-2.5 font-semibold text-right">Classes Attended</th>
+                    <th class="px-4 py-2.5 font-semibold text-right">Alert</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -61,6 +72,18 @@
                     <td class="px-4 py-2.5">{{ r.subject }}</td>
                     <td class="px-4 py-2.5 text-right font-bold text-red-600">{{ r.pct }}%</td>
                     <td class="px-4 py-2.5 text-right font-mono text-xs text-slate-500">{{ r.present }}/{{ r.total }}</td>
+                    <td class="px-4 py-2.5 text-right">
+                      <form method="post" action="{{ url_for('low_attendance_notify_one') }}"
+                            onsubmit="return confirm('Send a low-attendance alert email to {{ r.full_name }} for {{ r.subject }}?')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="student_id" value="{{ r.student_id }}">
+                        <input type="hidden" name="subject" value="{{ r.subject }}">
+                        <button class="text-xs px-2.5 py-1 bg-slate-100 hover:bg-amber-200 text-slate-600 hover:text-amber-800 rounded-md transition"
+                                title="Email {{ r.full_name }} about this subject">
+                          ✉
+                        </button>
+                      </form>
+                    </td>
                   </tr>
                   {% endfor %}
                 </tbody>

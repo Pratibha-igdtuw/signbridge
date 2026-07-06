@@ -37,6 +37,7 @@ from werkzeug.utils import secure_filename
 from config import Config
 import database as db
 from database import query_all, query_one, execute
+from utils import mailer
 import security as sec
 import forensics as fz
 from auth import (login_required, role_required, jwt_required, current_user,
@@ -2184,7 +2185,8 @@ def course_bulk_enroll(cid):
 @role_required("admin", "faculty")
 def low_attendance_report():
     rows = query_all("""
-        SELECT s.full_name, s.roll_number, s.department, s.year, s.current_semester, att.subject,
+        SELECT s.id AS student_id, s.full_name, s.roll_number, s.email, s.department, s.year,
+               s.current_semester, att.subject,
                SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) AS present,
                COUNT(*) AS total,
                ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
@@ -2252,6 +2254,71 @@ def low_attendance_export():
         "Content-Disposition": 'attachment; filename="low_attendance.csv"',
         "Content-Type": "text/csv",
     })
+
+
+@app.route("/low-attendance/notify-one", methods=["POST"])
+@role_required("admin", "faculty")
+def low_attendance_notify_one():
+    """Send a single low-attendance alert email for one student/subject row."""
+    student_id = request.form.get("student_id", type=int)
+    subject = (request.form.get("subject") or "").strip()
+
+    row = query_one("""
+        SELECT s.full_name, s.email, att.subject,
+               ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+        FROM attendance att
+        JOIN students s ON s.id = att.student_id
+        WHERE att.student_id = ? AND att.subject = ?
+        GROUP BY att.student_id, att.subject
+    """, (student_id, subject))
+
+    if not row or not row["email"]:
+        flash("Could not send alert — student or subject not found.", "error")
+        return redirect(url_for("low_attendance_report"))
+
+    ok = mailer.notify_low_attendance(row["email"], row["full_name"], row["subject"], row["pct"])
+    fz.log_activity(request, current_user(), "notify_low_attendance", "attendance",
+                    f"student_id={student_id} subject={subject} sent={ok}")
+
+    if ok:
+        flash(f"Low-attendance alert sent to {row['full_name']} ({row['subject']}).", "success")
+    else:
+        flash(f"Failed to send alert to {row['full_name']} — check mail configuration.", "error")
+    return redirect(url_for("low_attendance_report"))
+
+
+@app.route("/low-attendance/notify-branch/<dept>", methods=["POST"])
+@role_required("admin", "faculty")
+def low_attendance_notify_branch(dept):
+    """Send low-attendance alert emails to every student/subject row in a branch."""
+    rows = query_all("""
+        SELECT s.full_name, s.email, att.subject,
+               ROUND(100.0 * SUM(CASE WHEN att.status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
+        FROM attendance att
+        JOIN students s ON s.id = att.student_id
+        WHERE s.department = ?
+        GROUP BY att.student_id, att.subject
+        HAVING pct < 75
+    """, (dept,))
+
+    sent, failed = 0, 0
+    for r in rows:
+        if not r["email"]:
+            failed += 1
+            continue
+        ok = mailer.notify_low_attendance(r["email"], r["full_name"], r["subject"], r["pct"])
+        sent += 1 if ok else 0
+        failed += 0 if ok else 1
+
+    fz.log_activity(request, current_user(), "notify_low_attendance_branch", "attendance",
+                    f"dept={dept} sent={sent} failed={failed}")
+
+    if sent:
+        flash(f"Sent {sent} low-attendance alert{'s' if sent != 1 else ''} for {dept}."
+              + (f" ({failed} failed)" if failed else ""), "success")
+    else:
+        flash(f"No alerts sent for {dept} — check mail configuration.", "error")
+    return redirect(url_for("low_attendance_report"))
 
 
 # ============================================================================
