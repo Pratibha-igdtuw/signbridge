@@ -33,7 +33,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
-
+from datetime import datetime
 from config import Config
 import database as db
 from database import query_all, query_one, execute
@@ -147,10 +147,13 @@ def inject_user():
 @app.route("/")
 def index():
     u = current_user()
+
     if not u:
         return redirect(url_for("login"))
+
     if u["role"] == "student":
-        return redirect(url_for("attendance"))
+        return redirect(url_for("student_dashboard"))
+
     return redirect(url_for("dashboard"))
 
 
@@ -185,12 +188,16 @@ def register():
             return render_template("register.html", form=request.form)
 
         uid = execute(
-            "INSERT INTO users (username, email, password_hash, role, full_name, profile_complete) "
-            "VALUES (?, ?, ?, ?, ?, 0)",
-            (cleaned["username"], cleaned["email"],
-             generate_password_hash(cleaned["password"]),
-             cleaned["role"], cleaned["full_name"]),
-        )
+             "INSERT INTO users (username, email, password_hash, role, full_name, profile_complete, status) "
+             "VALUES (?, ?, ?, ?, ?, 0, 'pending')",
+    (
+        cleaned["username"],
+        cleaned["email"],
+        generate_password_hash(cleaned["password"]),
+        cleaned["role"],
+        cleaned["full_name"],
+    ),
+)
 
         # ── Auto-link or create student record ────────────────────────────
         existing_student = query_one(
@@ -208,7 +215,10 @@ def register():
 
         fz.log_activity(request, {"id": uid, "username": cleaned["username"]},
                         "register", "auth", f"role={cleaned['role']}")
-        flash("Account created successfully. Please sign in.", "success")
+        flash(
+            "Registration successful. Your account is awaiting admin approval.",
+             "success",
+)
         return redirect(url_for("login"))
     return render_template("register.html", form={})
 
@@ -275,9 +285,15 @@ def login():
             fz.log_activity(request, dict(user), "login", "auth")
             flash(f"Welcome back, {user['full_name']}.", "success")
             if not user["profile_complete"]:
-                return redirect(url_for("profile_setup"))
+               return redirect(url_for("profile_setup"))
+
             if user["role"] == "student":
-                return redirect(url_for("attendance"))
+                return redirect(url_for("student_dashboard"))
+            elif user["role"] == "admin":
+                return redirect(url_for("dashboard"))
+            elif user["role"] == "faculty":
+                 return redirect(url_for("dashboard"))
+
             return redirect(url_for("dashboard"))
 
         # ❌ FAILED LOGIN
@@ -294,7 +310,7 @@ def forgot_password():
 
     if request.method == "POST":
 
-        email = request.form["email"]
+        email = request.form.get("email")
 
         user = query_one(
             "SELECT * FROM users WHERE email=?",
@@ -302,7 +318,6 @@ def forgot_password():
         )
 
         if user:
-
             token = serializer.dumps(email, salt="reset-password")
 
             reset_link = url_for(
@@ -313,10 +328,8 @@ def forgot_password():
 
             send_reset_email(email, reset_link)
 
-            flash("Password reset email sent.")
-
-        else:
-            flash("Email not found.")
+        # Always show the same page
+        return render_template("reset_link_sent.html")
 
     return render_template("forgot_password.html")
 @app.route("/reset-password/<token>", methods=["GET","POST"])
@@ -388,8 +401,7 @@ def profile_setup():
         fz.log_activity(request, current_user(), "profile_setup", "auth")
         flash("Profile saved successfully!", "success")
         if user["role"] == "student":
-            return redirect(url_for("attendance"))
-        return redirect(url_for("dashboard"))
+            return redirect(url_for("student_dashboard"))
     return render_template("profile_setup.html", user=user, form={})
 
 
@@ -529,6 +541,54 @@ def dashboard():
                            pinned_notices=pinned_notices, upcoming_exams=upcoming_exams)
 
 
+
+@app.route("/student/dashboard")
+@role_required("student")
+def student_dashboard():
+    u = current_user()
+
+    user = query_one(
+        "SELECT * FROM users WHERE id=?",
+        (u["id"],)
+    )
+
+    student = query_one(
+        "SELECT * FROM students WHERE user_id=?",
+        (u["id"],)
+    )
+
+    if not student:
+        student = query_one(
+            "SELECT * FROM students WHERE email=?",
+            (user["email"],)
+        )
+
+    attendance_pct = 0
+    pending_assignments = 0
+    cgpa = 0
+    fee_status_label = "Pending"
+
+    upcoming_exams = []
+    recent_notices = []
+    tasks = []
+    recent_activity = []
+
+    now_date = datetime.now().strftime("%d %b %Y")
+
+    return render_template(
+        "student_dashboard.html",
+        user=user,
+        student=student,
+        attendance_pct=attendance_pct,
+        pending_assignments=pending_assignments,
+        cgpa=cgpa,
+        fee_status_label=fee_status_label,
+        upcoming_exams=upcoming_exams,
+        recent_notices=recent_notices,
+        tasks=tasks,
+        recent_activity=recent_activity,
+        now_date=now_date
+    )
 @app.route("/api/alert-count")
 @login_required
 def api_alert_count():
@@ -760,7 +820,11 @@ def verify_2fa():
                 return redirect(url_for("profile_setup"))
 
             if user["role"] == "student":
-                return redirect(url_for("attendance"))
+                return redirect(url_for("student_dashboard"))
+            elif user["role"] == "admin":
+                return redirect(url_for("dashboard"))
+            elif user["role"] == "faculty":
+                  return redirect(url_for("dashboard"))
 
             return redirect(url_for("dashboard"))
 
@@ -774,10 +838,22 @@ def verify_2fa():
 @app.route("/users/pending")
 @role_required("admin")
 def pending_users():
-    users = query_all(
-        "SELECT id, username, full_name, email, role, created_at "
-        "FROM users WHERE status='pending' ORDER BY id DESC"
-    )
+    try:
+        users = query_all(
+            "SELECT id, username, full_name, email, role, created_at "
+            "FROM users WHERE status='pending' ORDER BY id DESC"
+        )
+    except Exception:
+        # Self-heal: older deployed databases may not have the `status`
+        # column yet (migrate_v3 never ran on them). Add it, mark all
+        # existing accounts active, then retry once.
+        conn = db.get_connection()
+        db.migrate_v3(conn)
+        conn.close()
+        users = query_all(
+            "SELECT id, username, full_name, email, role, created_at "
+            "FROM users WHERE status='pending' ORDER BY id DESC"
+        )
     return render_template("pending_users.html", pending_users=users)
 
 
@@ -1921,13 +1997,14 @@ def bulk_upload_students():
                 username = f"{base}{suffix}"
                 suffix += 1
 
-            uid = execute(
-                "INSERT INTO users (username, email, password_hash, role, full_name, profile_complete) "
-                "VALUES (?, ?, ?, 'student', ?, 1)",
-                (username, email, default_pw, name)
-            )
+                uid = execute(
+                 "INSERT INTO users (username, email, password_hash, role, full_name, profile_complete, status) "
+                 "VALUES (?, ?, ?, 'student', ?, 1, 'active')",
+                    (username, email, default_pw, name)
+                    )
+            
             # Create student record
-            execute(
+                execute(
                 "INSERT INTO students (roll_number, full_name, email, department, year, section, "
                 "current_semester, phone, created_by) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
