@@ -51,17 +51,49 @@ from fee_due_notification import check_fee_due_dates
 
 from itsdangerous import URLSafeTimedSerializer
 
+# PDF export — using xhtml2pdf instead of WeasyPrint. WeasyPrint needs a
+# native GTK/Pango install (libgobject-2.0-0 etc.), which is painful to set
+# up on Windows and was causing OSError crashes. xhtml2pdf is pure-Python
+# (installs via plain `pip install xhtml2pdf`, no system libraries needed).
+try:
+    from xhtml2pdf import pisa
+    _PDF_ENGINE_AVAILABLE = True
+except ImportError:
+    _PDF_ENGINE_AVAILABLE = False
+
+
+def _render_pdf(html_string):
+    """
+    Render an HTML string to PDF bytes using xhtml2pdf.
+    
+    NOTE: xhtml2pdf is old and does NOT support:
+      - @page with nested pseudo-elements (@bottom-center, @top-left, etc.)
+      - position: fixed
+      - transform: rotate()
+      - counter() functions
+      - CSS variables (var())
+      - complex display: flex layouts
+    
+    Template must use basic HTML + inline CSS only!
+    """
+    buf = io.BytesIO()
+    try:
+        result = pisa.CreatePDF(src=html_string, dest=buf)
+        if result.err:
+            print(f"[PDF] xhtml2pdf reported errors: {result.err}")
+            return None
+        return buf.getvalue()
+    except Exception as e:
+        print(f"[PDF] Exception during PDF rendering: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
 from flask_mail import Mail
-
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'yourgmail@gmail.com'
-app.config['MAIL_PASSWORD'] = 'your_app_password'
 
 mail = Mail(app)
 
@@ -464,7 +496,16 @@ def user_unlock(uid):
 @app.route("/users")
 @role_required("admin")
 def users_list():
-    users = query_all("SELECT id, username, full_name, role, email, is_active, status, created_at FROM users ORDER BY id")
+    users = query_all("""
+    SELECT id, username, full_name, role, email, is_active, status, created_at
+    FROM users
+    ORDER BY CASE role
+                 WHEN 'admin' THEN 1
+                 WHEN 'faculty' THEN 2
+                 WHEN 'student' THEN 3
+                 ELSE 4
+             END, full_name
+""")
     return render_template("users.html", all_users=users)
 
 
@@ -701,49 +742,64 @@ def attendance_mark():
         flash(f"Error: {e}", "error")
     return redirect(url_for("attendance", student_id=student_id))
 
-
 @app.route("/attendance/export/pdf")
 @login_required
 def attendance_export_pdf():
-    try:
-        import weasyprint
-    except ImportError:
-        flash("PDF export is not available. WeasyPrint is not installed.", "error")
+    """Export a student's attendance record as PDF."""
+    if not _PDF_ENGINE_AVAILABLE:
+        flash("PDF export is not available. Run: pip install xhtml2pdf", "error")
         return redirect(url_for("attendance"))
-
+ 
     u = current_user()
     student_id = request.args.get("student_id")
-
+ 
+    # Student can only export their own attendance
     if u["role"] == "student":
         user_db = query_one("SELECT * FROM users WHERE id=?", (u["id"],))
         student = (query_one("SELECT * FROM students WHERE user_id=?", (u["id"],)) or
                    query_one("SELECT * FROM students WHERE email=?", (user_db["email"],)))
     else:
+        # Admin/Faculty need explicit student_id
         if not student_id:
             flash("Please specify a student_id.", "error")
             return redirect(url_for("attendance"))
         student = query_one("SELECT * FROM students WHERE id=?", (int(student_id),))
-
+ 
     if not student:
         flash("Student record not found.", "error")
         return redirect(url_for("attendance"))
-
+ 
+    # Get attendance data
     att_data = query_all("""
         SELECT subject,
                COUNT(*) total,
                SUM(CASE WHEN status='present' THEN 1 ELSE 0 END) present,
                ROUND(100.0 * SUM(CASE WHEN status='present' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct
-        FROM attendance WHERE student_id = ?
-        GROUP BY subject ORDER BY subject
+        FROM attendance 
+        WHERE student_id = ?
+        GROUP BY subject 
+        ORDER BY subject
     """, (student["id"],))
-
-    html = render_template("pdf_attendance.html", student=student, att_data=att_data)
-    pdf_bytes = weasyprint.HTML(string=html).write_pdf()
+ 
+    # Render template to HTML
+    try:
+        html = render_template("pdf_attendance.html", student=student, att_data=att_data)
+    except Exception as e:
+        print(f"[PDF] Template render error: {e}")
+        flash("Error generating PDF. Template error.", "error")
+        return redirect(url_for("attendance"))
+ 
+    # Convert HTML to PDF
+    pdf_bytes = _render_pdf(html)
+    if pdf_bytes is None:
+        flash("Could not generate the PDF. Please try again.", "error")
+        return redirect(url_for("attendance"))
+ 
+    # Return PDF as download
     name = (student["full_name"] or "student").replace(" ", "_")
     resp = Response(pdf_bytes, mimetype="application/pdf")
     resp.headers["Content-Disposition"] = f'attachment; filename="attendance_{name}.pdf"'
     return resp
-
 
 # ============================================================================
 # SGPA Calculator (page only — computation is client-side)
@@ -1726,40 +1782,69 @@ def result_delete(rid):
 @app.route("/results/export/pdf")
 @login_required
 def results_export_pdf():
-    try:
-        import weasyprint
-    except ImportError:
-        flash("PDF export is not available. WeasyPrint is not installed.", "error")
+    """Export a student's marksheet as PDF."""
+    if not _PDF_ENGINE_AVAILABLE:
+        flash("PDF export is not available. Run: pip install xhtml2pdf", "error")
         return redirect(url_for("results"))
-
+ 
     u = current_user()
     student_id = request.args.get("student_id")
-
+ 
+    # Student can only export their own results
     if u["role"] == "student":
         user_db = query_one("SELECT * FROM users WHERE id=?", (u["id"],))
         student = (query_one("SELECT * FROM students WHERE user_id=?", (u["id"],)) or
                    query_one("SELECT * FROM students WHERE email=?", (user_db["email"],)))
     else:
+        # Admin/Faculty need explicit student_id
         if not student_id:
             flash("Please specify a student_id.", "error")
             return redirect(url_for("results"))
         student = query_one("SELECT * FROM students WHERE id=?", (int(student_id),))
-
+ 
     if not student:
         flash("Student record not found.", "error")
         return redirect(url_for("results"))
-
+ 
+    # Get results grouped by semester
     results = query_all(
         "SELECT * FROM results WHERE student_id=? ORDER BY semester, subject",
         (student["id"],)
     )
+ 
     semesters = {}
     for r in results:
-        semesters.setdefault(r["semester"], []).append(r)
-
-    html = render_template("pdf_marksheet.html", student=student,
-                           semesters=semesters)
-    pdf_bytes = weasyprint.HTML(string=html).write_pdf()
+        sem = r["semester"]
+        semesters.setdefault(sem, []).append(r)
+ 
+    # Calculate CGPA
+    cgpa_row = query_one("""
+        SELECT ROUND(
+            SUM(grade_points * COALESCE(credits, 4)) /
+            NULLIF(SUM(COALESCE(credits, 4)), 0), 2) AS cgpa
+        FROM results 
+        WHERE student_id = ?
+    """, (student["id"],))
+    cgpa = cgpa_row["cgpa"] if cgpa_row else None
+ 
+    # Render template to HTML
+    try:
+        html = render_template("pdf_marksheet.html", 
+                             student=student,
+                             semesters=semesters,
+                             cgpa=cgpa)
+    except Exception as e:
+        print(f"[PDF] Template render error: {e}")
+        flash("Error generating PDF. Template error.", "error")
+        return redirect(url_for("results"))
+ 
+    # Convert HTML to PDF
+    pdf_bytes = _render_pdf(html)
+    if pdf_bytes is None:
+        flash("Could not generate the PDF. Please try again.", "error")
+        return redirect(url_for("results"))
+ 
+    # Return PDF as download
     name = (student["full_name"] or "student").replace(" ", "_")
     resp = Response(pdf_bytes, mimetype="application/pdf")
     resp.headers["Content-Disposition"] = f'attachment; filename="marksheet_{name}.pdf"'
@@ -2946,9 +3031,20 @@ def student_analytics():
                 "ORDER BY department, semester, name"
             )
 
-        # Build WHERE clause dynamically based on filters
-        # We filter attendance by matching students
-        student_filter_sql = "1=1"
+        # Build WHERE clause dynamically based on filters.
+        #
+        # NOTE (bugfix): this filter needs to be applied against TWO different
+        # query shapes below — the bare `attendance` table (column reference
+        # `student_id`) and `attendance AS att` joined with students (column
+        # reference `att.student_id`). The old code built ONE sql string using
+        # the bare "student_id" and then tried to adapt it for the aliased
+        # query with `.replace('student_id', 'att.student_id')`. That blind
+        # string-replace also mangled subquery references like
+        # `e.student_id` -> `e.att.student_id`, producing invalid SQL and a
+        # 500 error for faculty (whose default filter is a subquery). We now
+        # build a *template* with a `{col}` placeholder and `.format()` it
+        # separately for each query shape — no string surgery involved.
+        student_filter_tpl = "1=1"
         student_params = []
 
         if filter_course:
@@ -2965,13 +3061,13 @@ def student_analytics():
             else:
                 my_section = None
             if my_section:
-                student_filter_sql = (
-                    "student_id IN (SELECT e.student_id FROM enrollments e "
+                student_filter_tpl = (
+                    "{col} IN (SELECT e.student_id FROM enrollments e "
                     "JOIN students s ON s.id=e.student_id WHERE e.course_id=? AND s.section=?)"
                 )
                 student_params = [filter_course, my_section]
             else:
-                student_filter_sql = "student_id IN (SELECT student_id FROM enrollments WHERE course_id=?)"
+                student_filter_tpl = "{col} IN (SELECT student_id FROM enrollments WHERE course_id=?)"
                 student_params = [filter_course]
         else:
             parts, params = [], []
@@ -2990,11 +3086,11 @@ def student_analytics():
                 sid_list = [r["id"] for r in sid_rows]
                 if sid_list:
                     placeholders = ",".join("?" * len(sid_list))
-                    student_filter_sql = f"student_id IN ({placeholders})"
+                    student_filter_tpl = "{col} IN (" + placeholders + ")"
                     student_params = sid_list
                 else:
                     # No matching students → empty results
-                    student_filter_sql = "1=0"
+                    student_filter_tpl = "1=0"
                     student_params = []
 
                 label_parts = []
@@ -3005,16 +3101,20 @@ def student_analytics():
             else:
                 filter_label = "All Students (University-wide)"
 
-        # Faculty: restrict to own courses unless a course filter is set
-        if u["role"] == "faculty" and not filter_course and student_filter_sql == "1=1":
-            student_filter_sql = (
-                "student_id IN (SELECT e.student_id FROM enrollments e "
+        # Faculty default (no filters picked at all): restrict to their own students
+        if u["role"] == "faculty" and not filter_course and student_filter_tpl == "1=1":
+            student_filter_tpl = (
+                "{col} IN (SELECT e.student_id FROM enrollments e "
                 "JOIN course_faculty cf ON cf.course_id=e.course_id "
                 "JOIN students s ON s.id=e.student_id "
                 "WHERE cf.faculty_id=? AND (cf.section IS NULL OR cf.section=s.section))"
             )
             student_params = [u["id"]]
             filter_label = "My Students (All Courses)"
+
+        # Two concrete, correctly-qualified versions of the same filter:
+        student_filter_sql     = student_filter_tpl.format(col="student_id")
+        student_filter_sql_att = student_filter_tpl.format(col="att.student_id")
 
         # Attendance trend (weekly %)
         att_trend = list(reversed(query_all(f"""
@@ -3045,7 +3145,7 @@ def student_analytics():
                    COUNT(*) total
             FROM attendance att
             JOIN students s ON s.id = att.student_id
-            WHERE {student_filter_sql.replace('student_id', 'att.student_id')}
+            WHERE {student_filter_sql_att}
             GROUP BY att.student_id, att.subject
             HAVING pct < 75
             ORDER BY pct ASC
