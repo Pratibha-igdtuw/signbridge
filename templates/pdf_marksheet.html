@@ -3,24 +3,26 @@
 <head>
 <meta charset="utf-8">
 <style>
-  @page { size: A4; margin: 2cm 1.5cm; @bottom-center { content: "Page " counter(page) " of " counter(pages); font-size: 10px; color: #666; } }
+  @page {
+    size: A4;
+    margin: 2cm;
+}
   body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11px; color: #1e293b; }
-  .watermark { position: fixed; top: 45%; left: 10%; opacity: 0.06; font-size: 52px; font-weight: 900;
-               color: #0d9488; transform: rotate(-35deg); white-space: nowrap; z-index: -1; pointer-events: none; }
+  .watermark { position: absolute; top: 45%; left: 10%; opacity: 0.06; font-size: 52px; font-weight: 900;
+               color: #0d9488; white-space: nowrap; }
   .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 12px; margin-bottom: 16px; }
   .header h1 { font-size: 18px; font-weight: 700; color: #0f172a; margin: 0 0 2px; }
   .header p  { font-size: 10px; color: #64748b; margin: 0; }
-  .student-info { display: flex; gap: 24px; background: #f8fafc; border: 1px solid #e2e8f0;
-                  border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; }
-  .info-item label { font-size: 9px; text-transform: uppercase; color: #64748b; letter-spacing: .08em; display: block; }
+  .student-info { background: #f8fafc; border: 1px solid #e2e8f0;
+                   padding: 12px 16px; margin-bottom: 16px; }
+  .info-item label { font-size: 9px; text-transform: uppercase; color: #64748b; display: block; }
   .info-item span  { font-size: 12px; font-weight: 600; color: #0f172a; }
   .semester-heading { font-size: 12px; font-weight: 700; background: #0d9488; color: #fff;
-                       padding: 6px 12px; border-radius: 4px; margin: 14px 0 6px; }
+                       padding: 6px 12px; margin: 14px 0 6px; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
   th { background: #f1f5f9; text-align: left; padding: 6px 10px; font-size: 9px;
        text-transform: uppercase; color: #475569; border: 1px solid #e2e8f0; }
   td { padding: 6px 10px; border: 1px solid #e2e8f0; font-size: 10px; }
-  tr:nth-child(even) td { background: #f8fafc; }
   .grade-A { color: #16a34a; font-weight: 600; }
   .grade-B { color: #2563eb; font-weight: 600; }
   .grade-C { color: #d97706; font-weight: 600; }
@@ -36,14 +38,25 @@
   <h1>IDon Portal — Marksheet</h1>
   <p>Indira Gandhi Delhi Technical University for Women (IGDTUW) | ISEA Project Phase-III</p>
 </div>
-<div class="student-info">
-  <div class="info-item"><label>Name</label><span>{{ student.full_name }}</span></div>
-  <div class="info-item"><label>Roll Number</label><span>{{ student.roll_number }}</span></div>
-  <div class="info-item"><label>Department</label><span>{{ student.department }}</span></div>
-  <div class="info-item"><label>Year</label><span>{{ student.year }}</span></div>
-  {% if student.cgpa %}<div class="info-item"><label>CGPA</label><span>{{ "%.2f"|format(student.cgpa) }}</span></div>{% endif %}
-</div>
+<table width="100%" border="1" cellspacing="0" cellpadding="6" style="margin-bottom:15px;">
+    <tr>
+        <td><b>Name</b><br>{{ student.full_name }}</td>
+        <td><b>Roll Number</b><br>{{ student.roll_number }}</td>
+    </tr>
+    <tr>
+        <td><b>Department</b><br>{{ student.department }}</td>
+        <td><b>Year</b><br>{{ student.year }}</td>
+    </tr>
 
+    {% if student.cgpa %}
+    <tr>
+        <td colspan="2">
+            <b>CGPA</b><br>
+            {{ "%.2f"|format(student.cgpa) }}
+        </td>
+    </tr>
+    {% endif %}
+</table>
 {% for sem, rows in semesters.items()|sort %}
 <div class="semester-heading">Semester {{ sem }}</div>
 <table>
@@ -60,10 +73,10 @@
       <td>{{ "%.1f"|format(r.internal_marks or 0) }}</td>
       <td>{{ "%.1f"|format(r.external_marks or 0) }}</td>
       <td><strong>{{ "%.1f"|format(r.total_marks or 0) }}</strong></td>
-      <td class="grade-{{ r.grade[0] if r.grade else 'C' }}">{{ r.grade or '—' }}</td>
+      <td>{{ r.grade or '—' }}</td>
       <td>{{ r.grade_points or 0 }}</td>
       <td>{{ r.credits or 4 }}</td>
-      <td>{{ r.status|upper }}</td>
+      <td>{{ (r.status or "")|upper }}</td>
     </tr>
     {% endfor %}
     <tr class="sgpa-row">

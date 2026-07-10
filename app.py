@@ -50,45 +50,44 @@ from course_common import get_student_record
 from fee_due_notification import check_fee_due_dates
 
 from itsdangerous import URLSafeTimedSerializer
-
-# PDF export — using xhtml2pdf instead of WeasyPrint. WeasyPrint needs a
-# native GTK/Pango install (libgobject-2.0-0 etc.), which is painful to set
-# up on Windows and was causing OSError crashes. xhtml2pdf is pure-Python
-# (installs via plain `pip install xhtml2pdf`, no system libraries needed).
+ 
 try:
     from xhtml2pdf import pisa
     _PDF_ENGINE_AVAILABLE = True
 except ImportError:
     _PDF_ENGINE_AVAILABLE = False
 
+def _render_pdf(html: str):
+    """
+    Render HTML to PDF using xhtml2pdf.
+    Returns PDF bytes on success, or None on failure.
+    """
+    import io
+    import traceback
+    from xhtml2pdf import pisa
 
-def _render_pdf(html_string):
-    """
-    Render an HTML string to PDF bytes using xhtml2pdf.
-    
-    NOTE: xhtml2pdf is old and does NOT support:
-      - @page with nested pseudo-elements (@bottom-center, @top-left, etc.)
-      - position: fixed
-      - transform: rotate()
-      - counter() functions
-      - CSS variables (var())
-      - complex display: flex layouts
-    
-    Template must use basic HTML + inline CSS only!
-    """
     buf = io.BytesIO()
-    try:
-        result = pisa.CreatePDF(src=html_string, dest=buf)
-        if result.err:
-            print(f"[PDF] xhtml2pdf reported errors: {result.err}")
-            return None
-        return buf.getvalue()
-    except Exception as e:
-        print(f"[PDF] Exception during PDF rendering: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
 
+    try:
+        result = pisa.CreatePDF(
+            src=html,
+            dest=buf
+        )
+
+        if result.err:
+            print("========== PDF ERROR ==========")
+            print(f"Error count: {result.err}")
+            print("================================")
+            return None
+
+        return buf.getvalue()
+
+    except Exception as e:
+        print("========== PDF EXCEPTION ==========")
+        print(e)
+        traceback.print_exc()
+        print("===================================")
+        return None
 
 app = Flask(__name__)
 app.config.from_object(Config)
