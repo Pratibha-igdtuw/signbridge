@@ -3,52 +3,217 @@
 <head>
 <meta charset="utf-8">
 <style>
-  @page { size: A4; margin: 2cm 1.5cm; @bottom-center { content: "Page " counter(page) " of " counter(pages); font-size: 10px; color: #666; } }
-  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11px; color: #1e293b; }
-  .watermark { position: fixed; top: 45%; left: 10%; opacity: 0.06; font-size: 52px; font-weight: 900;
-               color: #0d9488; transform: rotate(-35deg); white-space: nowrap; z-index: -1; pointer-events: none; }
-  .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 12px; margin-bottom: 16px; }
-  .header h1 { font-size: 18px; font-weight: 700; color: #0f172a; margin: 0 0 2px; }
-  .header p  { font-size: 10px; color: #64748b; margin: 0; }
-  .student-info { display: flex; gap: 24px; background: #f8fafc; border: 1px solid #e2e8f0;
-                  border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; }
-  .info-item label { font-size: 9px; text-transform: uppercase; color: #64748b; letter-spacing: .08em; display: block; }
-  .info-item span  { font-size: 12px; font-weight: 600; color: #0f172a; }
-  .semester-heading { font-size: 12px; font-weight: 700; background: #0d9488; color: #fff;
-                       padding: 6px 12px; border-radius: 4px; margin: 14px 0 6px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
-  th { background: #f1f5f9; text-align: left; padding: 6px 10px; font-size: 9px;
-       text-transform: uppercase; color: #475569; border: 1px solid #e2e8f0; }
-  td { padding: 6px 10px; border: 1px solid #e2e8f0; font-size: 10px; }
-  tr:nth-child(even) td { background: #f8fafc; }
-  .grade-A { color: #16a34a; font-weight: 600; }
-  .grade-B { color: #2563eb; font-weight: 600; }
-  .grade-C { color: #d97706; font-weight: 600; }
-  .grade-F { color: #dc2626; font-weight: 600; }
-  .sgpa-row td { background: #f0fdfa; font-weight: 600; color: #0d9488; }
-  .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 10px; 
-            font-size: 9px; color: #94a3b8; text-align: center; }
+  body { 
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; 
+    font-size: 11px; 
+    color: #1e293b;
+    margin: 30px;
+    line-height: 1.4;
+  }
+  
+  .watermark { 
+    text-align: center;
+    opacity: 0.08; 
+    font-size: 44px; 
+    font-weight: 900;
+    color: #0d9488;
+    margin-bottom: 20px;
+  }
+  
+  .header { 
+    text-align: center; 
+    border-bottom: 2px solid #0d9488; 
+    padding-bottom: 12px; 
+    margin-bottom: 16px; 
+  }
+  
+  .header h1 { 
+    font-size: 18px; 
+    font-weight: 700; 
+    color: #0f172a;
+    margin: 0 0 2px; 
+  }
+  
+  .header p  { 
+    font-size: 10px; 
+    color: #64748b; 
+    margin: 0; 
+  }
+  
+  .student-info { 
+    background: #f8fafc; 
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 12px 16px; 
+    margin-bottom: 16px; 
+  }
+  
+  .info-row {
+    display: block;
+    margin-bottom: 8px;
+  }
+  
+  .info-row:last-child {
+    margin-bottom: 0;
+  }
+  
+  .info-item { 
+    display: inline-block;
+    margin-right: 50px;
+    margin-bottom: 6px;
+  }
+  
+  .info-item label { 
+    font-size: 9px; 
+    text-transform: uppercase; 
+    color: #64748b; 
+    letter-spacing: 0.08em; 
+    display: inline;
+    font-weight: bold;
+  }
+  
+  .info-item span  { 
+    font-size: 12px; 
+    font-weight: 600; 
+    margin-left: 4px;
+    color: #0f172a;
+  }
+  
+  .semester-heading { 
+    font-size: 12px; 
+    font-weight: 700; 
+    background: #0d9488; 
+    color: #fff;
+    padding: 6px 12px; 
+    border-radius: 4px; 
+    margin: 14px 0 6px; 
+  }
+  
+  table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    margin-bottom: 4px; 
+  }
+  
+  th { 
+    background: #f1f5f9; 
+    text-align: left; 
+    padding: 6px 10px; 
+    font-size: 9px;
+    text-transform: uppercase; 
+    color: #475569; 
+    border: 1px solid #e2e8f0;
+    font-weight: 700;
+  }
+  
+  td { 
+    padding: 6px 10px; 
+    border: 1px solid #e2e8f0; 
+    font-size: 10px; 
+  }
+  
+  tbody tr:nth-child(even) td { 
+    background: #f8fafc; 
+  }
+  
+  tbody tr:nth-child(odd) td {
+    background: #ffffff;
+  }
+  
+  .grade-A { 
+    color: #16a34a; 
+    font-weight: 600; 
+  }
+  
+  .grade-B { 
+    color: #2563eb; 
+    font-weight: 600; 
+  }
+  
+  .grade-C { 
+    color: #d97706; 
+    font-weight: 600; 
+  }
+  
+  .grade-F { 
+    color: #dc2626; 
+    font-weight: 600; 
+  }
+  
+  .grade-D {
+    color: #f59e0b;
+    font-weight: 600;
+  }
+  
+  .sgpa-row td { 
+    background: #f0fdfa; 
+    font-weight: 600; 
+    color: #0d9488; 
+  }
+  
+  .footer { 
+    margin-top: 24px; 
+    border-top: 1px solid #e2e8f0; 
+    padding-top: 10px; 
+    font-size: 9px; 
+    color: #94a3b8; 
+    text-align: center; 
+  }
 </style>
 </head>
 <body>
+
 <div class="watermark">IDon Portal — Confidential</div>
+
 <div class="header">
   <h1>IDon Portal — Marksheet</h1>
   <p>Indira Gandhi Delhi Technical University for Women (IGDTUW) | ISEA Project Phase-III</p>
 </div>
+
 <div class="student-info">
-  <div class="info-item"><label>Name</label><span>{{ student.full_name }}</span></div>
-  <div class="info-item"><label>Roll Number</label><span>{{ student.roll_number }}</span></div>
-  <div class="info-item"><label>Department</label><span>{{ student.department }}</span></div>
-  <div class="info-item"><label>Year</label><span>{{ student.year }}</span></div>
-  {% if student.cgpa %}<div class="info-item"><label>CGPA</label><span>{{ "%.2f"|format(student.cgpa) }}</span></div>{% endif %}
+  <div class="info-row">
+    <div class="info-item">
+      <label>Name</label>
+      <span>{{ student.full_name }}</span>
+    </div>
+    <div class="info-item">
+      <label>Roll Number</label>
+      <span>{{ student.roll_number }}</span>
+    </div>
+  </div>
+  <div class="info-row">
+    <div class="info-item">
+      <label>Department</label>
+      <span>{{ student.department }}</span>
+    </div>
+    <div class="info-item">
+      <label>Year</label>
+      <span>{{ student.year }}</span>
+    </div>
+    {% if student.cgpa %}
+    <div class="info-item">
+      <label>CGPA</label>
+      <span>{{ "%.2f"|format(student.cgpa) }}</span>
+    </div>
+    {% endif %}
+  </div>
 </div>
 
 {% for sem, rows in semesters.items()|sort %}
 <div class="semester-heading">Semester {{ sem }}</div>
+
 <table>
   <thead>
-    <tr><th>Subject</th><th>Internal</th><th>External</th><th>Total / 100</th><th>Grade</th><th>Grade Points</th><th>Credits</th><th>Status</th></tr>
+    <tr>
+      <th>Subject</th>
+      <th>Internal</th>
+      <th>External</th>
+      <th>Total / 100</th>
+      <th>Grade</th>
+      <th>Grade Points</th>
+      <th>Credits</th>
+      <th>Status</th>
+    </tr>
   </thead>
   <tbody>
     {% set ns = namespace(total_gp=0, total_cr=0) %}
@@ -79,5 +244,6 @@
 <div class="footer">
   Generated by IDon Portal — Secure Student Management System &nbsp;|&nbsp; IDon Portal — Confidential
 </div>
+
 </body>
 </html>
