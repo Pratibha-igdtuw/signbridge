@@ -22,6 +22,8 @@ import os
 import uuid
 import io
 import base64
+import secrets
+import string
 
 import pyotp
 import qrcode
@@ -119,6 +121,9 @@ _migration_conn = db.get_connection()
 db.migrate_v3(_migration_conn)  # status column, 2FA columns, password-expiry tracking
 db.migrate_v4(_migration_conn)  # notifications table
 db.migrate_v5(_migration_conn)  # access_manager role support
+db.migrate_v6(_migration_conn)  # force_password_change column (admin Password Reset)
+db.migrate_v7(_migration_conn)  # logout_time column (Access Manager Login History)
+db.migrate_v8(_migration_conn)  # programme column (User Accounts Edit)
 _migration_conn.close()
 db.seed()
 db.seed_extras()
@@ -307,7 +312,7 @@ def login():
 
         if user and not user["is_active"]:
             fz.log_login(request, user["id"], username, "locked", user["role"])
-            flash("Account is locked.", "error")
+            flash("Your account has been locked. Please contact the Access Manager.", "error")
             return render_template("login.html")
 
         status = user["status"] if (user and "status" in user.keys()) else "active"
@@ -351,6 +356,7 @@ def login():
             session["username"] = user["username"]
             session["role"] = user["role"]
             session["full_name"] = user["full_name"]
+            session["must_change_password"] = bool(user["force_password_change"]) if "force_password_change" in user.keys() else False
             fz.log_login(request, user["id"], username, "success", user["role"])
             fz.log_activity(request, dict(user), "login", "auth")
             flash(f"Welcome back, {user['full_name']}.", "success")
@@ -435,6 +441,19 @@ def reset_password(token):
 @app.route("/logout")
 def logout():
     fz.log_activity(request, current_user(), "logout", "auth")
+    uid = session.get("user_id")
+    if uid:
+        # Close out the most recent still-open successful login session for
+        # this user, so the simplified Login History page can show Logout
+        # Time alongside Login Time. Reuses the existing login_history
+        # table/mechanism — no new logging system.
+        execute(
+            "UPDATE login_history SET logout_time = CURRENT_TIMESTAMP "
+            "WHERE id = (SELECT id FROM login_history WHERE user_id = ? "
+            "AND status = 'success' AND logout_time IS NULL "
+            "ORDER BY id DESC LIMIT 1)",
+            (uid,),
+        )
     session.clear()
     flash("You've been signed out.", "success")
     return redirect(url_for("login"))
@@ -509,8 +528,9 @@ def profile():
             elif new_pw != confirm_pw:
                 flash("New passwords do not match.", "error")
             else:
-                execute("UPDATE users SET password_hash=? WHERE id=?",
+                execute("UPDATE users SET password_hash=?, force_password_change=0 WHERE id=?",
                         (generate_password_hash(new_pw), u["id"]))
+                session["must_change_password"] = False
                 fz.log_activity(request, current_user(), "password_changed", "auth")
                 flash("Password changed successfully.", "success")
         return redirect(url_for("profile"))
@@ -518,17 +538,56 @@ def profile():
 
 
 # ============================================================================
-# Admin & Access Manager: unlock user
+# Admin & Access Manager: lock / unlock user accounts
 # ============================================================================
+@app.route("/users/<int:uid>/lock", methods=["POST"])
+@role_required("admin", "access_manager")
+def user_lock(uid):
+    me = current_user()
+    if uid == me["id"]:
+        flash("You cannot lock your own account.", "error")
+        return redirect(url_for("users_list"))
+
+    user = query_one("SELECT username, role, is_active FROM users WHERE id = ?", (uid,))
+    if not user:
+        abort(404)
+    if not user["is_active"]:
+        flash(f"Account '{user['username']}' is already locked.", "error")
+        return redirect(url_for("users_list"))
+    if user["role"] == "admin":
+        admin_count = query_one("SELECT COUNT(*) c FROM users WHERE role = 'admin'")["c"]
+        if admin_count <= 1:
+            flash("Cannot lock this account — at least one Super Admin "
+                  "must remain active in the system.", "error")
+            return redirect(url_for("users_list"))
+
+    execute("UPDATE users SET is_active = 0 WHERE id = ?", (uid,))
+    fz.log_activity(
+        request, me, "account_locked", "auth",
+        f"administrator={me['username']} target={user['username']} "
+        f"action=Account Locked previous_status=Active new_status=Locked"
+    )
+    flash(f"Account '{user['username']}' has been locked.", "success")
+    return redirect(url_for("users_list"))
+
+
 @app.route("/users/<int:uid>/unlock", methods=["POST"])
 @role_required("admin", "access_manager")
 def user_unlock(uid):
-    user = query_one("SELECT username FROM users WHERE id = ?", (uid,))
+    me = current_user()
+    user = query_one("SELECT username, is_active FROM users WHERE id = ?", (uid,))
     if not user:
         abort(404)
+    if user["is_active"]:
+        flash(f"Account '{user['username']}' is already active.", "error")
+        return redirect(url_for("users_list"))
+
     execute("UPDATE users SET is_active = 1 WHERE id = ?", (uid,))
-    fz.log_activity(request, current_user(), "account_unlocked", "auth",
-                    f"unlocked user id={uid}")
+    fz.log_activity(
+        request, me, "account_unlocked", "auth",
+        f"administrator={me['username']} target={user['username']} "
+        f"action=Account Unlocked previous_status=Locked new_status=Active"
+    )
     flash(f"Account '{user['username']}' has been unlocked.", "success")
     return redirect(url_for("users_list"))
 
@@ -547,7 +606,259 @@ def users_list():
                  ELSE 5
              END, full_name
 """)
-    return render_template("users.html", all_users=users)
+    return render_template("users.html", all_users=users, role_labels=ROLE_LABELS)
+
+
+# ============================================================================
+# Admin + Access Manager: edit a user's profile fields (User Accounts page)
+# Full Name, Email, Department, Programme, Semester only — never password.
+# Passwords change only via self-service Change Password or the Access
+# Manager's Password Reset feature.
+# ============================================================================
+@app.route("/users/<int:uid>/edit", methods=["GET", "POST"])
+@role_required("admin", "access_manager")
+def user_edit(uid):
+    target = query_one("SELECT * FROM users WHERE id = ?", (uid,))
+    if not target:
+        abort(404)
+
+    if request.method == "POST":
+        full_name = (request.form.get("full_name") or "").strip()
+        email     = (request.form.get("email") or "").strip()
+        branch    = (request.form.get("branch") or "").strip()      # Department
+        programme = (request.form.get("programme") or "").strip()   # Programme
+        year_raw  = (request.form.get("year") or "").strip()        # Semester (students)
+
+        errors = []
+        if not full_name: errors.append("Full name is required.")
+        if not email:      errors.append("Email is required.")
+        dupe = query_one("SELECT id FROM users WHERE email = ? AND id != ?", (email, uid))
+        if dupe: errors.append(f"Email '{email}' is already registered to another account.")
+
+        year_val = None
+        if target["role"] == "student" and year_raw:
+            if not year_raw.isdigit():
+                errors.append("Semester must be a number.")
+            else:
+                year_val = int(year_raw)
+
+        if errors:
+            for e in errors: flash(e, "error")
+            return redirect(url_for("user_edit", uid=uid))
+
+        execute(
+            "UPDATE users SET full_name = ?, email = ?, branch = ?, programme = ?, "
+            "year = ? WHERE id = ?",
+            (full_name, email, branch or None, programme or None, year_val, uid),
+        )
+        actor = current_user()
+        fz.log_activity(
+            request, actor, "account_edited", "auth",
+            f"administrator={actor['username']} target={target['username']} "
+            f"action=Account Edited"
+        )
+        flash(f"Account '{target['username']}' updated successfully.", "success")
+        return redirect(url_for("users_list"))
+
+    return render_template("user_edit.html", target=target, role_labels=ROLE_LABELS)
+
+
+# ============================================================================
+# Role Management (admin + access_manager)
+# Lets Super Admins / Access Managers change a user's role from a single
+# table, reusing the same users list + audit trail as the rest of the
+# Identity & Access section.
+# ============================================================================
+ROLE_CHOICES = ("student", "faculty", "access_manager", "admin")
+ROLE_LABELS = {
+    "student": "Student",
+    "faculty": "Faculty",
+    "access_manager": "Access Manager",
+    "admin": "Super Admin",
+}
+
+
+@app.route("/users/roles")
+@role_required("admin", "access_manager")
+def role_management():
+    users = query_all("""
+    SELECT id, username, full_name, role, email
+    FROM users
+    ORDER BY CASE role
+                 WHEN 'admin' THEN 1
+                 WHEN 'access_manager' THEN 2
+                 WHEN 'faculty' THEN 3
+                 WHEN 'student' THEN 4
+                 ELSE 5
+             END, full_name
+""")
+    return render_template("role_management.html", all_users=users,
+                           role_choices=ROLE_CHOICES, role_labels=ROLE_LABELS)
+
+
+@app.route("/users/<int:uid>/role", methods=["POST"])
+@role_required("admin", "access_manager")
+def update_user_role(uid):
+    new_role = (request.form.get("new_role") or "").strip()
+    target = query_one("SELECT id, username, role FROM users WHERE id = ?", (uid,))
+    if not target:
+        abort(404)
+
+    # Validate the submitted role before touching anything.
+    if new_role not in ROLE_CHOICES:
+        flash("Invalid role selected.", "error")
+        return redirect(url_for("role_management"))
+
+    old_role = target["role"]
+
+    if old_role == new_role:
+        flash(f"'{target['username']}' already has the {ROLE_LABELS[new_role]} role.", "error")
+        return redirect(url_for("role_management"))
+
+    # Never allow the last remaining Super Admin to be changed away from
+    # that role -- that would lock the system out of Super Admin access.
+    if old_role == "admin" and new_role != "admin":
+        admin_count = query_one("SELECT COUNT(*) c FROM users WHERE role = 'admin'")["c"]
+        if admin_count <= 1:
+            flash("Cannot change this user's role -- at least one Super Admin "
+                  "must remain in the system.", "error")
+            return redirect(url_for("role_management"))
+
+    execute("UPDATE users SET role = ? WHERE id = ?", (new_role, uid))
+
+    actor = current_user()
+    fz.log_activity(
+        request, actor, "role_change", "auth",
+        f"changed role of user '{target['username']}' (id={uid}) "
+        f"from '{old_role}' to '{new_role}'"
+    )
+
+    flash(f"Role for '{target['username']}' updated: "
+          f"{ROLE_LABELS[old_role]} to {ROLE_LABELS[new_role]}.", "success")
+    return redirect(url_for("role_management"))
+
+
+# ============================================================================
+# Password Reset (admin + access_manager)
+# Administrative password reset — separate from the self-service "Change
+# Password" feature on every user's own Profile page. Lets a Super Admin /
+# Access Manager search for a user, set (or generate) a temporary password
+# for them, and optionally force them to change it on next login.
+# ============================================================================
+def _generate_temp_password(length=12):
+    """Random temporary password: at least one lower/upper/digit/symbol char."""
+    alphabet = string.ascii_letters + string.digits + "!@#$%&*"
+    while True:
+        pw = "".join(secrets.choice(alphabet) for _ in range(length))
+        if (any(c.islower() for c in pw) and any(c.isupper() for c in pw)
+                and any(c.isdigit() for c in pw) and any(c in "!@#$%&*" for c in pw)):
+            return pw
+
+
+@app.route("/users/password-reset")
+@role_required("admin", "access_manager")
+def password_reset():
+    q = (request.args.get("q") or "").strip()
+    results = []
+    if q:
+        like = f"%{q}%"
+        results = query_all(
+            "SELECT id, username, full_name, role, email FROM users "
+            "WHERE username LIKE ? OR full_name LIKE ? OR email LIKE ? "
+            "ORDER BY full_name LIMIT 25",
+            (like, like, like),
+        )
+    return render_template("password_reset.html", q=q, results=results,
+                           role_labels=ROLE_LABELS)
+
+
+@app.route("/users/<int:uid>/reset-password", methods=["POST"])
+@role_required("admin", "access_manager")
+def admin_reset_password(uid):
+    q = request.form.get("q") or ""
+    target = query_one("SELECT id, username, full_name FROM users WHERE id = ?", (uid,))
+    if not target:
+        abort(404)
+
+    mode = request.form.get("mode")  # "manual" or "generate"
+    force_change = 1 if request.form.get("force_change") == "on" else 0
+
+    if mode == "generate":
+        new_password = _generate_temp_password()
+    else:
+        new_password = request.form.get("temp_password") or ""
+        if len(new_password) < 8:
+            flash("Temporary password must be at least 8 characters.", "error")
+            return redirect(url_for("password_reset", q=q))
+
+    # Hash using the same password hashing implementation used everywhere
+    # else in the app (Werkzeug PBKDF2 via generate_password_hash).
+    execute(
+        "UPDATE users SET password_hash = ?, force_password_change = ?, "
+        "last_password_change = CURRENT_TIMESTAMP WHERE id = ?",
+        (generate_password_hash(new_password), force_change, uid),
+    )
+
+    actor = current_user()
+    fz.log_activity(
+        request, actor, "password_reset", "auth",
+        f"administrator={actor['username']} username={target['username']} "
+        f"force_password_change={'yes' if force_change else 'no'}"
+    )
+
+    flash(f"Password for '{target['username']}' has been reset to: {new_password}"
+          + (" — the user must change it on next login." if force_change else "")
+          + " Share this securely; it will not be shown again.", "success")
+    return redirect(url_for("password_reset", q=q))
+
+
+# ============================================================================
+# Login History (admin + access_manager) — Identity & Access
+# A simplified, authentication-only view of login_history for the Access
+# Manager module. This is intentionally separate from the Forensics module
+# (Activity Logs / Injection Alerts / File Access / Security Analytics),
+# which remains Super-Admin-only and unchanged. Reuses the same
+# login_history table and logging calls (fz.log_login) — no new logging
+# mechanism, no SQL injection alerts, no file-access data, no activity logs.
+# ============================================================================
+LOGIN_HISTORY_ROLES = ("student", "faculty", "access_manager", "admin")
+LOGIN_HISTORY_STATUSES = ("success", "failed", "locked")
+
+
+@app.route("/users/login-history")
+@role_required("admin", "access_manager")
+def login_history():
+    q          = (request.args.get("q") or "").strip()
+    role       = (request.args.get("role") or "").strip()
+    date       = (request.args.get("date") or "").strip()
+    status     = (request.args.get("status") or "").strip()
+
+    sql = ("SELECT username, role, timestamp AS login_time, logout_time, "
+           "status, ip_address, user_agent FROM login_history WHERE 1=1")
+    params = []
+
+    if q:
+        sql += " AND (username LIKE ? OR ip_address LIKE ? OR user_agent LIKE ?)"
+        like = f"%{q}%"
+        params += [like, like, like]
+    if role in LOGIN_HISTORY_ROLES:
+        sql += " AND role = ?"
+        params.append(role)
+    if date:
+        sql += " AND date(timestamp) = ?"
+        params.append(date)
+    if status in LOGIN_HISTORY_STATUSES:
+        sql += " AND status = ?"
+        params.append(status)
+
+    sql += " ORDER BY timestamp DESC LIMIT 1000"
+    rows = query_all(sql, tuple(params))
+
+    return render_template(
+        "login_history.html", rows=rows, q=q, role=role, date=date, status=status,
+        role_choices=LOGIN_HISTORY_ROLES, status_choices=LOGIN_HISTORY_STATUSES,
+        role_labels=ROLE_LABELS,
+    )
 
 
 # ============================================================================
@@ -920,6 +1231,7 @@ def verify_2fa():
             session["username"] = user["username"]
             session["role"] = user["role"]
             session["full_name"] = user["full_name"]
+            session["must_change_password"] = bool(user["force_password_change"]) if "force_password_change" in user.keys() else False
 
             fz.log_login(request, user["id"], user["username"], "success", user["role"])
             fz.log_activity(request, dict(user), "login_2fa", "auth")
@@ -990,12 +1302,25 @@ def user_approve(uid):
 @app.route("/users/<int:uid>/suspend", methods=["POST"])
 @role_required("admin","access_manager")
 def user_suspend(uid):
-    user = query_one("SELECT username FROM users WHERE id=?", (uid,))
+    me = current_user()
+    if uid == me["id"]:
+        flash("You cannot suspend your own account.", "error")
+        return redirect(url_for("users_list"))
+    user = query_one("SELECT username, role FROM users WHERE id=?", (uid,))
     if not user:
         abort(404)
+    if user["role"] == "admin":
+        admin_count = query_one("SELECT COUNT(*) c FROM users WHERE role = 'admin'")["c"]
+        if admin_count <= 1:
+            flash("Cannot suspend this account — at least one Super Admin "
+                  "must remain active in the system.", "error")
+            return redirect(url_for("users_list"))
     execute("UPDATE users SET status='suspended' WHERE id=?", (uid,))
-    fz.log_activity(request, current_user(), "account_suspended", "auth",
-                    f"suspended user id={uid}")
+    fz.log_activity(
+        request, me, "account_suspended", "auth",
+        f"administrator={me['username']} target={user['username']} "
+        f"action=Account Suspended"
+    )
     flash(f"Account '{user['username']}' suspended.", "success")
     return redirect(url_for("users_list"))
 
@@ -1003,12 +1328,16 @@ def user_suspend(uid):
 @app.route("/users/<int:uid>/activate", methods=["POST"])
 @role_required("admin","access_manager")
 def user_activate(uid):
+    me = current_user()
     user = query_one("SELECT username FROM users WHERE id=?", (uid,))
     if not user:
         abort(404)
     execute("UPDATE users SET status='active' WHERE id=?", (uid,))
-    fz.log_activity(request, current_user(), "account_activated", "auth",
-                    f"activated user id={uid}")
+    fz.log_activity(
+        request, me, "account_activated", "auth",
+        f"administrator={me['username']} target={user['username']} "
+        f"action=Account Unsuspended"
+    )
     flash(f"Account '{user['username']}' activated.", "success")
     return redirect(url_for("users_list"))
 
@@ -2554,22 +2883,31 @@ def low_attendance_notify_branch(dept):
 
 
 # ============================================================================
-# Admin: create faculty / admin accounts & delete users
+# Admin + Access Manager: create staff accounts & delete users
 # ============================================================================
 @app.route("/users/create", methods=["POST"])
-@role_required("admin")
+@role_required("admin", "access_manager")
 def admin_create_user():
+    actor     = current_user()
     full_name = (request.form.get("full_name") or "").strip()
     username  = (request.form.get("username") or "").strip()
     email     = (request.form.get("email") or "").strip()
     role      = (request.form.get("role") or "").strip()
     password  = request.form.get("password") or ""
+
+    # Access Managers may create Faculty or Access Manager accounts only.
+    # Only a Super Admin may create another Super Admin account.
+    allowed_roles = ("faculty", "access_manager", "admin") if actor["role"] == "admin" \
+        else ("faculty", "access_manager")
+
     errors = []
     if not full_name: errors.append("Full name is required.")
     if not username:  errors.append("Username is required.")
     if not email:     errors.append("Email is required.")
-    if role not in ("faculty", "admin"):
-        errors.append("Role must be faculty or admin.")
+    if role == "admin" and actor["role"] != "admin":
+        errors.append("Only a Super Admin may create another Super Admin account.")
+    elif role not in allowed_roles:
+        errors.append("Please choose a valid role.")
     if len(password) < 8:
         errors.append("Password must be at least 8 characters.")
     if query_one("SELECT id FROM users WHERE username = ?", (username,)):
@@ -2584,10 +2922,14 @@ def admin_create_user():
         "VALUES (?, ?, ?, ?, ?, 1)",
         (username, email, generate_password_hash(password), role, full_name),
     )
-    fz.log_activity(request, current_user(), "admin_create_user", "auth",
-                    f"created {role} account: {username}")
-    flash(f"{role.capitalize()} account '{username}' created successfully.", "success")
+    fz.log_activity(
+        request, actor, "account_created", "auth",
+        f"administrator={actor['username']} target={username} "
+        f"action=Account Created role={role}"
+    )
+    flash(f"{ROLE_LABELS.get(role, role.capitalize())} account '{username}' created successfully.", "success")
     return redirect(url_for("users_list"))
+
 
 
 @app.route("/users/<int:uid>/delete", methods=["POST"])
@@ -2600,11 +2942,21 @@ def admin_delete_user(uid):
     user = query_one("SELECT username, role FROM users WHERE id = ?", (uid,))
     if not user:
         abort(404)
+    if user["role"] == "admin":
+        admin_count = query_one("SELECT COUNT(*) c FROM users WHERE role = 'admin'")["c"]
+        if admin_count <= 1:
+            flash("Cannot delete this account — at least one Super Admin "
+                  "must remain in the system.", "error")
+            return redirect(url_for("users_list"))
     execute("DELETE FROM users WHERE id = ?", (uid,))
-    fz.log_activity(request, current_user(), "admin_delete_user", "auth",
-                    f"deleted {user['role']} account: {user['username']}")
+    fz.log_activity(
+        request, me, "account_deleted", "auth",
+        f"administrator={me['username']} target={user['username']} "
+        f"action=Account Deleted role={user['role']}"
+    )
     flash(f"Account '{user['username']}' has been deleted.", "success")
     return redirect(url_for("users_list"))
+
 
 
 # ============================================================================

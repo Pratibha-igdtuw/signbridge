@@ -757,6 +757,51 @@ def migrate_v5(conn):
     conn.commit()
 
 
+def migrate_v6(conn):
+    """
+    v6: adds 'force_password_change' — set on a user by the Access Manager's
+    administrative Password Reset feature. When set to 1, the user is
+    required to set a new password immediately after their next login.
+    Idempotent (try/except, same pattern as migrate_v3).
+    """
+    cur = conn.cursor()
+    try:
+        cur.execute("ALTER TABLE users ADD COLUMN force_password_change INTEGER DEFAULT 0")
+    except Exception:
+        pass  # column already exists
+    cur.execute("UPDATE users SET force_password_change=0 WHERE force_password_change IS NULL")
+    conn.commit()
+
+
+def migrate_v7(conn):
+    """
+    v7: adds 'logout_time' to login_history so the Access Manager's
+    simplified Login History page can show when a session ended, not just
+    when it began. Idempotent (try/except, same pattern as migrate_v3).
+    """
+    cur = conn.cursor()
+    try:
+        cur.execute("ALTER TABLE login_history ADD COLUMN logout_time DATETIME")
+    except Exception:
+        pass  # column already exists
+    conn.commit()
+
+
+def migrate_v8(conn):
+    """
+    v8: adds 'programme' to users (e.g. B.Tech / M.Tech / MBA) — used by the
+    User Accounts "Edit" feature. 'branch' already covers Department;
+    'year' already covers Semester/Year of study — both reused as-is.
+    Idempotent (try/except, same pattern as migrate_v3).
+    """
+    cur = conn.cursor()
+    try:
+        cur.execute("ALTER TABLE users ADD COLUMN programme TEXT")
+    except Exception:
+        pass  # column already exists
+    conn.commit()
+
+
 def seed_access_manager():
     """
     Seed one Access Manager demo account, separately from seed() — seed()

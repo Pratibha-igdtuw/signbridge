@@ -73,6 +73,9 @@ def login_required(view):
         if _check_session_timeout():
             flash("Your session expired due to inactivity. Please sign in again.", "error")
             return redirect(url_for("login"))
+        if session.get("must_change_password") and view.__name__ not in ("profile", "logout"):
+            flash("You must change your password before continuing.", "error")
+            return redirect(url_for("profile"))
         return view(*args, **kwargs)
     return wrapped
 
@@ -87,6 +90,9 @@ def role_required(*roles):
             if _check_session_timeout():
                 flash("Your session expired due to inactivity. Please sign in again.", "error")
                 return redirect(url_for("login"))
+            if session.get("must_change_password") and view.__name__ not in ("profile", "logout"):
+                flash("You must change your password before continuing.", "error")
+                return redirect(url_for("profile"))
             if session.get("role") not in roles:
                 flash("You do not have permission to access that page.", "error")
                 role = session.get("role")

@@ -38,18 +38,21 @@
        overflowing) the whole page. `overflow-x: auto` here also stops
        this table from forcing its parent flex/grid column wider than
        the viewport (an item's automatic min-size collapses to 0 once
-       it has non-visible overflow).
-       NOTE: display:block on the <table> itself turns it into a plain
-       scroll wrapper — the actual column layout is then done by thead/
-       tbody, which by default just shrink-to-fit their content instead
-       of filling the wrapper. Explicitly giving them display:table and
-       width:100% restores full-width columns when the content is
-       narrower than the container, while the outer wrapper still scrolls
-       horizontally once real content (e.g. many columns on a narrow
-       screen) is wider than it. */
-    table.evidence { display: block; overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
-    table.evidence thead,
-    table.evidence tbody { display: table; width: 100%; table-layout: auto; }
+       it has non-visible overflow) — that collapse is driven by the
+       computed 'overflow' value alone, so it still applies here even
+       though we no longer change 'display'.
+       NOTE: an earlier version of this rule set display:block on the
+       <table> and display:table independently on thead/tbody to get
+       scrolling. That split the table into two separate column-width
+       computations — one for the header row, one for the body — so
+       whenever header text and cell content differed enough in length
+       (e.g. "LOGOUT TIME" over a short "—"), the header and body
+       columns drifted out of alignment. Leaving the table as a single
+       table box (its default display) keeps thead and tbody on one
+       shared column-width computation, so headers always line up with
+       their data, while overflow-x still makes long/narrow tables
+       scroll horizontally instead of overflowing the page. */
+    table.evidence { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
   </style>
   <!-- Dark mode CSS variables -->
   <style>
@@ -506,6 +509,9 @@
           {{ nav('bulk_upload_students', 'Bulk Student Upload', '📥') }}
           {{ nav('files', 'File Manager', '📁') }}
           {{ nav('users_list', 'User Accounts', '🛡️') }}
+          {{ nav('role_management', 'Role Management', '🧩') }}
+          {{ nav('password_reset', 'Password Reset', '🔑') }}
+          {{ nav('login_history', 'Login History', '🕘') }}
           {% if has_endpoint('pending_users') %}
           <a href="{{ url_for('pending_users') }}" class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
                 {{ 'nav-active' if request.endpoint == 'pending_users' else '' }}">
@@ -589,8 +595,8 @@
       ACCESS MANAGER NAVIGATION — Identity & Access Management only
       NOTE: only routes that already permit 'access_manager' in their
       @role_required(...) list are linked here. If you later add
-      dedicated Role Management / Password Reset / Lock-Unlock pages,
-      add their nav links in this block too.
+      dedicated Password Reset / Lock-Unlock pages, add their nav
+      links in this block too.
       ============================================================ #}
       {% elif user.role == 'access_manager' %}
       <details class="sidebar-dropdown" open>
@@ -610,6 +616,9 @@
         </summary>
         <div class="submenu">
           {{ nav('users_list', 'User Accounts', '🛡️') }}
+          {{ nav('role_management', 'Role Management', '🧩') }}
+          {{ nav('password_reset', 'Password Reset', '🔑') }}
+          {{ nav('login_history', 'Login History', '🕘') }}
           {{ nav('students', 'Student Information', '👥') }}
           {{ nav('bulk_upload_students', 'Bulk Student Upload', '📥') }}
           {# 'Pending Approvals' currently requires role_required("admin") only.

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Role Management{% endblock %}
+{% block heading %}Role Management{% endblock %}
+{% block content %}
+
+<div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+  <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+    <div>
+      <h2 class="text-sm font-semibold text-ink">All Users</h2>
+      <p class="text-xs text-slate-400 mt-0.5">Change a user's role. Every change is written to the Digital Audit Trail.</p>
+    </div>
+    <span class="text-xs text-slate-400">{{ all_users|length }} total</span>
+  </div>
+  <table class="w-full text-sm evidence">
+    <thead class="bg-slate-50 text-left text-xs uppercase eyebrow text-slate-400">
+      <tr>
+        <th class="px-4 py-3 font-semibold">Name</th>
+        <th class="px-4 py-3 font-semibold">Username</th>
+        <th class="px-4 py-3 font-semibold">Current Role</th>
+        <th class="px-4 py-3 font-semibold">New Role</th>
+        <th class="px-4 py-3 font-semibold text-right">Update</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for u in all_users %}
+        <tr class="hover:bg-slate-50">
+          <td class="px-4 py-3 font-medium text-ink">{{ u.full_name }}</td>
+          <td class="px-4 py-3 font-mono text-xs text-steel">{{ u.username }}</td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-0.5 rounded text-xs
+                         {{ 'bg-purple-50 text-purple-700' if u.role=='admin'
+                            else 'bg-blue-50 text-blue-700' if u.role=='faculty'
+                            else 'bg-teal-50 text-teal-700' if u.role=='access_manager'
+                            else 'bg-slate-100 text-slate-600' }}">{{ role_labels.get(u.role, u.role) }}</span>
+          </td>
+          <td class="px-4 py-3" colspan="2">
+            <form method="post" action="{{ url_for('update_user_role', uid=u.id) }}"
+                  class="flex items-center justify-between gap-3"
+                  onsubmit="return confirm('Change role of ' + {{ (u.full_name ~ ' (' ~ u.username ~ ')')|tojson }} + ' to ' + this.new_role.options[this.new_role.selectedIndex].text + '?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <select name="new_role"
+                      class="rounded-md border border-slate-300 px-2 py-1.5 text-xs bg-white text-ink
+                             focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+                {% for r in role_choices %}
+                  <option value="{{ r }}" {{ 'selected' if r == u.role else '' }}>{{ role_labels[r] }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit"
+                      class="bg-signal hover:bg-teal-700 text-white text-xs font-medium px-3 py-1.5 rounded-md transition whitespace-nowrap">
+                Update
+              </button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="px-4 py-8 text-center text-slate-400">No users found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="text-xs text-slate-400 mt-3">
+  ⚠ The last remaining <strong>Super Admin</strong> account cannot be changed to another role — this prevents the system from being locked out of Super Admin access.
+  All role changes are recorded in the Digital Audit Trail with who made the change, the old role, the new role, and a timestamp.
+</p>
+{% endblock %}
