@@ -38,8 +38,18 @@
        overflowing) the whole page. `overflow-x: auto` here also stops
        this table from forcing its parent flex/grid column wider than
        the viewport (an item's automatic min-size collapses to 0 once
-       it has non-visible overflow). */
+       it has non-visible overflow).
+       NOTE: display:block on the <table> itself turns it into a plain
+       scroll wrapper — the actual column layout is then done by thead/
+       tbody, which by default just shrink-to-fit their content instead
+       of filling the wrapper. Explicitly giving them display:table and
+       width:100% restores full-width columns when the content is
+       narrower than the container, while the outer wrapper still scrolls
+       horizontally once real content (e.g. many columns on a narrow
+       screen) is wider than it. */
     table.evidence { display: block; overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+    table.evidence thead,
+    table.evidence tbody { display: table; width: 100%; table-layout: auto; }
   </style>
   <!-- Dark mode CSS variables -->
   <style>
@@ -56,14 +66,14 @@
     }
 
     [data-theme="dark"] {
-      --bg-page: #0f172a;
-      --bg-sidebar: #020617;
-      --bg-card: #1e293b;
-      --text-main: #e2e8f0;
-      --text-muted: #94a3b8;
-      --border-col: #334155;
-      --header-bg: #1e293b;
-      --table-row-alt: #162032;
+      --bg-page: #10182b;
+      --bg-sidebar: #0a1220;
+      --bg-card: #1b2740;
+      --text-main: #d8dee8;
+      --text-muted: #93a1b8;
+      --border-col: #30405c;
+      --header-bg: #1b2740;
+      --table-row-alt: #17203590;
     }
 
     body {
@@ -93,6 +103,53 @@
       background-color: #162032 !important;
     }
 
+    [data-theme="dark"] .bg-slate-200 {
+      background-color: #263450 !important;
+    }
+
+    /* ---- Row/element hover states --------------------------------------
+       Every data table in the portal (audit logs, exam schedule, courses,
+       users, ...) highlights a row on hover using Tailwind's hover:bg-*
+       utilities (hover:bg-slate-50, hover:bg-slate-100, etc). Those are a
+       DIFFERENT class from their non-hover counterparts above, so fixing
+       .bg-slate-50 above does nothing for .hover\:bg-slate-50:hover — on
+       hover, rows were flashing back to their original light-mode
+       near-white background while the dark-mode text colors sat on top of
+       it, making the whole row unreadable for as long as the mouse was
+       over it. */
+    [data-theme="dark"] .hover\:bg-white:hover {
+      background-color: var(--bg-card) !important;
+    }
+    [data-theme="dark"] .hover\:bg-slate-50:hover {
+      background-color: #202c47 !important;
+    }
+    [data-theme="dark"] .hover\:bg-slate-100:hover {
+      background-color: #263450 !important;
+    }
+    [data-theme="dark"] .hover\:bg-slate-200:hover {
+      background-color: #2e3d5c !important;
+    }
+    [data-theme="dark"] .hover\:bg-red-50\/50:hover,
+    [data-theme="dark"] .hover\:bg-red-50:hover,
+    [data-theme="dark"] .hover\:bg-red-100:hover {
+      background-color: rgba(239,68,68,.12) !important;
+    }
+    [data-theme="dark"] .hover\:bg-red-200:hover {
+      background-color: rgba(239,68,68,.2) !important;
+    }
+    [data-theme="dark"] .hover\:bg-amber-200:hover {
+      background-color: rgba(245,158,11,.2) !important;
+    }
+    [data-theme="dark"] .hover\:bg-teal-100:hover {
+      background-color: rgba(20,184,166,.2) !important;
+    }
+    /* Row highlight applied conditionally via Jinja (e.g. bg-red-50/40 on
+       inactive users) — same substance issue as the hover rules above. */
+    [data-theme="dark"] .bg-red-50\/40,
+    [data-theme="dark"] .bg-red-50\/50 {
+      background-color: rgba(239,68,68,.1) !important;
+    }
+
     [data-theme="dark"] .border-slate-200 {
       border-color: var(--border-col) !important;
     }
@@ -113,6 +170,33 @@
       color: #e2e8f0 !important;
     }
 
+    /* .text-steel (#334155, dark navy) and .text-alert (#b45309, dark amber)
+       are custom brand colors tuned for light backgrounds. Used all over
+       the portal for names, labels, and warning headings (dashboard,
+       audit tables, course lists, user accounts, etc.) — on a dark card
+       they were dark-on-dark and essentially unreadable. */
+    [data-theme="dark"] .text-steel {
+      color: #b9c4d6 !important;
+    }
+    [data-theme="dark"] .text-alert {
+      color: #fbbf24 !important;
+    }
+    [data-theme="dark"] .border-alert\/30 {
+      border-color: rgba(245, 158, 11, .3) !important;
+    }
+    [data-theme="dark"] .text-slate-400 {
+      color: #9aa7bd !important;
+    }
+
+    /* Small inline pills (e.g. the "login"/"logout" action tags on the
+       dashboard) use bg-slate-100, which our page-background override
+       above sets to the exact same color as the page — making the pill
+       blend in and disappear. Give pills their own distinct tone. */
+    [data-theme="dark"] .rounded.bg-slate-100,
+    [data-theme="dark"] .rounded-full.bg-slate-100 {
+      background-color: #29385280 !important;
+    }
+
     [data-theme="dark"] header {
       background: var(--header-bg) !important;
     }
@@ -121,6 +205,126 @@
     [data-theme="dark"] table tr:nth-child(even) {
       background: var(--table-row-alt) !important;
     }
+
+    /* ---- Select2 (used for the searchable student dropdown, e.g. Fee
+       Status) ships its own light-mode-only stylesheet that our Tailwind
+       overrides can't reach since it uses its own class names. ---- */
+    [data-theme="dark"] .select2-container--default .select2-selection--single {
+      background-color: var(--bg-card) !important;
+      border-color: var(--border-col) !important;
+    }
+    [data-theme="dark"] .select2-container--default .select2-selection--single .select2-selection__rendered {
+      color: var(--text-main) !important;
+    }
+    [data-theme="dark"] .select2-container--default .select2-selection--single .select2-selection__arrow b {
+      border-color: var(--text-muted) transparent transparent transparent !important;
+    }
+    [data-theme="dark"] .select2-dropdown {
+      background-color: var(--bg-card) !important;
+      border-color: var(--border-col) !important;
+    }
+    [data-theme="dark"] .select2-search--dropdown .select2-search__field {
+      background-color: var(--bg-page) !important;
+      color: var(--text-main) !important;
+      border-color: var(--border-col) !important;
+    }
+    [data-theme="dark"] .select2-results__option {
+      color: var(--text-main) !important;
+    }
+    [data-theme="dark"] .select2-container--default .select2-results__option--highlighted[aria-selected] {
+      background-color: #0d9488 !important;
+      color: #fff !important;
+    }
+
+    /* Primary "ink" buttons (Filter, Export CSV, etc.) are near-black in
+       light mode — on a dark page that made them nearly invisible against
+       the background. Lift them a couple of shades so they still read as
+       buttons. NOTE: the sidebar (#sidebar) also uses .bg-ink for its own,
+       intentionally near-black background — exclude it so this only
+       affects buttons, not the sidebar / its submenu contrast. */
+    [data-theme="dark"] .bg-ink:not(#sidebar) {
+      background-color: #2b3a55 !important;
+    }
+    [data-theme="dark"] #sidebar.bg-ink {
+      background-color: var(--bg-sidebar) !important;
+    }
+    [data-theme="dark"] .hover\:bg-steel:hover {
+      background-color: #3a4d70 !important;
+    }
+
+    /* ---- Status badges / pills / alert boxes ----------------------------
+       Across the portal, badges like "success" / "locked" / "failed" and
+       various alert banners use Tailwind's light pastel shades (-50/-100/
+       -200) for backgrounds with a dark, saturated text color. Left as-is
+       in dark mode those pastels stay full-brightness against a near-black
+       page, which is what made everything feel glaring/heavy. These rules
+       swap the light backgrounds for a low-opacity tint of the same hue,
+       and lighten the paired text so the color is still recognizable but
+       comfortable to read. Solid, fully-saturated buttons (e.g. bg-red-600,
+       bg-signal) are untouched on purpose — they already read fine on any
+       background. */
+    [data-theme="dark"] .bg-teal-50,
+    [data-theme="dark"] .bg-teal-100,
+    [data-theme="dark"] .bg-teal-200 { background-color: rgba(20,184,166,.14) !important; }
+    [data-theme="dark"] .text-teal-600,
+    [data-theme="dark"] .text-teal-700,
+    [data-theme="dark"] .text-teal-800,
+    [data-theme="dark"] .text-teal-900 { color: #5eead4 !important; }
+    [data-theme="dark"] .border-teal-200,
+    [data-theme="dark"] .border-teal-300,
+    [data-theme="dark"] .border-teal-500 { border-color: rgba(20,184,166,.35) !important; }
+
+    [data-theme="dark"] .bg-red-50,
+    [data-theme="dark"] .bg-red-100,
+    [data-theme="dark"] .bg-red-200,
+    [data-theme="dark"] .bg-red-300 { background-color: rgba(239,68,68,.14) !important; }
+    [data-theme="dark"] .text-red-600,
+    [data-theme="dark"] .text-red-700,
+    [data-theme="dark"] .text-red-800,
+    [data-theme="dark"] .text-red-900 { color: #fca5a5 !important; }
+    [data-theme="dark"] .border-red-100,
+    [data-theme="dark"] .border-red-200,
+    [data-theme="dark"] .border-red-400 { border-color: rgba(239,68,68,.35) !important; }
+
+    [data-theme="dark"] .bg-amber-50,
+    [data-theme="dark"] .bg-amber-100,
+    [data-theme="dark"] .bg-amber-200 { background-color: rgba(245,158,11,.14) !important; }
+    [data-theme="dark"] .text-amber-500,
+    [data-theme="dark"] .text-amber-600,
+    [data-theme="dark"] .text-amber-700,
+    [data-theme="dark"] .text-amber-800,
+    [data-theme="dark"] .text-amber-900 { color: #fcd34d !important; }
+    [data-theme="dark"] .border-amber-200 { border-color: rgba(245,158,11,.35) !important; }
+
+    [data-theme="dark"] .bg-green-100,
+    [data-theme="dark"] .bg-green-200 { background-color: rgba(34,197,94,.14) !important; }
+    [data-theme="dark"] .text-green-600,
+    [data-theme="dark"] .text-green-700 { color: #86efac !important; }
+
+    [data-theme="dark"] .bg-blue-50,
+    [data-theme="dark"] .bg-blue-100 { background-color: rgba(59,130,246,.14) !important; }
+    [data-theme="dark"] .text-blue-600,
+    [data-theme="dark"] .text-blue-700,
+    [data-theme="dark"] .text-blue-900 { color: #93c5fd !important; }
+    [data-theme="dark"] .border-blue-200,
+    [data-theme="dark"] .border-blue-500 { border-color: rgba(59,130,246,.35) !important; }
+
+    [data-theme="dark"] .bg-purple-50 { background-color: rgba(168,85,247,.14) !important; }
+    [data-theme="dark"] .text-purple-600,
+    [data-theme="dark"] .text-purple-700 { color: #d8b4fe !important; }
+    [data-theme="dark"] .border-purple-200 { border-color: rgba(168,85,247,.35) !important; }
+
+    [data-theme="dark"] .bg-yellow-50,
+    [data-theme="dark"] .bg-yellow-100 { background-color: rgba(234,179,8,.14) !important; }
+    [data-theme="dark"] .text-yellow-600,
+    [data-theme="dark"] .text-yellow-700 { color: #fde047 !important; }
+    [data-theme="dark"] .border-yellow-200 { border-color: rgba(234,179,8,.35) !important; }
+
+    [data-theme="dark"] .bg-orange-50 { background-color: rgba(249,115,22,.14) !important; }
+    [data-theme="dark"] .text-orange-700 { color: #fdba74 !important; }
+
+    [data-theme="dark"] .bg-rose-50 { background-color: rgba(244,63,94,.14) !important; }
+    [data-theme="dark"] .text-rose-700 { color: #fda4af !important; }
 
     /* Simple Sidebar Dropdown */
     .sidebar-dropdown {
@@ -536,10 +740,12 @@
       <div class="max-w-[1400px] mx-auto">
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% for category, msg in messages %}
-        <div class="mb-3 px-4 py-2.5 rounded-md text-sm border
+        <div class="js-flash mb-3 px-4 py-2.5 rounded-md text-sm border flex items-start justify-between gap-3 transition-opacity duration-500
                       {{ 'bg-teal-50 border-teal-200 text-teal-800' if category=='success'
                          else 'bg-red-50 border-red-200 text-red-800' }}">
-          {{ msg }}
+          <span>{{ msg }}</span>
+          <button type="button" onclick="this.closest('.js-flash').remove()"
+                  class="shrink-0 opacity-60 hover:opacity-100 leading-none text-base">&times;</button>
         </div>
         {% endfor %}
       {% endwith %}
@@ -602,8 +808,36 @@
 </script>
 
 {% else %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="fixed top-4 left-1/2 -translate-x-1/2 z-[200] w-full max-w-md px-4 space-y-2">
+    {% for category, msg in messages %}
+    <div class="js-flash px-4 py-2.5 rounded-md text-sm border shadow-sm flex items-start justify-between gap-3 transition-opacity duration-500
+                  {{ 'bg-teal-50 border-teal-200 text-teal-800' if category=='success'
+                     else 'bg-red-50 border-red-200 text-red-800' }}">
+      <span>{{ msg }}</span>
+      <button type="button" onclick="this.closest('.js-flash').remove()"
+              class="shrink-0 opacity-60 hover:opacity-100 leading-none text-base">&times;</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}
 {% block auth %}{% endblock %}
 {% endif %}
+<script>
+  // Auto-dismiss flash messages on the auth pages (login/register/etc.)
+  // after a few seconds — same behaviour for every category: invalid
+  // credentials, lockout, session-expired, success, etc.
+  (function () {
+    document.querySelectorAll('.js-flash').forEach(function (el, i) {
+      setTimeout(function () {
+        el.style.opacity = '0';
+        setTimeout(function () { el.remove(); }, 500); // let the fade finish
+      }, 6000 + i * 300); // stagger slightly if there are multiple
+    });
+  })();
+</script>
 <script>
   function toggleTheme() {
     var html = document.documentElement;
@@ -644,6 +878,22 @@
       if (ov) ov.classList.add('hidden');
     }
   });
+</script>
+
+<!-- Flash messages (login errors, "Invalid credentials", "signed out", lockout
+     notices, etc.) auto-dismiss after a few seconds instead of sitting on
+     screen forever. Users can also close them early with the × button. -->
+<script>
+  (function () {
+    var AUTO_DISMISS_MS = 6000;
+    document.querySelectorAll('.js-flash').forEach(function (el, i) {
+      setTimeout(function () {
+        if (!el.isConnected) return;
+        el.style.opacity = '0';
+        setTimeout(function () { el.remove(); }, 500); // matches duration-500
+      }, AUTO_DISMISS_MS + i * 300); // stagger if multiple messages stacked
+    });
+  })();
 </script>
 </body>
 

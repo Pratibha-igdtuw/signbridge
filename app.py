@@ -33,7 +33,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
-from datetime import datetime
+from datetime import datetime, timedelta
 from config import Config
 import database as db
 from database import query_all, query_one, execute
@@ -266,6 +266,31 @@ def _count_recent_failures(username):
     return row["c"] if row else 0
 
 
+def _lockout_remaining_minutes(username):
+    """
+    Minutes left until the rolling lockout window clears — i.e. until the
+    oldest of the last MAX_FAILED_LOGINS failed attempts ages out of the
+    LOCKOUT_WINDOW_MINUTES window. Returns None if it can't be determined
+    (falls back to the full window in that case).
+    """
+    row = query_one(
+        "SELECT timestamp FROM login_history "
+        "WHERE username = ? AND status = 'failed' "
+        "AND timestamp >= datetime('now', ?) "
+        "ORDER BY timestamp DESC LIMIT 1 OFFSET ?",
+        (username, f"-{Config.LOCKOUT_WINDOW_MINUTES} minutes", Config.MAX_FAILED_LOGINS - 1),
+    )
+    if not row or not row["timestamp"]:
+        return None
+    try:
+        oldest = datetime.strptime(row["timestamp"], "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+    unlock_at = oldest + timedelta(minutes=Config.LOCKOUT_WINDOW_MINUTES)
+    remaining = unlock_at - datetime.utcnow()
+    return max(int(remaining.total_seconds() // 60) + 1, 1)
+
+
 @app.route("/login", methods=["GET", "POST"])
 @limiter.limit("10 per minute")
 def login():
@@ -294,6 +319,18 @@ def login():
             fz.log_login(request, user["id"], username, "locked", user["role"])
             flash("This account is awaiting admin approval.", "error")
             return render_template("login.html")
+
+        # ── Brute-force lockout: too many recent failed attempts ───────────
+        if user:
+            recent_fails = _count_recent_failures(username)
+            if recent_fails >= Config.MAX_FAILED_LOGINS:
+                fz.log_login(request, user["id"], username, "locked", user["role"])
+                remaining = _lockout_remaining_minutes(username) or Config.LOCKOUT_WINDOW_MINUTES
+                flash(
+                    f"Too many failed attempts. Your account is locked — "
+                    f"please try again after {remaining} minute"
+                    f"{'s' if remaining != 1 else ''}.", "error")
+                return render_template("login.html")
 
         # ✅ SUCCESS LOGIN BLOCK
         if user and check_password_hash(user["password_hash"], password):
@@ -1501,7 +1538,7 @@ def audit_logins():
     date_from = request.args.get("from", "").strip()
     date_to   = request.args.get("to", "").strip()
     rows = query_all("SELECT * FROM login_history ORDER BY id DESC LIMIT 1000")
-    cols = ["timestamp", "username", "role", "entry_hash", "status", "ip_address", "user_agent"]
+    cols = ["timestamp", "ip_address", "username", "role", "entry_hash", "status", "user_agent"]
     filtered = _audit_filter([dict(r) for r in rows], cols, q, date_from, date_to)
     return render_template("audit.html", title="Login History", rows=filtered,
                            kind="logins", cols=cols, q=q, date_from=date_from, date_to=date_to)
@@ -1544,6 +1581,21 @@ def audit_export(kind):
     return Response(csv_text, headers={
         "Content-Disposition": f'attachment; filename="{filename}"',
         "Content-Type": "text/csv",
+    })
+
+
+@app.route("/audit/certificate/<kind>")
+@role_required("admin")
+def audit_certificate(kind):
+    """Section 63(4)(c) BSA 2023 electronic-evidence certificate (PDF)."""
+    try:
+        filename, pdf_bytes = fz.generate_certificate_pdf(kind, party=current_user())
+    except ValueError:
+        abort(404)
+    fz.log_activity(request, current_user(), "evidence_certificate", "forensics", f"kind={kind}")
+    return Response(pdf_bytes, headers={
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Content-Type": "application/pdf",
     })
 
 

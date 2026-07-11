@@ -214,6 +214,9 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
   const ctx = document.getElementById('deptChart').getContext('2d');
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9';
+  const tickColor = isDark ? '#93a1b8' : '#64748b';
   new Chart(ctx, {
     type: 'bar',
     data: {
@@ -231,8 +234,8 @@
       responsive: true,
       plugins: { legend: { display: false } },
       scales: {
-        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: '#f1f5f9' } },
-        x: { ticks: { font: { size: 11 } }, grid: { display: false } }
+        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 }, color: tickColor }, grid: { color: gridColor } },
+        x: { ticks: { font: { size: 11 }, color: tickColor }, grid: { display: false } }
       }
     }
   });

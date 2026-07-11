@@ -307,6 +307,9 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 const SIGNAL = '#0d9488';
+const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+const GRID = isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9';
+Chart.defaults.color = isDark ? '#93a1b8' : '#64748b';
 
 {% if att_trend %}
 new Chart(document.getElementById('attChart'), {
@@ -324,7 +327,7 @@ new Chart(document.getElementById('attChart'), {
   },
   options: {
     scales: {
-      y: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: '#f1f5f9' } },
+      y: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: GRID } },
       x: { grid: { display: false } }
     },
     plugins: {
@@ -357,7 +360,7 @@ new Chart(document.getElementById('sgpaChart'), {
   },
   options: {
     scales: {
-      y: { min: 0, max: 10, grid: { color: '#f1f5f9' } },
+      y: { min: 0, max: 10, grid: { color: GRID } },
       x: { grid: { display: false } }
     },
     plugins: { legend: { display: false } }
@@ -382,7 +385,7 @@ new Chart(document.getElementById('subjectChart'), {
   options: {
     indexAxis: 'y',
     scales: {
-      x: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: '#f1f5f9' } },
+      x: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: GRID } },
       y: { grid: { display: false } }
     },
     plugins: {

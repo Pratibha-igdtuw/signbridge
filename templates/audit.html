@@ -31,10 +31,17 @@
 
 <div class="flex items-center justify-between mb-3">
   <p class="text-sm text-slate-500">{{ rows|length }} record(s) shown · newest first.</p>
-  <a href="{{ url_for('audit_export', kind=kind) }}"
-     class="bg-ink hover:bg-steel text-white rounded-md px-4 py-2 text-sm font-medium transition">
-    ⬇ Export evidence (CSV)
-  </a>
+  <div class="flex gap-2">
+    <a href="{{ url_for('audit_export', kind=kind) }}"
+       class="bg-ink hover:bg-steel text-white rounded-md px-4 py-2 text-sm font-medium transition">
+      ⬇ Export evidence (CSV)
+    </a>
+    <a href="{{ url_for('audit_certificate', kind=kind) }}"
+       title="Section 63(4)(c), Bharatiya Sakshya Adhiniyam, 2023 electronic-evidence certificate"
+       class="bg-white border border-ink text-ink hover:bg-slate-50 rounded-md px-4 py-2 text-sm font-medium transition">
+      ⬇ Generate 63(4)(c) Certificate (PDF)
+    </a>
+  </div>
 </div>
 
 <div class="bg-white rounded-lg border border-slate-200 overflow-x-auto">
