@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS users (
     username        TEXT UNIQUE NOT NULL,
     email           TEXT UNIQUE NOT NULL,
     password_hash   TEXT NOT NULL,
-    role            TEXT NOT NULL CHECK(role IN ('admin','faculty','student')),
+    role            TEXT NOT NULL CHECK(role IN ('admin','access_manager','faculty','student')),
     full_name       TEXT NOT NULL,
     otp_code TEXT,
     otp_expiry DATETIME,
@@ -301,11 +301,14 @@ def seed():
         ("student", "student@igdtuw.edu", "Student@123", "student", "Rohan Verma",           None),
     ]
     for username, email, pw, role, name, branch in accounts:
-        execute(
-            "INSERT INTO users (username, email, password_hash, role, full_name, branch, profile_complete) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (username, email, generate_password_hash(pw), role, name, branch, 1),
-        )
+        try:
+            execute(
+                "INSERT INTO users (username, email, password_hash, role, full_name, branch, profile_complete) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (username, email, generate_password_hash(pw), role, name, branch, 1),
+            )
+        except Exception:
+            pass  # already seeded on a previous run — don't crash startup
 
     sample_students = [
         ("CU22BCS001", "Aarav Singh",  "aarav@cu.edu",  "CSE", 3, 8.4, "9876500001"),
@@ -314,11 +317,14 @@ def seed():
         ("CU23BEC112", "Ananya Reddy", "ananya@cu.edu", "ECE", 2, 8.9, "9876500004"),
     ]
     for roll, name, email, dept, year, cgpa, phone in sample_students:
-        execute(
-            "INSERT INTO students (roll_number, full_name, email, department, year, cgpa, phone, created_by) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (roll, name, email, dept, year, cgpa, phone, 1),
-        )
+        try:
+            execute(
+                "INSERT INTO students (roll_number, full_name, email, department, year, cgpa, phone, created_by) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (roll, name, email, dept, year, cgpa, phone, 1),
+            )
+        except Exception:
+            pass  # already seeded on a previous run — don't crash startup
 
     # Seed sample attendance
     import random
@@ -669,6 +675,104 @@ def migrate_v4(conn):
     """)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read)")
     conn.commit()
+
+
+def migrate_v5(conn):
+    """
+    Adds 'access_manager' as a valid role.
+
+    SQLite can't ALTER a CHECK constraint in place, so on databases created
+    before this change we rebuild the `users` table with the widened
+    constraint and copy every row across. Idempotent — safe to call on every
+    startup; it no-ops once the table already allows the new role (checked
+    by inspecting the table's stored CREATE statement rather than tracking
+    a separate "have I migrated" flag, so it self-heals even if a partial
+    migration was interrupted).
+
+    Column list is built dynamically from whatever the OLD table actually
+    has (via PRAGMA table_info) instead of assuming migrate_v3/v4 already
+    ran — some deployed DBs never got those columns, and hardcoding them
+    caused "no such column" errors here.
+    """
+    cur = conn.cursor()
+    cur.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'")
+    row = cur.fetchone()
+    if row and row[0] and "access_manager" in row[0]:
+        return  # already has the widened constraint — nothing to do
+
+    # Columns the NEW table needs, in order, with a safe default expression
+    # to use when the OLD table doesn't have that column at all.
+    new_columns = [
+        ("id", None), ("username", None), ("email", None),
+        ("password_hash", None), ("role", None), ("full_name", None),
+        ("otp_code", "NULL"), ("otp_expiry", "NULL"),
+        ("contact_no", "NULL"), ("branch", "NULL"), ("university", "NULL"),
+        ("year", "NULL"), ("profile_complete", "0"), ("is_active", "1"),
+        ("created_at", "CURRENT_TIMESTAMP"),
+        ("totp_secret", "NULL"), ("totp_enabled", "0"),
+        ("status", "'active'"), ("last_password_change", "CURRENT_TIMESTAMP"),
+    ]
+
+    cur.execute("PRAGMA table_info(users)")
+    old_cols = {r[1] for r in cur.fetchall()}  # r[1] = column name
+
+    select_exprs = []
+    for col, default in new_columns:
+        if col in old_cols:
+            select_exprs.append(col)
+        else:
+            select_exprs.append(f"{default} AS {col}")
+
+    col_names = ", ".join(c for c, _ in new_columns)
+    select_sql = ", ".join(select_exprs)
+
+    cur.execute("PRAGMA foreign_keys=OFF")
+    cur.execute("ALTER TABLE users RENAME TO users_old_v5")
+    cur.execute("""
+        CREATE TABLE users (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            username        TEXT UNIQUE NOT NULL,
+            email           TEXT UNIQUE NOT NULL,
+            password_hash   TEXT NOT NULL,
+            role            TEXT NOT NULL CHECK(role IN ('admin','access_manager','faculty','student')),
+            full_name       TEXT NOT NULL,
+            otp_code TEXT,
+            otp_expiry DATETIME,
+            contact_no      TEXT,
+            branch          TEXT,
+            university      TEXT,
+            year            INTEGER,
+            profile_complete INTEGER NOT NULL DEFAULT 0,
+            is_active       INTEGER NOT NULL DEFAULT 1,
+            created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+            totp_secret TEXT,
+            totp_enabled INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'active',
+            last_password_change DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cur.execute(f"INSERT INTO users ({col_names}) SELECT {select_sql} FROM users_old_v5")
+    cur.execute("DROP TABLE users_old_v5")
+    cur.execute("PRAGMA foreign_keys=ON")
+    conn.commit()
+
+
+def seed_access_manager():
+    """
+    Seed one Access Manager demo account, separately from seed() — seed()
+    bails out early if 'admin' already exists, which would silently skip
+    this on every already-deployed database. Idempotent (checks its own
+    username first).
+    """
+    if query_one("SELECT id FROM users WHERE username = ?", ("access_manager",)):
+        return
+    execute(
+        "INSERT INTO users (username, email, password_hash, role, full_name, "
+        "profile_complete, status) VALUES (?, ?, ?, ?, ?, 1, 'active')",
+        ("access_manager", "access.manager@igdtuw.edu",
+         generate_password_hash("AccessMgr@123"), "access_manager",
+         "Access Manager"),
+    )
 
 
 def create_notification(user_id, message, link=None):

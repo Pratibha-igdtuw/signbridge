@@ -119,12 +119,14 @@ db.migrate_db()
 _migration_conn = db.get_connection()
 db.migrate_v3(_migration_conn)  # status column, 2FA columns, password-expiry tracking
 db.migrate_v4(_migration_conn)  # notifications table
+db.migrate_v5(_migration_conn)  # access_manager role support
 _migration_conn.close()
 db.seed()
 db.seed_extras()
 db.seed_courses()
 db.backfill_user_id()
 db.seed_timetable()
+db.seed_access_manager()  # Create access_manager demo account
 init_syllabus_db()
 init_materials_db()
 init_announcements_db()
@@ -156,7 +158,7 @@ This link expires in 30 minutes.
 def inject_user():
     u = current_user()
     pending_count = 0
-    if u and u["role"] == "admin":
+    if u and u["role"] in ("admin", "access_manager"):
         try:
             row = db.query_one("SELECT COUNT(*) AS c FROM users WHERE status = 'pending'")
             pending_count = row["c"] if row else 0
@@ -323,6 +325,8 @@ def login():
                 return redirect(url_for("student_dashboard"))
             elif user["role"] == "admin":
                 return redirect(url_for("dashboard"))
+            elif user["role"] == "access_manager":
+                return redirect(url_for("users_list"))
             elif user["role"] == "faculty":
                  return redirect(url_for("dashboard"))
 
@@ -478,10 +482,10 @@ def profile():
 
 
 # ============================================================================
-# Admin: unlock user
+# Admin & Access Manager: unlock user
 # ============================================================================
 @app.route("/users/<int:uid>/unlock", methods=["POST"])
-@role_required("admin")
+@role_required("admin", "access_manager")
 def user_unlock(uid):
     user = query_one("SELECT username FROM users WHERE id = ?", (uid,))
     if not user:
@@ -494,26 +498,27 @@ def user_unlock(uid):
 
 
 @app.route("/users")
-@role_required("admin")
+@role_required("admin", "access_manager") 
 def users_list():
     users = query_all("""
     SELECT id, username, full_name, role, email, is_active, status, created_at
     FROM users
     ORDER BY CASE role
                  WHEN 'admin' THEN 1
-                 WHEN 'faculty' THEN 2
-                 WHEN 'student' THEN 3
-                 ELSE 4
+                 WHEN 'access_manager' THEN 2
+                 WHEN 'faculty' THEN 3
+                 WHEN 'student' THEN 4
+                 ELSE 5
              END, full_name
 """)
     return render_template("users.html", all_users=users)
 
 
 # ============================================================================
-# Dashboard (admin + faculty only)
+# Dashboard (admin + faculty + access_manager)
 # ============================================================================
 @app.route("/dashboard")
-@role_required("admin", "faculty")
+@role_required("admin", "faculty", "access_manager")
 def dashboard():
     u = current_user()
     base_stats = {
@@ -525,6 +530,18 @@ def dashboard():
     if u["role"] == "admin":
         base_stats["users"]  = query_one("SELECT COUNT(*) c FROM users")["c"]
         base_stats["alerts"] = query_one("SELECT COUNT(*) c FROM injection_alerts")["c"]
+        locked_count = query_one("SELECT COUNT(*) c FROM users WHERE is_active = 0")["c"]
+        failed = query_all(
+            "SELECT username, ip_address, timestamp FROM login_history "
+            "WHERE status='failed' ORDER BY id DESC LIMIT 5"
+        )
+        recent = query_all(
+            "SELECT username, action, module, timestamp FROM activity_logs "
+            "ORDER BY id DESC LIMIT 8"
+        )
+    elif u["role"] == "access_manager":
+        base_stats["users"]  = query_one("SELECT COUNT(*) c FROM users")["c"]
+        base_stats["pending"] = query_one("SELECT COUNT(*) c FROM users WHERE status = 'pending'")["c"]
         locked_count = query_one("SELECT COUNT(*) c FROM users WHERE is_active = 0")["c"]
         failed = query_all(
             "SELECT username, ip_address, timestamp FROM login_history "
@@ -698,7 +715,7 @@ def attendance():
             )
         sid = request.args.get("student_id") or None
     else:
-        # Admin sees all
+        # Admin & Access Manager see all
         students = query_all("SELECT * FROM students ORDER BY roll_number")
         sid = request.args.get("student_id") or None
 
@@ -759,7 +776,7 @@ def attendance_export_pdf():
         student = (query_one("SELECT * FROM students WHERE user_id=?", (u["id"],)) or
                    query_one("SELECT * FROM students WHERE email=?", (user_db["email"],)))
     else:
-        # Admin/Faculty need explicit student_id
+        # Admin/Faculty/Access Manager need explicit student_id
         if not student_id:
             flash("Please specify a student_id.", "error")
             return redirect(url_for("attendance"))
@@ -879,6 +896,8 @@ def verify_2fa():
                 return redirect(url_for("student_dashboard"))
             elif user["role"] == "admin":
                 return redirect(url_for("dashboard"))
+            elif user["role"] == "access_manager":
+                return redirect(url_for("users_list"))
             elif user["role"] == "faculty":
                   return redirect(url_for("dashboard"))
 
@@ -890,9 +909,9 @@ def verify_2fa():
     return render_template("verify_2fa.html")
 
 
-# ── Registration Approval ─────────────────────────────────────────────────────
+# ── Registration Approval (Admin only) ────────────────────────────────────
 @app.route("/users/pending")
-@role_required("admin")
+@role_required("admin","access_manager")
 def pending_users():
     try:
         users = query_all(
@@ -914,7 +933,7 @@ def pending_users():
 
 
 @app.route("/users/<int:uid>/approve", methods=["POST"])
-@role_required("admin")
+@role_required("admin","access_manager")
 def user_approve(uid):
     user = query_one("SELECT * FROM users WHERE id=?", (uid,))
     if not user:
@@ -933,7 +952,7 @@ def user_approve(uid):
 
 
 @app.route("/users/<int:uid>/suspend", methods=["POST"])
-@role_required("admin")
+@role_required("admin","access_manager")
 def user_suspend(uid):
     user = query_one("SELECT username FROM users WHERE id=?", (uid,))
     if not user:
@@ -946,7 +965,7 @@ def user_suspend(uid):
 
 
 @app.route("/users/<int:uid>/activate", methods=["POST"])
-@role_required("admin")
+@role_required("admin","access_manager")
 def user_activate(uid):
     user = query_one("SELECT username FROM users WHERE id=?", (uid,))
     if not user:
@@ -1202,8 +1221,8 @@ def students():
         q = ""
     col, dir_ = sec.safe_sort(sort, direction)
 
-    if u["role"] == "admin":
-        # Admin sees all students
+    if u["role"] in ("admin", "access_manager"):
+        # Admin and Access Manager see all students
         if q:
             rows = query_all(
                 f"SELECT * FROM students WHERE roll_number LIKE ? OR full_name LIKE ? OR email LIKE ? ORDER BY {col} {dir_}",
@@ -1796,7 +1815,7 @@ def results_export_pdf():
         student = (query_one("SELECT * FROM students WHERE user_id=?", (u["id"],)) or
                    query_one("SELECT * FROM students WHERE email=?", (user_db["email"],)))
     else:
-        # Admin/Faculty need explicit student_id
+        # Admin/Faculty/Access Manager need explicit student_id
         if not student_id:
             flash("Please specify a student_id.", "error")
             return redirect(url_for("results"))
@@ -1989,7 +2008,7 @@ def grievance_close(gid):
 # Admin: Bulk Student Registration via CSV
 # ============================================================================
 @app.route("/students/bulk-upload", methods=["GET", "POST"])
-@role_required("admin")
+@role_required("admin", "access_manager")
 def bulk_upload_students():
     results_log = []
     if request.method == "POST":
@@ -2082,14 +2101,14 @@ def bulk_upload_students():
                 username = f"{base}{suffix}"
                 suffix += 1
 
-                uid = execute(
-                 "INSERT INTO users (username, email, password_hash, role, full_name, profile_complete, status) "
-                 "VALUES (?, ?, ?, 'student', ?, 1, 'active')",
-                    (username, email, default_pw, name)
-                    )
+            uid = execute(
+                "INSERT INTO users (username, email, password_hash, role, full_name, profile_complete, status) "
+                "VALUES (?, ?, ?, 'student', ?, 1, 'active')",
+                (username, email, default_pw, name)
+            )
             
             # Create student record
-                execute(
+            execute(
                 "INSERT INTO students (roll_number, full_name, email, department, year, section, "
                 "current_semester, phone, created_by) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -2107,7 +2126,7 @@ def bulk_upload_students():
 
 
 @app.route("/students/bulk-upload/template")
-@role_required("admin")
+@role_required("admin", "access_manager")
 def bulk_upload_template():
     """Download a sample CSV template."""
     import csv, io
