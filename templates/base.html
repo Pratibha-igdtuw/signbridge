@@ -218,6 +218,8 @@
             <span class="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full font-semibold">ADMIN</span>
           {% elif user.role == 'faculty' %}
             <span class="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-semibold">FACULTY</span>
+          {% elif user.role == 'access_manager' %}
+            <span class="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full font-semibold">ACCESS MANAGER</span>
           {% else %}
             <span class="text-[10px] bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded-full font-semibold">STUDENT</span>
           {% endif %}
@@ -376,6 +378,49 @@
           {{ nav('exam_schedule', 'Exam Schedule', '🗓️') }}
           {{ nav('grievances', 'Grievances', '📨') }}
           {{ nav('leaves', 'Leave Applications', '🏖️') }}
+        </div>
+      </details>
+
+      {# ============================================================
+      ACCESS MANAGER NAVIGATION — Identity & Access Management only
+      NOTE: only routes that already permit 'access_manager' in their
+      @role_required(...) list are linked here. If you later add
+      dedicated Role Management / Password Reset / Lock-Unlock pages,
+      add their nav links in this block too.
+      ============================================================ #}
+      {% elif user.role == 'access_manager' %}
+      <details class="sidebar-dropdown" open>
+        <summary>
+          <span class="flex items-center gap-2">📋 Overview</span>
+          <span class="arrow">⌄</span>
+        </summary>
+        <div class="submenu">
+          {{ nav('dashboard', 'Dashboard', '📊') }}
+        </div>
+      </details>
+
+      <details class="sidebar-dropdown" open>
+        <summary>
+          <span class="flex items-center gap-2">🔐 Identity & Access</span>
+          <span class="arrow">⌄</span>
+        </summary>
+        <div class="submenu">
+          {{ nav('users_list', 'User Accounts', '🛡️') }}
+          {{ nav('students', 'Student Information', '👥') }}
+          {{ nav('bulk_upload_students', 'Bulk Student Upload', '📥') }}
+          {# 'Pending Approvals' currently requires role_required("admin") only.
+             Either add "access_manager" to that route's role_required list,
+             or leave this link out until it's updated — linking to a page
+             that 403s is worse than not showing it. #}
+          {% if has_endpoint('pending_users') %}
+          <a href="{{ url_for('pending_users') }}" class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
+                {{ 'nav-active' if request.endpoint == 'pending_users' else '' }}">
+            <span class="flex items-center gap-2">⏳ Pending Approvals</span>
+            {% if pending_count > 0 %}
+            <span class="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">{{ pending_count }}</span>
+            {% endif %}
+          </a>
+          {% endif %}
         </div>
       </details>
 

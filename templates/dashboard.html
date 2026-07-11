@@ -3,7 +3,7 @@
 {% block heading %}Dashboard{% endblock %}
 {% block content %}
 
-<!-- Stat cards — shown to both admin & faculty but injection alerts only for admin -->
+<!-- Stat cards — admin, faculty, and access_manager each get their own set -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
   {% macro stat(label, value, accent) %}
     <div class="bg-white rounded-lg border border-slate-200 p-5">
@@ -16,6 +16,12 @@
   {% if user.role == 'admin' %}
     {{ stat('System Users', stats.users, 'text-ink') }}
     {{ stat('Injection Alerts', stats.alerts, 'text-alert' if stats.alerts else 'text-ink') }}
+  {% elif user.role == 'access_manager' %}
+    {# Access Manager owns Identity & Access Management — show IAM-relevant
+       counts (total users, pending approvals), never security-internal
+       stats like injection alerts, and never student self-service stats. #}
+    {{ stat('System Users', stats.users, 'text-ink') }}
+    {{ stat('Pending Approvals', stats.pending, 'text-alert' if stats.pending else 'text-ink') }}
   {% else %}
     {# Faculty sees subject/assignment counts instead of internal security stats #}
     {{ stat('Assignments', stats.assignments, 'text-ink') }}
@@ -23,16 +29,19 @@
   {% endif %}
 </div>
 
-<!-- Locked accounts — ADMIN ONLY -->
-{% if user.role == 'admin' and locked_count > 0 %}
+<!-- Locked accounts — ADMIN & ACCESS MANAGER (both can unlock accounts) -->
+{% if user.role in ('admin', 'access_manager') and locked_count > 0 %}
 <div class="mt-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 flex items-center justify-between">
   <span>⚠ <strong>{{ locked_count }}</strong> account{{ 's are' if locked_count != 1 else ' is' }} locked.</span>
   <a href="{{ url_for('users_list') }}" class="underline hover:text-amber-900">Manage →</a>
 </div>
 {% endif %}
 
-<!-- Low attendance summary — shown to both admin & faculty -->
-{% if low_att %}
+<!-- Low attendance summary — shown to admin & faculty only.
+     Access Manager doesn't manage academic data (attendance is a Faculty/
+     Admin concern per the IAM vs academic-ops split), so it's intentionally
+     excluded here rather than falling into a generic "else" branch. -->
+{% if low_att and user.role in ('admin', 'faculty') %}
 <div class="mt-4 px-4 py-3 bg-red-50 border border-red-200 rounded-md">
   <div class="flex items-center justify-between mb-2">
     <p class="text-sm font-semibold text-red-700">📉 Students Below 75% Attendance (top 10)</p>
@@ -76,6 +85,25 @@
     </a>
     <a href="{{ url_for('results') }}"      class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
       <span class="text-2xl">📊</span><div><div class="text-xs text-slate-400">Results</div><div class="font-semibold text-ink text-sm">Post Marks</div></div>
+    </a>
+  {% elif user.role == 'access_manager' %}
+    {# IAM-only quick links — no academic data (attendance/results/marks) #}
+    <a href="{{ url_for('users_list') }}"   class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
+      <span class="text-2xl">🛡️</span><div><div class="text-xs text-slate-400">Users</div><div class="font-semibold text-ink text-sm">Manage Accounts</div></div>
+    </a>
+    {% if has_endpoint('pending_users') %}
+    <a href="{{ url_for('pending_users') }}" class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition {{ 'ring-1 ring-amber-300 border-amber-200' if stats.pending > 0 else '' }}">
+      <span class="text-2xl">⏳</span><div><div class="text-xs text-slate-400">Approvals</div>
+      <div class="font-semibold text-ink text-sm">
+        {% if stats.pending > 0 %}<span class="text-amber-600">{{ stats.pending }} pending</span>{% else %}All clear{% endif %}
+      </div></div>
+    </a>
+    {% endif %}
+    <a href="{{ url_for('bulk_upload_students') }}" class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
+      <span class="text-2xl">📥</span><div><div class="text-xs text-slate-400">Bulk Upload</div><div class="font-semibold text-ink text-sm">Add Students</div></div>
+    </a>
+    <a href="{{ url_for('students') }}"     class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
+      <span class="text-2xl">👥</span><div><div class="text-xs text-slate-400">Directory</div><div class="font-semibold text-ink text-sm">Student Information</div></div>
     </a>
   {% else %}
     <a href="{{ url_for('results') }}"      class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
@@ -137,10 +165,13 @@
     {% endif %}
   </div>
 
-  <!-- Recent activity — ADMIN ONLY (full system log); FACULTY sees their own actions -->
+  <!-- Recent activity — ADMIN sees full system log; ACCESS MANAGER sees full
+       system log too (IAM needs visibility into all user activity, same
+       query the backend already sends for this role); FACULTY sees only
+       their own actions. -->
   <div class="bg-white rounded-lg border border-slate-200 p-5">
     <h2 class="text-sm font-semibold text-ink mb-4">
-      {% if user.role == 'admin' %}Recent system activity{% else %}My recent activity{% endif %}
+      {% if user.role in ('admin', 'access_manager') %}Recent system activity{% else %}My recent activity{% endif %}
     </h2>
     <table class="w-full text-sm evidence">
       <tbody class="divide-y divide-slate-100">
@@ -159,8 +190,10 @@
   </div>
 </div>
 
-<!-- Failed logins — ADMIN ONLY -->
-{% if user.role == 'admin' and failed %}
+<!-- Failed logins — ADMIN & ACCESS MANAGER (both need visibility into
+     failed sign-in attempts for IAM/security purposes; backend already
+     populates `failed` for both roles) -->
+{% if user.role in ('admin', 'access_manager') and failed %}
 <div class="bg-white rounded-lg border border-alert/30 p-5 mt-5">
   <h2 class="text-sm font-semibold text-alert mb-3">Recent failed sign-ins</h2>
   <table class="w-full text-sm evidence">

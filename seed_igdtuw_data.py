@@ -1,5 +1,5 @@
 """
-IGDTUW Curriculum Seeding Script - Generate 60 realistic students + proper course structure
+IGDTUW Curriculum Seeding Script - Generate 20 realistic students + proper course structure
 Academic Year: 2026-27
 
 FIXED (this version):
@@ -12,6 +12,7 @@ FIXED (this version):
      at all, so Year 4 got nothing. This version loops over BOTH semesters
      of each of the 3 years covered by the dict (1-6), matching how the rest
      of the app computes year from semester: year = (semester + 1) // 2.
+  3. enrollment count per course reduced from 60 -> 20 students.
 
 Safe to re-run: existing course codes / student roll numbers are skipped
 via UNIQUE constraint handling, and enrollments/attendance use INSERT OR IGNORE.
@@ -103,6 +104,9 @@ IGDTUW_DEPARTMENTS = {
 # All semesters actually defined above (1 through 6 -> Years 1, 2, 3)
 ALL_SEMESTERS = [1, 2, 3, 4, 5, 6]
 
+# How many students to generate per (department, year) batch.
+STUDENTS_PER_BATCH = 20
+
 # ============================================================================
 # Generate Realistic Student Data for IGDTUW
 # ============================================================================
@@ -159,8 +163,10 @@ def generate_phone():
     """Generate Indian phone number"""
     return f"98{random.randint(10000000, 99999999)}"
 
-def generate_students_for_course(dept, year, count=60):
-    """Generate 60 realistic students for a course"""
+def generate_students_for_course(dept, year, count=STUDENTS_PER_BATCH):
+    """Generate students for a department/year batch (default: STUDENTS_PER_BATCH),
+    round-robin distributed across sections A/B/C."""
+    sections = ["A", "B", "C"]
     students = []
     for i in range(1, count + 1):
         first = random.choice(FIRST_NAMES)
@@ -171,6 +177,7 @@ def generate_students_for_course(dept, year, count=60):
         email = generate_email(full_name, dept, i)
         phone = generate_phone()
         cgpa = round(random.uniform(6.5, 9.5), 2)
+        section = sections[(i - 1) % len(sections)]
 
         students.append({
             "roll_number": roll_number,
@@ -180,6 +187,7 @@ def generate_students_for_course(dept, year, count=60):
             "year": year,
             "cgpa": cgpa,
             "phone": phone,
+            "section": section,
         })
     return students
 
@@ -298,10 +306,10 @@ def seed_departments_and_courses():
     conn.close()
     print(f"\n✅ Total courses created: {courses_created}")
 
-def seed_60_students_per_course():
-    """Seed 60 realistic students per department/year and enroll them in
-    every course for their (department, semester) — where semester is
-    derived from year the same way the rest of the app does:
+def seed_students_per_course():
+    """Seed STUDENTS_PER_BATCH realistic students per department/year and
+    enroll them in every course for their (department, semester) — where
+    semester is derived from year the same way the rest of the app does:
         year = (semester + 1) // 2   <=>   semesters {1,2}->year1, {3,4}->year2, {5,6}->year3
 
     Uses a SINGLE connection for the whole batch, with commits at each
@@ -322,22 +330,23 @@ def seed_60_students_per_course():
 
     for dept_code in IGDTUW_DEPARTMENTS.keys():
         for year in years_covered:
-            print(f"\n👥 Generating 60 students for {dept_code} Year {year}...")
+            print(f"\n👥 Generating {STUDENTS_PER_BATCH} students for {dept_code} Year {year}...")
 
-            students_data = generate_students_for_course(dept_code, year, count=60)
+            students_data = generate_students_for_course(dept_code, year, count=STUDENTS_PER_BATCH)
 
             for student in students_data:
                 try:
                     cur.execute(
                         """INSERT INTO students
-                        (roll_number, full_name, email, department, year, cgpa, phone, created_by)
-                        VALUES (?,?,?,?,?,?,?,?)""",
+                        (roll_number, full_name, email, department, year, section, cgpa, phone, created_by)
+                        VALUES (?,?,?,?,?,?,?,?,?)""",
                         (
                             student["roll_number"],
                             student["full_name"],
                             student["email"],
                             student["department"],
                             student["year"],
+                            student["section"],
                             student["cgpa"],
                             student["phone"],
                             admin_id
@@ -366,7 +375,17 @@ def seed_60_students_per_course():
                 ).fetchall()
 
                 for course in courses:
-                    for student in students_for_enroll:
+                    # Cap enrollment per course at STUDENTS_PER_BATCH instead
+                    # of enrolling every student in the dept+year batch into
+                    # every one of that semester's courses -- that's what
+                    # was silently blowing enrollments-per-course way past
+                    # STUDENTS_PER_BATCH even though students_for_enroll
+                    # itself was already capped at generation time.
+                    pool = students_for_enroll
+                    if len(pool) > STUDENTS_PER_BATCH:
+                        pool = random.sample(pool, STUDENTS_PER_BATCH)
+
+                    for student in pool:
                         try:
                             cur.execute(
                                 "INSERT OR IGNORE INTO enrollments (course_id, student_id) VALUES (?,?)",
@@ -448,8 +467,8 @@ if __name__ == "__main__":
     print("\n[2/4] Seeding departments and courses...")
     seed_departments_and_courses()
 
-    print("\n[3/4] Generating 60 students per course...")
-    seed_60_students_per_course()
+    print(f"\n[3/4] Generating {STUDENTS_PER_BATCH} students per course...")
+    seed_students_per_course()
 
     print("\n[4/4] Seeding sample attendance...")
     seed_sample_attendance()

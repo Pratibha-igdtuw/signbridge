@@ -50,14 +50,35 @@ class Config:
     RATELIMIT_DEFAULT = "200 per minute"
     RATELIMIT_STORAGE_URL = "memory://"
 
-    # Flask-Mail
+    # ── Flask-Mail ──────────────────────────────────────────────────────
+    # IMPORTANT: set these as real environment variables (never hardcode
+    # real credentials in app.py / config.py). For Gmail you need an
+    # "App Password" (Google Account -> Security -> 2-Step Verification ->
+    # App Passwords), NOT your normal login password — Gmail rejects plain
+    # passwords for SMTP.
+    #
+    #   Windows (PowerShell):  $env:MAIL_USERNAME="you@gmail.com"
+    #                          $env:MAIL_PASSWORD="16-char-app-password"
+    #                          $env:MAIL_SUPPRESS_SEND="false"
+    #   Linux / Mac:           export MAIL_USERNAME="you@gmail.com"
+    #                          export MAIL_PASSWORD="16-char-app-password"
+    #                          export MAIL_SUPPRESS_SEND="false"
     MAIL_SERVER   = os.environ.get("MAIL_SERVER",   "smtp.gmail.com")
     MAIL_PORT     = int(os.environ.get("MAIL_PORT", "587"))
     MAIL_USE_TLS  = True
     MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "")
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "")
-    MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER", "noreply@idonportal.com")
-    MAIL_SUPPRESS_SEND = os.environ.get("MAIL_SUPPRESS_SEND", "true").lower() == "true"
+    MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER", MAIL_USERNAME or "noreply@idonportal.com")
+
+    # BUGFIX: previously defaulted to "true" in ALL environments (including
+    # production), which means Flask-Mail silently pretended every email
+    # succeeded without ever opening an SMTP connection — this is exactly
+    # why "email sent" flashes appeared with nothing arriving in inboxes.
+    # Now: suppressed by default only in development; real sends happen in
+    # production unless explicitly turned off.
+    MAIL_SUPPRESS_SEND = os.environ.get(
+        "MAIL_SUPPRESS_SEND", "false" if _IS_PRODUCTION else "true"
+    ).lower() == "true"
 
     # Security headers
     FORCE_HTTPS = os.environ.get("FORCE_HTTPS", "false").lower() == "true"

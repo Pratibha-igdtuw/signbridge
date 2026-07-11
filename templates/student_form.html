@@ -33,13 +33,16 @@
     <div class="grid grid-cols-4 gap-4">
       <div>
         <label class="block text-sm font-medium text-steel mb-1">Department</label>
-        <select name="department"
-                class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
-                       focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+        <input name="department" list="department-options" value="{{ form.department or '' }}"
+               placeholder="e.g. CSE" required autocomplete="off"
+               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                      focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+        <datalist id="department-options">
           {% for d in ['CSE','ME','ECE','CE','EE','IT','AIML'] %}
-            <option value="{{ d }}" {{ 'selected' if form.department==d else '' }}>{{ d }}</option>
+            <option value="{{ d }}">
           {% endfor %}
-        </select>
+        </datalist>
+        <p class="text-xs text-slate-400 mt-1">Choose from the list or type a new department name.</p>
       </div>
       <div>
         <label class="block text-sm font-medium text-steel mb-1">Year</label>
