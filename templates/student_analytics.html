@@ -1,7 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Analytics{% endblock %}
+{% block title %}{% if user.role == 'admin' %}Institution Analytics{% else %}Analytics{% endif %}{% endblock %}
 {% block heading %}
   {% if user.role == 'student' %}My Analytics
+  {% elif user.role == 'admin' %}Institution Analytics
   {% else %}Class Analytics{% if filter_label %} — <span class="text-signal font-normal text-base">{{ filter_label }}</span>{% endif %}
   {% endif %}
 {% endblock %}
@@ -80,7 +81,8 @@
   </div>
 {% endif %}
 
-{# Admin/Faculty summary stat cards #}
+{% if user.role == 'faculty' %}
+{# Faculty summary stat cards — unchanged #}
 <div class="grid sm:grid-cols-3 gap-4 mb-6">
   <div class="bg-white rounded-lg border border-slate-200 p-4">
     <div class="text-xs eyebrow uppercase text-slate-400 mb-1">Overall Attendance</div>
@@ -108,6 +110,39 @@
     <div class="text-xs text-slate-400 mt-1">Due from today onwards</div>
   </div>
 </div>
+{% elif user.role == 'admin' %}
+{# Super Admin — institution-level summary cards #}
+<div class="grid sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+  <div class="bg-white rounded-lg border border-slate-200 p-4">
+    <div class="text-xs eyebrow uppercase text-slate-400 mb-1">Total Students</div>
+    <div class="text-2xl font-bold text-ink">{{ total_students_count if total_students_count is not none else '—' }}</div>
+  </div>
+  <div class="bg-white rounded-lg border border-slate-200 p-4">
+    <div class="text-xs eyebrow uppercase text-slate-400 mb-1">Total Faculty</div>
+    <div class="text-2xl font-bold text-ink">{{ total_faculty_count if total_faculty_count is not none else '—' }}</div>
+  </div>
+  <div class="bg-white rounded-lg border border-slate-200 p-4">
+    <div class="text-xs eyebrow uppercase text-slate-400 mb-1">Overall Attendance</div>
+    <div class="text-2xl font-bold {{ 'text-teal-600' if overall_pct is not none and overall_pct >= 75 else 'text-red-500' if overall_pct is not none else 'text-slate-300' }}">
+      {{ (overall_pct ~ '%') if overall_pct is not none else '—' }}
+    </div>
+  </div>
+  <div class="bg-white rounded-lg border border-slate-200 p-4">
+    <div class="text-xs eyebrow uppercase text-slate-400 mb-1">Average CGPA</div>
+    <div class="text-2xl font-bold text-ink">{{ avg_cgpa if avg_cgpa is not none else '—' }}</div>
+  </div>
+  <div class="bg-white rounded-lg border border-slate-200 p-4">
+    <div class="text-xs eyebrow uppercase text-slate-400 mb-1">Overall Pass %</div>
+    <div class="text-2xl font-bold {{ 'text-teal-600' if overall_pass_pct is not none and overall_pass_pct >= 75 else 'text-red-500' if overall_pass_pct is not none else 'text-slate-300' }}">
+      {{ (overall_pass_pct ~ '%') if overall_pass_pct is not none else '—' }}
+    </div>
+  </div>
+  <div class="bg-white rounded-lg border border-slate-200 p-4">
+    <div class="text-xs eyebrow uppercase text-slate-400 mb-1">Total Departments</div>
+    <div class="text-2xl font-bold text-ink">{{ total_departments_count if total_departments_count is not none else '—' }}</div>
+  </div>
+</div>
+{% endif %}
 {% endif %}
 
 {# ═══════════════════════════════════════════════════════
@@ -148,14 +183,16 @@
 {% endif %}
 
 {# ═══════════════════════════════════════════════════════
-   CHARTS — Attendance Trend + SGPA
+   CHARTS — Attendance Trend + SGPA (faculty / student only —
+   Weekly Attendance Trend is a Faculty responsibility)
    ═══════════════════════════════════════════════════════ #}
+{% if user.role != 'admin' %}
 <div class="grid {{ 'lg:grid-cols-2' if user.role == 'student' else '' }} gap-6 mb-6">
   <div class="bg-white rounded-lg border border-slate-200 p-5">
     <h3 class="text-sm font-semibold text-ink mb-1">📅 Attendance Trend
       <span class="text-xs text-slate-400 font-normal ml-1">(by week)</span>
     </h3>
-    {% if user.role in ('admin','faculty') and filter_label %}
+    {% if user.role == 'faculty' and filter_label %}
     <p class="text-xs text-slate-400 mb-3">{{ filter_label }}</p>
     {% endif %}
     {% if att_trend %}
@@ -179,18 +216,63 @@
   {% endif %}
 </div>
 
-{# Subject-wise breakdown — both roles #}
+{# Subject-wise breakdown — faculty / student only (Faculty responsibility) #}
 {% if subject_breakdown %}
 <div class="bg-white rounded-lg border border-slate-200 p-5 mb-6">
   <h3 class="text-sm font-semibold text-ink mb-1">📊 Subject-wise Attendance
-    {% if user.role in ('admin','faculty') %}
+    {% if user.role == 'faculty' %}
     <span class="text-xs text-slate-400 font-normal ml-1">— average across all students in scope</span>
     {% endif %}
   </h3>
-  {% if user.role in ('admin','faculty') and filter_label %}
+  {% if user.role == 'faculty' and filter_label %}
   <p class="text-xs text-slate-400 mb-3">{{ filter_label }}</p>
   {% endif %}
   <canvas id="subjectChart" height="{{ [subject_breakdown|length * 28, 120]|max }}"></canvas>
+</div>
+{% endif %}
+{% endif %}
+
+{# ═══════════════════════════════════════════════════════
+   INSTITUTION-LEVEL CHARTS — Super Admin only
+   ═══════════════════════════════════════════════════════ #}
+{% if user.role == 'admin' %}
+<div class="grid lg:grid-cols-2 gap-6 mb-6">
+  <div class="bg-white rounded-lg border border-slate-200 p-5">
+    <h3 class="text-sm font-semibold text-ink mb-1">🏛️ Attendance by Department</h3>
+    <p class="text-xs text-slate-400 mb-3">Average attendance, all departments</p>
+    {% if dept_attendance %}
+    <canvas id="deptAttChart" height="220"></canvas>
+    {% else %}
+    <p class="text-sm text-slate-400 py-8 text-center">No attendance data yet.</p>
+    {% endif %}
+  </div>
+  <div class="bg-white rounded-lg border border-slate-200 p-5">
+    <h3 class="text-sm font-semibold text-ink mb-1">🎓 Result Distribution</h3>
+    <p class="text-xs text-slate-400 mb-3">Students by CGPA range</p>
+    {% if cgpa_distribution %}
+    <canvas id="cgpaDistChart" height="220"></canvas>
+    {% else %}
+    <p class="text-sm text-slate-400 py-8 text-center">No CGPA data yet.</p>
+    {% endif %}
+  </div>
+  <div class="bg-white rounded-lg border border-slate-200 p-5">
+    <h3 class="text-sm font-semibold text-ink mb-1">🏢 Department-wise Student Strength</h3>
+    <p class="text-xs text-slate-400 mb-3">Total students per department</p>
+    {% if dept_strength %}
+    <canvas id="deptStrengthChart" height="220"></canvas>
+    {% else %}
+    <p class="text-sm text-slate-400 py-8 text-center">No students yet.</p>
+    {% endif %}
+  </div>
+  <div class="bg-white rounded-lg border border-slate-200 p-5">
+    <h3 class="text-sm font-semibold text-ink mb-1">📚 Course Enrollment Statistics</h3>
+    <p class="text-xs text-slate-400 mb-3">Students enrolled per course (top 12)</p>
+    {% if course_enrollment %}
+    <canvas id="courseEnrollChart" height="220"></canvas>
+    {% else %}
+    <p class="text-sm text-slate-400 py-8 text-center">No enrollment data yet.</p>
+    {% endif %}
+  </div>
 </div>
 {% endif %}
 
@@ -241,12 +323,13 @@
 </div>
 {% endif %}
 
-{# Heatmap Calendar #}
+{# Heatmap Calendar — faculty / student only #}
+{% if user.role != 'admin' %}
 <div class="bg-white rounded-lg border border-slate-200 p-6 mb-6">
   <h3 class="font-semibold text-sm text-ink mb-1">Attendance Calendar
     <span class="text-xs text-slate-400 font-normal ml-1">— last 365 days</span>
   </h3>
-  {% if user.role in ('admin','faculty') and filter_label %}
+  {% if user.role == 'faculty' and filter_label %}
   <p class="text-xs text-slate-400 mb-2">{{ filter_label }}</p>
   {% endif %}
   <p class="text-xs text-slate-500 mb-3">Each cell = one day. Hover for date.</p>
@@ -263,8 +346,9 @@
     <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-slate-200 inline-block"></span> No class</span>
   </div>
 </div>
+{% endif %}
 
-{# Quick action links — student only #}
+{# Quick action links / Reports #}
 {% if user.role == 'student' %}
 <div class="grid sm:grid-cols-3 gap-4">
   <a href="{{ url_for('attendance') }}"
@@ -286,7 +370,7 @@
     <div class="text-xs text-slate-400">Apply or track status</div>
   </a>
 </div>
-{% else %}
+{% elif user.role == 'faculty' %}
 <div class="grid sm:grid-cols-2 gap-4">
   <a href="{{ url_for('low_attendance_report') }}"
      class="bg-white rounded-lg border border-slate-200 p-4 hover:border-signal transition group">
@@ -301,6 +385,38 @@
     <div class="text-xs text-slate-400">Mark entire class at once</div>
   </a>
 </div>
+{% elif user.role == 'admin' %}
+{# Reports — Super Admin. View/export only; no attendance marking here. #}
+<div class="mb-2">
+  <h3 class="text-sm font-semibold text-ink mb-1">Reports</h3>
+  <p class="text-xs text-slate-400 mb-3">View-only reporting. Attendance is marked by Faculty, not from here.</p>
+</div>
+<div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  <a href="{{ url_for('analytics_export_csv') }}"
+     class="bg-white rounded-lg border border-slate-200 p-4 hover:border-signal transition group">
+    <div class="text-xl mb-1">📊</div>
+    <div class="text-sm font-semibold text-ink group-hover:text-signal">University Analytics Report</div>
+    <div class="text-xs text-slate-400">Institution summary — CSV</div>
+  </a>
+  <a href="{{ url_for('analytics_export_dept_csv') }}"
+     class="bg-white rounded-lg border border-slate-200 p-4 hover:border-signal transition group">
+    <div class="text-xl mb-1">🏢</div>
+    <div class="text-sm font-semibold text-ink group-hover:text-signal">Department-wise Report</div>
+    <div class="text-xs text-slate-400">Per-department breakdown — CSV</div>
+  </a>
+  <a href="{{ url_for('low_attendance_report') }}"
+     class="bg-white rounded-lg border border-slate-200 p-4 hover:border-signal transition group">
+    <div class="text-xl mb-1">📉</div>
+    <div class="text-sm font-semibold text-ink group-hover:text-signal">Low Attendance Report</div>
+    <div class="text-xs text-slate-400">View-only · export · notify faculty</div>
+  </a>
+  <a href="{{ url_for('analytics_export_pdf') }}"
+     class="bg-white rounded-lg border border-slate-200 p-4 hover:border-signal transition group">
+    <div class="text-xl mb-1">📄</div>
+    <div class="text-sm font-semibold text-ink group-hover:text-signal">Export PDF</div>
+    <div class="text-xs text-slate-400">Institution summary — PDF</div>
+  </a>
+</div>
 {% endif %}
 
 {# ══ All charts JS ══ #}
@@ -311,6 +427,7 @@ const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 const GRID = isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9';
 Chart.defaults.color = isDark ? '#93a1b8' : '#64748b';
 
+{% if user.role != 'admin' %}
 {% if att_trend %}
 new Chart(document.getElementById('attChart'), {
   type: 'line',
@@ -394,6 +511,98 @@ new Chart(document.getElementById('subjectChart'), {
     }
   }
 });
+{% endif %}
+{% endif %}
+
+{% if user.role == 'admin' %}
+{% if dept_attendance %}
+new Chart(document.getElementById('deptAttChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ dept_attendance | map(attribute='department') | list | tojson }},
+    datasets: [{
+      label: 'Attendance %',
+      data: {{ dept_attendance | map(attribute='pct') | list | tojson }},
+      backgroundColor: {{ dept_attendance | map(attribute='pct') | list | tojson }}.map(
+        v => v >= 75 ? 'rgba(13,148,136,.8)' : v >= 50 ? 'rgba(251,191,36,.8)' : 'rgba(248,113,113,.8)'
+      ),
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    scales: {
+      y: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: GRID } },
+      x: { grid: { display: false } }
+    },
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.y + '%' } } }
+  }
+});
+{% endif %}
+
+{% if cgpa_distribution %}
+new Chart(document.getElementById('cgpaDistChart'), {
+  type: 'doughnut',
+  data: {
+    labels: {{ cgpa_distribution | map(attribute='label') | list | tojson }},
+    datasets: [{
+      data: {{ cgpa_distribution | map(attribute='count') | list | tojson }},
+      backgroundColor: ['rgba(13,148,136,.85)', 'rgba(45,212,191,.85)', 'rgba(251,191,36,.85)', 'rgba(248,113,113,.85)'],
+      borderWidth: 0,
+    }]
+  },
+  options: { plugins: { legend: { position: 'bottom' } } }
+});
+{% endif %}
+
+{% if dept_strength %}
+new Chart(document.getElementById('deptStrengthChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ dept_strength | map(attribute='department') | list | tojson }},
+    datasets: [{
+      label: 'Students',
+      data: {{ dept_strength | map(attribute='c') | list | tojson }},
+      backgroundColor: 'rgba(13,148,136,.8)',
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    scales: {
+      y: { min: 0, grid: { color: GRID } },
+      x: { grid: { display: false } }
+    },
+    plugins: { legend: { display: false } }
+  }
+});
+{% endif %}
+
+{% if course_enrollment %}
+new Chart(document.getElementById('courseEnrollChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ course_enrollment | map(attribute='code') | list | tojson }},
+    datasets: [{
+      label: 'Enrolled',
+      data: {{ course_enrollment | map(attribute='c') | list | tojson }},
+      backgroundColor: 'rgba(45,212,191,.85)',
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    scales: {
+      x: { min: 0, grid: { color: GRID } },
+      y: { grid: { display: false } }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: {
+        title: ctx => {{ course_enrollment | map(attribute='name') | list | tojson }}[ctx[0].dataIndex]
+      } }
+    }
+  }
+});
+{% endif %}
 {% endif %}
 
 // Heatmap

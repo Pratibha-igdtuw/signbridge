@@ -18,7 +18,7 @@
 </style>
 
 <div class="min-h-screen grid lg:grid-cols-2">
-  <div class="hidden lg:flex flex-col justify-between bg-ink text-slate-300 p-12 relative overflow-hidden">
+  <div id="login-brand-panel" class="hidden lg:flex flex-col justify-between bg-ink text-slate-300 p-12 relative overflow-hidden">
     <canvas id="loginCanvas"></canvas>
     <div>
       <div class="eyebrow text-[11px] uppercase text-signal font-semibold">IDon Portal</div>
@@ -49,14 +49,14 @@
         <div>
           <label class="block text-sm font-medium text-steel mb-1">Username</label>
           <input name="username" autocomplete="username" required
-                 class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                 class="w-full rounded-md border border-slate-300 bg-white text-ink px-3 py-2 text-sm
                         focus:border-signal focus:ring-1 focus:ring-signal outline-none">
         </div>
         <div>
           <label class="block text-sm font-medium text-steel mb-1">Password</label>
           <div class="relative">
             <input id="pw-login" name="password" type="password" autocomplete="current-password" required
-                   class="w-full rounded-md border border-slate-300 px-3 py-2 pr-10 text-sm
+                   class="w-full rounded-md border border-slate-300 bg-white text-ink px-3 py-2 pr-10 text-sm
                           focus:border-signal focus:ring-1 focus:ring-signal outline-none">
             <button type="button" onclick="toggleEye('pw-login','eye-login')"
                     class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">

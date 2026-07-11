@@ -124,6 +124,8 @@ db.migrate_v5(_migration_conn)  # access_manager role support
 db.migrate_v6(_migration_conn)  # force_password_change column (admin Password Reset)
 db.migrate_v7(_migration_conn)  # logout_time column (Access Manager Login History)
 db.migrate_v8(_migration_conn)  # programme column (User Accounts Edit)
+db.migrate_v9(_migration_conn)  # suspicious_activities table (Forensics)
+db.migrate_v10(_migration_conn) # approved_at column (Today's Summary widget)
 _migration_conn.close()
 db.seed()
 db.seed_extras()
@@ -168,10 +170,18 @@ def inject_user():
             pending_count = row["c"] if row else 0
         except Exception:
             pending_count = 0
+    open_suspicious_count = 0
+    if u and u["role"] == "admin":
+        try:
+            row = db.query_one("SELECT COUNT(*) AS c FROM suspicious_activities WHERE status = 'Open'")
+            open_suspicious_count = row["c"] if row else 0
+        except Exception:
+            open_suspicious_count = 0
     return {
         "user": u,
         "config": Config,
         "pending_count": pending_count,
+        "open_suspicious_count": open_suspicious_count,
         # Lets templates check `{% if has_endpoint('twofa_setup') %}` before
         # calling url_for() on a route that may not be registered yet, so a
         # missing/renamed route doesn't crash every page that extends base.html.
@@ -312,12 +322,20 @@ def login():
 
         if user and not user["is_active"]:
             fz.log_login(request, user["id"], username, "locked", user["role"])
+            fz.record_suspicious_activity(
+                request, dict(user), "Locked Account Login Attempt",
+                "Login Attempt from Locked Account.", "Medium", "Blocked", dedup_minutes=10,
+            )
             flash("Your account has been locked. Please contact the Access Manager.", "error")
             return render_template("login.html")
 
         status = user["status"] if (user and "status" in user.keys()) else "active"
         if user and status == "suspended":
             fz.log_login(request, user["id"], username, "locked", user["role"])
+            fz.record_suspicious_activity(
+                request, dict(user), "Locked Account Login Attempt",
+                "Login Attempt from Locked Account.", "Medium", "Blocked", dedup_minutes=10,
+            )
             flash("This account has been suspended. Contact an administrator.", "error")
             return render_template("login.html")
         if user and status == "pending":
@@ -330,6 +348,11 @@ def login():
             recent_fails = _count_recent_failures(username)
             if recent_fails >= Config.MAX_FAILED_LOGINS:
                 fz.log_login(request, user["id"], username, "locked", user["role"])
+                fz.record_suspicious_activity(
+                    request, dict(user), "Multiple Failed Logins",
+                    "Possible brute-force attack.", "Medium", "Blocked",
+                    dedup_minutes=Config.LOCKOUT_WINDOW_MINUTES,
+                )
                 remaining = _lockout_remaining_minutes(username) or Config.LOCKOUT_WINDOW_MINUTES
                 flash(
                     f"Too many failed attempts. Your account is locked — "
@@ -874,9 +897,25 @@ def dashboard():
             "SELECT COUNT(*) c FROM login_history WHERE date(timestamp)=date('now')"
         )["c"],
     }
+    health = None
+    today_summary = None
+    high_open_count = 0
     if u["role"] == "admin":
-        base_stats["users"]  = query_one("SELECT COUNT(*) c FROM users")["c"]
+        # Super Admin owns system administration, academic configuration,
+        # security monitoring, and digital forensics -- not IAM (that's the
+        # Access Manager's job), so these stats stay security/ops-focused.
+        base_stats["faculty"] = query_one(
+            "SELECT COUNT(*) c FROM users WHERE role = 'faculty'"
+        )["c"]
+        base_stats["active_users"] = query_one(
+            "SELECT COUNT(*) c FROM users WHERE is_active = 1 AND status = 'active'"
+        )["c"]
         base_stats["alerts"] = query_one("SELECT COUNT(*) c FROM injection_alerts")["c"]
+        base_stats["failed_today"] = query_one(
+            "SELECT COUNT(*) c FROM login_history WHERE status='failed' AND date(timestamp)=date('now')"
+        )["c"]
+        base_stats["active_notices"] = query_one("SELECT COUNT(*) c FROM notices")["c"]
+
         locked_count = query_one("SELECT COUNT(*) c FROM users WHERE is_active = 0")["c"]
         failed = query_all(
             "SELECT username, ip_address, timestamp FROM login_history "
@@ -886,6 +925,62 @@ def dashboard():
             "SELECT username, action, module, timestamp FROM activity_logs "
             "ORDER BY id DESC LIMIT 8"
         )
+
+        active_sessions = query_one(
+            "SELECT COUNT(*) c FROM login_history "
+            "WHERE status='success' AND logout_time IS NULL AND date(timestamp)=date('now')"
+        )["c"]
+        activity_count = query_one("SELECT COUNT(*) c FROM activity_logs")["c"]
+
+        # Suspicious Activity module (Forensics) is now the single source of
+        # truth for this figure -- it's populated by the detection hooks in
+        # auth.py / forensics.py / the login route, not a dashboard-only guess.
+        open_suspicious = query_one(
+            "SELECT COUNT(*) c FROM suspicious_activities WHERE status = 'Open'"
+        )["c"]
+        high_open_count = query_one(
+            "SELECT COUNT(*) c FROM suspicious_activities WHERE status = 'Open' AND severity = 'High'"
+        )["c"]
+        breaches_today = query_one(
+            "SELECT COUNT(*) c FROM suspicious_activities WHERE date(timestamp) = date('now')"
+        )["c"]
+
+        health = {
+            "db_status": "Connected",
+            "audit_trail_status": "Active" if activity_count > 0 else "Inactive",
+            "backup_status": "Manual only (no automated backups configured)",
+            "active_sessions": active_sessions,
+            "locked_accounts": locked_count,
+            "failed_logins": base_stats["failed_today"],
+            "sql_injection_blocked": base_stats["alerts"],
+            "suspicious_activities": open_suspicious,
+        }
+
+        # ---- Today's Summary widget (replaces Role Distribution) ----------
+        students_today = query_one(
+            "SELECT COUNT(*) c FROM users WHERE role = 'student' AND date(created_at) = date('now')"
+        )["c"]
+        faculty_approved_today = query_one(
+            "SELECT COUNT(*) c FROM users WHERE role = 'faculty' AND date(approved_at) = date('now')"
+        )["c"]
+        notices_today = query_one(
+            "SELECT COUNT(*) c FROM notices WHERE date(created_at) = date('now')"
+        )["c"]
+        leaves_pending = 0
+        try:
+            leaves_pending = query_one(
+                "SELECT COUNT(*) c FROM leave_applications WHERE status = 'pending'"
+            )["c"]
+        except Exception:
+            leaves_pending = 0
+        today_summary = {
+            "students_today": students_today,
+            "faculty_approved_today": faculty_approved_today,
+            "notices_today": notices_today,
+            "leaves_pending": leaves_pending,
+            "breaches_today": breaches_today,
+        }
+
     elif u["role"] == "access_manager":
         base_stats["users"]  = query_one("SELECT COUNT(*) c FROM users")["c"]
         base_stats["pending"] = query_one("SELECT COUNT(*) c FROM users WHERE status = 'pending'")["c"]
@@ -943,7 +1038,9 @@ def dashboard():
     return render_template("dashboard.html", stats=base_stats, by_dept=by_dept,
                            recent=recent, failed=failed, locked_count=locked_count,
                            low_att=low_att, open_grievances=open_grievances,
-                           pinned_notices=pinned_notices, upcoming_exams=upcoming_exams)
+                           pinned_notices=pinned_notices, upcoming_exams=upcoming_exams,
+                           health=health, today_summary=today_summary,
+                           high_open_count=high_open_count)
 
 
 
@@ -1286,7 +1383,7 @@ def user_approve(uid):
     user = query_one("SELECT * FROM users WHERE id=?", (uid,))
     if not user:
         abort(404)
-    execute("UPDATE users SET status='active' WHERE id=?", (uid,))
+    execute("UPDATE users SET status='active', approved_at=CURRENT_TIMESTAMP WHERE id=?", (uid,))
     fz.log_activity(request, current_user(), "account_approved", "auth",
                     f"approved user id={uid}")
     # Notify student
@@ -1897,6 +1994,93 @@ def audit_alerts():
     filtered = _audit_filter([dict(r) for r in rows], cols, q, date_from, date_to)
     return render_template("audit.html", title="SQL Injection Alerts", rows=filtered,
                            kind="alerts", cols=cols, q=q, date_from=date_from, date_to=date_to)
+
+
+@app.route("/audit/suspicious")
+@role_required("admin")
+def suspicious_activity():
+    q         = request.args.get("q", "").strip()
+    date_from = request.args.get("from", "").strip()
+    date_to   = request.args.get("to", "").strip()
+    severity  = request.args.get("severity", "").strip()
+    a_type    = request.args.get("type", "").strip()
+    status    = request.args.get("status", "").strip()
+    try:
+        page = max(int(request.args.get("page", 1)), 1)
+    except ValueError:
+        page = 1
+    per_page = 25
+
+    where, params = ["1=1"], []
+    if q:
+        like = f"%{q}%"
+        where.append("(username LIKE ? OR ip_address LIKE ? OR description LIKE ?)")
+        params += [like, like, like]
+    if date_from:
+        where.append("date(timestamp) >= ?"); params.append(date_from)
+    if date_to:
+        where.append("date(timestamp) <= ?"); params.append(date_to)
+    if severity:
+        where.append("severity = ?"); params.append(severity)
+    if a_type:
+        where.append("activity_type = ?"); params.append(a_type)
+    if status:
+        where.append("status = ?"); params.append(status)
+    where_sql = " AND ".join(where)
+
+    total = query_one(f"SELECT COUNT(*) c FROM suspicious_activities WHERE {where_sql}", params)["c"]
+    total_pages = max((total + per_page - 1) // per_page, 1)
+    page = min(page, total_pages)
+    offset = (page - 1) * per_page
+
+    rows = query_all(
+        f"SELECT * FROM suspicious_activities WHERE {where_sql} "
+        f"ORDER BY id DESC LIMIT ? OFFSET ?",
+        params + [per_page, offset],
+    )
+    activity_types = [r["activity_type"] for r in query_all(
+        "SELECT DISTINCT activity_type FROM suspicious_activities ORDER BY activity_type"
+    )]
+    open_count = query_one("SELECT COUNT(*) c FROM suspicious_activities WHERE status='Open'")["c"]
+    high_open_count = query_one(
+        "SELECT COUNT(*) c FROM suspicious_activities WHERE status='Open' AND severity='High'"
+    )["c"]
+
+    return render_template(
+        "suspicious_activity.html", rows=rows, q=q, date_from=date_from, date_to=date_to,
+        severity=severity, a_type=a_type, status=status, page=page, total_pages=total_pages,
+        total=total, activity_types=activity_types, open_count=open_count,
+        high_open_count=high_open_count,
+    )
+
+
+@app.route("/audit/suspicious/<int:sid>/review", methods=["POST"])
+@role_required("admin")
+def suspicious_activity_review(sid):
+    """
+    Marks an event Reviewed and stores an optional investigation note.
+    The original record (timestamp, description, severity, etc.) is never
+    modified -- only the review metadata (status/reviewed_by/note/time) is
+    set, so the underlying audit evidence stays immutable. No delete route
+    exists for this table by design.
+    """
+    row = query_one("SELECT id FROM suspicious_activities WHERE id = ?", (sid,))
+    if not row:
+        abort(404)
+    note = (request.form.get("note") or "").strip()
+    admin = current_user()
+    execute(
+        "UPDATE suspicious_activities "
+        "SET status = 'Reviewed', reviewed_by = ?, review_note = ?, reviewed_at = CURRENT_TIMESTAMP "
+        "WHERE id = ?",
+        (admin["username"], note, sid),
+    )
+    fz.log_activity(
+        request, admin, "suspicious_activity_reviewed", "forensics",
+        f"administrator={admin['username']} suspicious_activity_id={sid} action=Marked Reviewed"
+    )
+    flash("Event marked as reviewed.", "success")
+    return redirect(url_for("suspicious_activity", **{k: v for k, v in request.args.items()}))
 
 
 @app.route("/audit/export/<kind>")
@@ -3601,6 +3785,92 @@ def student_analytics():
             pct = r["pct"] or 0
             heatmap[r["date"]] = "high" if pct >= 75 else ("mid" if pct >= 50 else "low")
 
+        # ── Institution-level analytics (Super Admin only) ────────────────
+        # Kept entirely separate from the faculty queries above — faculty
+        # behavior on this route is unchanged. Department/Semester filters
+        # (the two filters this module keeps) are respected for the
+        # headline numbers; the four comparison charts below are always
+        # institution-wide since their whole purpose is comparing across
+        # departments/courses.
+        total_students_count   = None
+        total_faculty_count    = None
+        total_departments_count = None
+        avg_cgpa                = None
+        overall_pass_pct        = None
+        dept_attendance         = []
+        cgpa_distribution       = []
+        dept_strength           = []
+        course_enrollment       = []
+
+        if u["role"] == "admin":
+            admin_parts, admin_params = [], []
+            if filter_dept:
+                admin_parts.append("department = ?"); admin_params.append(filter_dept)
+            if filter_sem:
+                admin_parts.append("year = ?"); admin_params.append((filter_sem + 1) // 2)
+            admin_where = ("WHERE " + " AND ".join(admin_parts)) if admin_parts else ""
+
+            total_students_count = query_one(
+                f"SELECT COUNT(*) c FROM students {admin_where}", admin_params)["c"]
+            total_faculty_count = query_one(
+                "SELECT COUNT(*) c FROM users WHERE role = 'faculty'")["c"]
+            total_departments_count = query_one(
+                "SELECT COUNT(DISTINCT department) c FROM students WHERE department != ''")["c"]
+            avg_cgpa = query_one(
+                f"SELECT ROUND(AVG(cgpa), 2) c FROM students {admin_where}"
+                f"{' AND' if admin_where else 'WHERE'} cgpa IS NOT NULL", admin_params)["c"]
+
+            result_parts, result_params = [], []
+            if filter_dept:
+                result_parts.append("s.department = ?"); result_params.append(filter_dept)
+            if filter_sem:
+                result_parts.append("r.semester = ?"); result_params.append(filter_sem)
+            result_where = ("WHERE " + " AND ".join(result_parts)) if result_parts else ""
+            overall_pass_pct = query_one(f"""
+                SELECT ROUND(100.0 * SUM(CASE WHEN r.status='pass' THEN 1 ELSE 0 END)
+                       / NULLIF(COUNT(*),0), 1) c
+                FROM results r JOIN students s ON s.id = r.student_id {result_where}
+            """, result_params)["c"]
+
+            # A. Attendance by Department
+            dept_attendance = [dict(r) for r in query_all("""
+                SELECT s.department AS department,
+                       ROUND(100.0 * SUM(CASE WHEN a.status='present' THEN 1 ELSE 0 END)
+                             / NULLIF(COUNT(*),0), 1) AS pct
+                FROM attendance a JOIN students s ON s.id = a.student_id
+                WHERE s.department != ''
+                GROUP BY s.department ORDER BY s.department
+            """)]
+
+            # B. Result Distribution by CGPA range
+            row = query_one(f"""
+                SELECT
+                  SUM(CASE WHEN cgpa > 9 THEN 1 ELSE 0 END) AS above_9,
+                  SUM(CASE WHEN cgpa >= 8 AND cgpa <= 9 THEN 1 ELSE 0 END) AS r_8_9,
+                  SUM(CASE WHEN cgpa >= 7 AND cgpa < 8 THEN 1 ELSE 0 END) AS r_7_8,
+                  SUM(CASE WHEN cgpa < 7 THEN 1 ELSE 0 END) AS below_7
+                FROM students {admin_where}{' AND' if admin_where else 'WHERE'} cgpa IS NOT NULL
+            """, admin_params)
+            cgpa_distribution = [
+                {"label": "CGPA > 9",   "count": row["above_9"] or 0},
+                {"label": "CGPA 8–9",   "count": row["r_8_9"] or 0},
+                {"label": "CGPA 7–8",   "count": row["r_7_8"] or 0},
+                {"label": "Below 7",    "count": row["below_7"] or 0},
+            ]
+
+            # C. Department-wise Student Strength
+            dept_strength = [dict(r) for r in query_all("""
+                SELECT department, COUNT(*) AS c FROM students
+                WHERE department != '' GROUP BY department ORDER BY department
+            """)]
+
+            # D. Course Enrollment Statistics
+            course_enrollment = [dict(r) for r in query_all("""
+                SELECT c.name, c.code, COUNT(e.student_id) AS c
+                FROM courses c LEFT JOIN enrollments e ON e.course_id = c.id
+                GROUP BY c.id ORDER BY c DESC LIMIT 12
+            """)]
+
         fz.log_activity(request, u, "view", "analytics",
                         f"filter={filter_label}")
 
@@ -3632,7 +3902,17 @@ def student_analytics():
                                all_courses=all_courses,
                                overall_pct=overall_pct,
                                total_students_in_filter=total_students_in_filter,
-                               top_defaulters=top_defaulters)
+                               top_defaulters=top_defaulters,
+                               # Super Admin institution-level extras
+                               total_students_count=total_students_count,
+                               total_faculty_count=total_faculty_count,
+                               total_departments_count=total_departments_count,
+                               avg_cgpa=avg_cgpa,
+                               overall_pass_pct=overall_pass_pct,
+                               dept_attendance=dept_attendance,
+                               cgpa_distribution=cgpa_distribution,
+                               dept_strength=dept_strength,
+                               course_enrollment=course_enrollment)
 
     fz.log_activity(request, u, "view", "analytics")
 
@@ -3657,6 +3937,114 @@ def student_analytics():
                            overall_pct=None,
                            total_students_in_filter=0,
                            top_defaulters=[])
+
+
+# ============================================================================
+# Institution Analytics — Reports (Super Admin only)
+# Read-only exports of the same institution-level numbers shown on
+# /analytics for admin. Reuses the app's existing CSV (csv/io/Response) and
+# PDF (_PDF_ENGINE_AVAILABLE / _render_pdf) export patterns — same as
+# low_attendance_export / attendance_export_pdf — rather than introducing a
+# new export mechanism.
+# ============================================================================
+def _institution_summary():
+    total_students = query_one("SELECT COUNT(*) c FROM students")["c"]
+    total_faculty  = query_one("SELECT COUNT(*) c FROM users WHERE role='faculty'")["c"]
+    total_depts    = query_one("SELECT COUNT(DISTINCT department) c FROM students WHERE department != ''")["c"]
+    avg_cgpa       = query_one("SELECT ROUND(AVG(cgpa),2) c FROM students WHERE cgpa IS NOT NULL")["c"]
+    overall_att    = query_one(
+        "SELECT ROUND(100.0*SUM(CASE WHEN status='present' THEN 1 ELSE 0 END)/NULLIF(COUNT(*),0),1) c "
+        "FROM attendance")["c"]
+    pass_pct       = query_one(
+        "SELECT ROUND(100.0*SUM(CASE WHEN status='pass' THEN 1 ELSE 0 END)/NULLIF(COUNT(*),0),1) c "
+        "FROM results")["c"]
+    return {
+        "total_students": total_students, "total_faculty": total_faculty,
+        "total_departments": total_depts, "avg_cgpa": avg_cgpa,
+        "overall_attendance": overall_att, "overall_pass_pct": pass_pct,
+    }
+
+
+def _department_breakdown():
+    return query_all("""
+        SELECT s.department AS department,
+               COUNT(DISTINCT s.id) AS total_students,
+               ROUND(AVG(s.cgpa), 2) AS avg_cgpa,
+               ROUND(100.0 * SUM(CASE WHEN a.status='present' THEN 1 ELSE 0 END)
+                     / NULLIF(COUNT(a.id),0), 1) AS attendance_pct
+        FROM students s
+        LEFT JOIN attendance a ON a.student_id = s.id
+        WHERE s.department != ''
+        GROUP BY s.department ORDER BY s.department
+    """)
+
+
+@app.route("/analytics/export/csv")
+@role_required("admin")
+def analytics_export_csv():
+    """University Analytics Report — institution-wide summary, CSV."""
+    import csv, io
+    summary = _institution_summary()
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Metric", "Value"])
+    w.writerow(["Total Students", summary["total_students"]])
+    w.writerow(["Total Faculty", summary["total_faculty"]])
+    w.writerow(["Total Departments", summary["total_departments"]])
+    w.writerow(["Overall Attendance (%)", summary["overall_attendance"]])
+    w.writerow(["Average CGPA", summary["avg_cgpa"]])
+    w.writerow(["Overall Pass Percentage (%)", summary["overall_pass_pct"]])
+    fz.log_activity(request, current_user(), "export_csv", "analytics", "university_analytics_report")
+    return Response(buf.getvalue(), headers={
+        "Content-Disposition": 'attachment; filename="university_analytics_report.csv"',
+        "Content-Type": "text/csv",
+    })
+
+
+@app.route("/analytics/export/dept-csv")
+@role_required("admin")
+def analytics_export_dept_csv():
+    """Department-wise Report — one row per department, CSV."""
+    import csv, io
+    rows = _department_breakdown()
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Department", "Total Students", "Average CGPA", "Attendance (%)"])
+    for r in rows:
+        w.writerow([r["department"], r["total_students"], r["avg_cgpa"], r["attendance_pct"]])
+    fz.log_activity(request, current_user(), "export_csv", "analytics", "department_wise_report")
+    return Response(buf.getvalue(), headers={
+        "Content-Disposition": 'attachment; filename="department_wise_report.csv"',
+        "Content-Type": "text/csv",
+    })
+
+
+@app.route("/analytics/export/pdf")
+@role_required("admin")
+def analytics_export_pdf():
+    """University Analytics Report — institution-wide summary, PDF."""
+    if not _PDF_ENGINE_AVAILABLE:
+        flash("PDF export is not available. Run: pip install xhtml2pdf", "error")
+        return redirect(url_for("student_analytics"))
+
+    summary = _institution_summary()
+    departments = _department_breakdown()
+    try:
+        html = render_template("pdf_analytics.html", summary=summary, departments=departments)
+    except Exception as e:
+        print(f"[PDF] Template render error: {e}")
+        flash("Error generating PDF. Template error.", "error")
+        return redirect(url_for("student_analytics"))
+
+    pdf_bytes = _render_pdf(html)
+    if pdf_bytes is None:
+        flash("Could not generate the PDF. Please try again.", "error")
+        return redirect(url_for("student_analytics"))
+
+    fz.log_activity(request, current_user(), "export_pdf", "analytics", "university_analytics_report")
+    resp = Response(pdf_bytes, mimetype="application/pdf")
+    resp.headers["Content-Disposition"] = 'attachment; filename="university_analytics_report.pdf"'
+    return resp
 
 
 # ============================================================================

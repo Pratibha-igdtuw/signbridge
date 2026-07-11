@@ -245,7 +245,7 @@
        buttons. NOTE: the sidebar (#sidebar) also uses .bg-ink for its own,
        intentionally near-black background — exclude it so this only
        affects buttons, not the sidebar / its submenu contrast. */
-    [data-theme="dark"] .bg-ink:not(#sidebar) {
+    [data-theme="dark"] .bg-ink:not(#sidebar):not(#login-brand-panel) {
       background-color: #2b3a55 !important;
     }
     [data-theme="dark"] #sidebar.bg-ink {
@@ -538,6 +538,13 @@
                 {{ 'nav-active' if request.endpoint == 'audit_alerts' else '' }}">
             <span class="flex items-center gap-2">⚠️ Injection Alerts</span>
             <span id="alert-badge" class="hidden badge-pulse bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center"></span>
+          </a>
+          <a href="{{ url_for('suspicious_activity') }}" class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
+                {{ 'nav-active' if request.endpoint == 'suspicious_activity' else '' }}">
+            <span class="flex items-center gap-2">🕵️ Suspicious Activity</span>
+            {% if open_suspicious_count %}
+            <span class="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">{{ open_suspicious_count }}</span>
+            {% endif %}
           </a>
         </div>
       </details>

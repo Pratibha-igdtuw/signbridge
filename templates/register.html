@@ -21,20 +21,20 @@
       <div>
         <label class="block text-sm font-medium text-steel mb-1">Full name</label>
         <input name="full_name" value="{{ form.full_name or '' }}" required
-               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+               class="w-full rounded-md border border-slate-300 bg-white text-ink px-3 py-2 text-sm
                       focus:border-signal focus:ring-1 focus:ring-signal outline-none">
       </div>
       <div>
         <label class="block text-sm font-medium text-steel mb-1">Username</label>
         <input name="username" value="{{ form.username or '' }}" required
-               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+               class="w-full rounded-md border border-slate-300 bg-white text-ink px-3 py-2 text-sm
                       focus:border-signal focus:ring-1 focus:ring-signal outline-none">
       </div>
       <div>
         <label class="block text-sm font-medium text-steel mb-1">Email</label>
         <input name="email" type="email" value="{{ form.email or '' }}" required
                placeholder="yourname@igdtuw.ac.in"
-               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+               class="w-full rounded-md border border-slate-300 bg-white text-ink px-3 py-2 text-sm
                       focus:border-signal focus:ring-1 focus:ring-signal outline-none">
         <p class="text-xs text-slate-400 mt-1">Must be your IGDTUW college email (@igdtuw.ac.in)</p>
       </div>
@@ -42,7 +42,7 @@
         <label class="block text-sm font-medium text-steel mb-1">Password</label>
         <div class="relative">
           <input id="pw" name="password" type="password" required
-                 class="w-full rounded-md border border-slate-300 px-3 py-2 pr-10 text-sm
+                 class="w-full rounded-md border border-slate-300 bg-white text-ink px-3 py-2 pr-10 text-sm
                         focus:border-signal focus:ring-1 focus:ring-signal outline-none">
           <button type="button" onclick="toggleEye('pw','eye-reg')"
                   class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">

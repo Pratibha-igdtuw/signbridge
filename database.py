@@ -802,6 +802,55 @@ def migrate_v8(conn):
     conn.commit()
 
 
+def migrate_v9(conn):
+    """
+    v9: creates 'suspicious_activities' -- the Suspicious Activity module
+    under Forensics. Reuses the same audit-trail spirit as activity_logs /
+    login_history / injection_alerts (append-only, never deleted), but adds
+    a severity + review workflow (Open/Reviewed) since these events need a
+    human admin to triage them, unlike the other read-only logs.
+    Idempotent (CREATE TABLE IF NOT EXISTS, same pattern as init_db).
+    """
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS suspicious_activities (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp     DATETIME DEFAULT CURRENT_TIMESTAMP,
+            user_id       INTEGER,
+            username      TEXT,
+            role          TEXT,
+            ip_address    TEXT,
+            activity_type TEXT NOT NULL,
+            description   TEXT,
+            severity      TEXT NOT NULL DEFAULT 'Medium'
+                              CHECK(severity IN ('Low','Medium','High')),
+            action_taken  TEXT NOT NULL DEFAULT 'Blocked'
+                              CHECK(action_taken IN ('Blocked','Allowed','Warning')),
+            status        TEXT NOT NULL DEFAULT 'Open'
+                              CHECK(status IN ('Open','Reviewed')),
+            reviewed_by   TEXT,
+            review_note   TEXT,
+            reviewed_at   DATETIME
+        )
+    """)
+    conn.commit()
+
+
+def migrate_v10(conn):
+    """
+    v10: adds 'approved_at' to users so the Admin Dashboard's Today's Summary
+    widget can report "Faculty Accounts Approved Today" from real data
+    (status/is_active alone don't carry a timestamp of *when* the approval
+    happened). Idempotent (try/except, same pattern as migrate_v3).
+    """
+    cur = conn.cursor()
+    try:
+        cur.execute("ALTER TABLE users ADD COLUMN approved_at DATETIME")
+    except Exception:
+        pass  # column already exists
+    conn.commit()
+
+
 def seed_access_manager():
     """
     Seed one Access Manager demo account, separately from seed() — seed()

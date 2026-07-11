@@ -18,6 +18,7 @@ import jwt
 from flask import session, redirect, url_for, flash, request, jsonify, abort
 
 from config import Config
+import forensics as fz
 
 
 # ----------------------------- JWT helpers ----------------------------------
@@ -94,6 +95,17 @@ def role_required(*roles):
                 flash("You must change your password before continuing.", "error")
                 return redirect(url_for("profile"))
             if session.get("role") not in roles:
+                actor = {
+                    "id": session.get("user_id"),
+                    "username": session.get("username"),
+                    "role": session.get("role"),
+                }
+                fz.record_suspicious_activity(
+                    request, actor, "Unauthorized Route Access",
+                    f"Unauthorized Role-based Access Attempt "
+                    f"(role={actor['role']!r} tried to access {request.path}).",
+                    "High", "Blocked", dedup_minutes=5,
+                )
                 flash("You do not have permission to access that page.", "error")
                 role = session.get("role")
                 if role == "student":

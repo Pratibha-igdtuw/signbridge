@@ -6,7 +6,7 @@ import csv
 import hashlib
 import io
 
-from database import execute, query_all
+from database import execute, query_all, query_one
 from security import looks_like_injection
 
 
@@ -82,8 +82,56 @@ def record_injection_alert(request, user, field, payload):
 def guard_input(request, user, field, value):
     if value and looks_like_injection(value):
         record_injection_alert(request, user or {}, field, value)
+        record_suspicious_activity(
+            request, user, "SQL Injection Attempt",
+            f"Blocked SQL Injection Attempt (field: {field}).",
+            "High", "Blocked", dedup_minutes=0,
+        )
         return True
     return False
+
+
+# ----------------------------------------------------------------------------
+# Suspicious Activity module
+# ----------------------------------------------------------------------------
+def _recent_duplicate_exists(activity_type, username, minutes):
+    if not minutes:
+        return False
+    row = query_one(
+        "SELECT id FROM suspicious_activities WHERE activity_type = ? AND username = ? "
+        "AND status = 'Open' AND timestamp >= datetime('now', ?) LIMIT 1",
+        (activity_type, username, f"-{minutes} minutes"),
+    )
+    return row is not None
+
+
+def record_suspicious_activity(request, user, activity_type, description, severity,
+                               action_taken="Blocked", dedup_minutes=0):
+    """
+    Insert a Suspicious Activity record. `dedup_minutes` suppresses repeat
+    inserts of the *same* activity_type + username within that many minutes,
+    so a single ongoing incident (e.g. someone hammering a locked account)
+    doesn't flood the table with near-duplicate rows -- each distinct
+    incident is still recorded once. Pass 0 to always insert (e.g. for
+    SQL injection attempts, where every blocked payload matters).
+    """
+    try:
+        username = (user.get("username") if user else None) or "anonymous"
+        role = user.get("role") if user else None
+        if _recent_duplicate_exists(activity_type, username, dedup_minutes):
+            return
+        execute(
+            "INSERT INTO suspicious_activities "
+            "(user_id, username, role, ip_address, activity_type, description, severity, action_taken) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                user.get("id") if user else None,
+                username, role, _client_ip(request),
+                activity_type, description, severity, action_taken,
+            ),
+        )
+    except Exception:
+        pass
 
 
 _EXPORTS = {

@@ -3,6 +3,22 @@
 {% block heading %}Dashboard{% endblock %}
 {% block content %}
 
+{% if user.role == 'admin' %}
+<p class="text-xs text-slate-400 -mt-2 mb-4">Super Admin Dashboard – Monitor system health, security events, academic configuration, and overall platform operations.</p>
+{% endif %}
+
+{% if user.role == 'admin' and high_open_count and high_open_count > 0 %}
+<a href="{{ url_for('suspicious_activity', severity='High', status='Open') }}"
+   class="block mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition">
+  <div class="flex items-center justify-between">
+    <span class="text-sm font-semibold text-red-700">
+      ⚠ {{ high_open_count }} High Severity Security Event{{ 's' if high_open_count != 1 else '' }} Require{{ '' if high_open_count != 1 else 's' }} Review
+    </span>
+    <span class="text-xs text-red-600 underline whitespace-nowrap">View Suspicious Activity →</span>
+  </div>
+</a>
+{% endif %}
+
 <!-- Stat cards — admin, faculty, and access_manager each get their own set -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
   {% macro stat(label, value, accent) %}
@@ -11,23 +27,37 @@
       <div class="text-3xl font-semibold mt-2 {{ accent }}">{{ value }}</div>
     </div>
   {% endmacro %}
-  {{ stat('Students', stats.students, 'text-ink') }}
-  {{ stat('Logins Today', stats.logins_today, 'text-signal') }}
   {% if user.role == 'admin' %}
-    {{ stat('System Users', stats.users, 'text-ink') }}
-    {{ stat('Injection Alerts', stats.alerts, 'text-alert' if stats.alerts else 'text-ink') }}
+    {# Super Admin: system administration + security oversight, not IAM #}
+    {{ stat('Total Students', stats.students, 'text-ink') }}
+    {{ stat('Total Faculty', stats.faculty, 'text-ink') }}
+    {{ stat('Active System Users', stats.active_users, 'text-ink') }}
+    {{ stat('Security Alerts', stats.alerts, 'text-alert' if stats.alerts else 'text-ink') }}
   {% elif user.role == 'access_manager' %}
+    {{ stat('Students', stats.students, 'text-ink') }}
+    {{ stat('Logins Today', stats.logins_today, 'text-signal') }}
     {# Access Manager owns Identity & Access Management — show IAM-relevant
        counts (total users, pending approvals), never security-internal
        stats like injection alerts, and never student self-service stats. #}
     {{ stat('System Users', stats.users, 'text-ink') }}
     {{ stat('Pending Approvals', stats.pending, 'text-alert' if stats.pending else 'text-ink') }}
   {% else %}
+    {{ stat('Students', stats.students, 'text-ink') }}
+    {{ stat('Logins Today', stats.logins_today, 'text-signal') }}
     {# Faculty sees subject/assignment counts instead of internal security stats #}
     {{ stat('Assignments', stats.assignments, 'text-ink') }}
     {{ stat('Subjects Tracked', stats.subjects, 'text-ink') }}
   {% endif %}
 </div>
+
+{% if user.role == 'admin' %}
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+  {{ stat('Locked Accounts', locked_count, 'text-alert' if locked_count else 'text-ink') }}
+  {{ stat('Failed Logins Today', stats.failed_today, 'text-alert' if stats.failed_today else 'text-ink') }}
+  {{ stat('Active Notices', stats.active_notices, 'text-ink') }}
+  {{ stat('Pending Grievances', open_grievances, 'text-alert' if open_grievances else 'text-ink') }}
+</div>
+{% endif %}
 
 <!-- Locked accounts — ADMIN & ACCESS MANAGER (both can unlock accounts) -->
 {% if user.role in ('admin', 'access_manager') and locked_count > 0 %}
@@ -37,11 +67,60 @@
 </div>
 {% endif %}
 
-<!-- Low attendance summary — shown to admin & faculty only.
-     Access Manager doesn't manage academic data (attendance is a Faculty/
-     Admin concern per the IAM vs academic-ops split), so it's intentionally
-     excluded here rather than falling into a generic "else" branch. -->
-{% if low_att and user.role in ('admin', 'faculty') %}
+<!-- System Health & Security Overview — SUPER ADMIN ONLY. Replaces the
+     academic "low attendance" table on this role's dashboard: attendance
+     management belongs to Faculty, while system health/security oversight
+     belongs to the Super Admin. -->
+{% if user.role == 'admin' and health %}
+<div class="mt-4 bg-white rounded-lg border border-slate-200 p-5">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-sm font-semibold text-ink">🖥️ System Health &amp; Security Overview</h2>
+    <a href="{{ url_for('audit_activity') }}" class="text-xs bg-signal hover:bg-teal-700 text-white px-3 py-1.5 rounded-md transition">View Security Dashboard →</a>
+  </div>
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="px-3 py-2.5 rounded-md bg-slate-50 border border-slate-100">
+      <div class="text-[10px] uppercase text-slate-400 font-semibold">Database Connection</div>
+      <div class="text-sm font-semibold mt-1 text-teal-600">✔ {{ health.db_status }}</div>
+    </div>
+    <div class="px-3 py-2.5 rounded-md bg-slate-50 border border-slate-100">
+      <div class="text-[10px] uppercase text-slate-400 font-semibold">Audit Trail</div>
+      <div class="text-sm font-semibold mt-1 {{ 'text-teal-600' if health.audit_trail_status == 'Active' else 'text-alert' }}">
+        {{ '✔' if health.audit_trail_status == 'Active' else '⚠' }} {{ health.audit_trail_status }}
+      </div>
+    </div>
+    <div class="px-3 py-2.5 rounded-md bg-slate-50 border border-slate-100">
+      <div class="text-[10px] uppercase text-slate-400 font-semibold">Backup Status</div>
+      <div class="text-sm font-semibold mt-1 text-amber-600">⚠ {{ health.backup_status }}</div>
+    </div>
+    <div class="px-3 py-2.5 rounded-md bg-slate-50 border border-slate-100">
+      <div class="text-[10px] uppercase text-slate-400 font-semibold">Active Sessions</div>
+      <div class="text-sm font-semibold mt-1 text-ink">{{ health.active_sessions }}</div>
+    </div>
+    <div class="px-3 py-2.5 rounded-md bg-slate-50 border border-slate-100">
+      <div class="text-[10px] uppercase text-slate-400 font-semibold">Locked Accounts</div>
+      <div class="text-sm font-semibold mt-1 {{ 'text-alert' if health.locked_accounts else 'text-ink' }}">{{ health.locked_accounts }}</div>
+    </div>
+    <div class="px-3 py-2.5 rounded-md bg-slate-50 border border-slate-100">
+      <div class="text-[10px] uppercase text-slate-400 font-semibold">Failed Login Attempts</div>
+      <div class="text-sm font-semibold mt-1 {{ 'text-alert' if health.failed_logins else 'text-ink' }}">{{ health.failed_logins }}</div>
+    </div>
+    <div class="px-3 py-2.5 rounded-md bg-slate-50 border border-slate-100">
+      <div class="text-[10px] uppercase text-slate-400 font-semibold">SQL Injection Attempts Blocked</div>
+      <div class="text-sm font-semibold mt-1 {{ 'text-alert' if health.sql_injection_blocked else 'text-ink' }}">{{ health.sql_injection_blocked }}</div>
+    </div>
+    <a href="{{ url_for('suspicious_activity', status='Open') }}"
+       class="px-3 py-2.5 rounded-md bg-slate-50 border border-slate-100 hover:border-signal transition block">
+      <div class="text-[10px] uppercase text-slate-400 font-semibold">Suspicious Activities Detected</div>
+      <div class="text-sm font-semibold mt-1 {{ 'text-alert' if health.suspicious_activities else 'text-ink' }}">{{ health.suspicious_activities }} <span class="text-[10px] font-normal text-slate-400">open</span></div>
+    </a>
+  </div>
+</div>
+{% endif %}
+
+<!-- Low attendance summary — FACULTY ONLY. Attendance is a Faculty concern;
+     Super Admin now sees System Health & Security above instead, and
+     Access Manager doesn't manage academic data (IAM vs academic-ops split). -->
+{% if low_att and user.role == 'faculty' %}
 <div class="mt-4 px-4 py-3 bg-red-50 border border-red-200 rounded-md">
   <div class="flex items-center justify-between mb-2">
     <p class="text-sm font-semibold text-red-700">📉 Students Below 75% Attendance (top 10)</p>
@@ -70,7 +149,24 @@
 
 <!-- Quick-links row -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
-  {% if user.role in ('admin','faculty') %}
+  {% if user.role == 'admin' %}
+    {# Super Admin: system administration + academic configuration.
+       No User Accounts / Role Management / Password Reset / Student
+       Information / Bulk Upload / Pending Approvals here -- those are
+       Access Manager territory (separation of duties). #}
+    <a href="{{ url_for('courses') }}"       class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
+      <span class="text-2xl">📚</span><div><div class="text-xs text-slate-400">Courses</div><div class="font-semibold text-ink text-sm">Manage Courses</div></div>
+    </a>
+    <a href="{{ url_for('syllabus.admin_index') }}" class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
+      <span class="text-2xl">🏛️</span><div><div class="text-xs text-slate-400">Academic Structure</div><div class="font-semibold text-ink text-sm">Manage Departments</div></div>
+    </a>
+    <a href="{{ url_for('syllabus.admin_index') }}" class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
+      <span class="text-2xl">📖</span><div><div class="text-xs text-slate-400">Scheme &amp; Syllabus</div><div class="font-semibold text-ink text-sm">Manage Syllabus</div></div>
+    </a>
+    <a href="{{ url_for('files') }}"         class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
+      <span class="text-2xl">🗂️</span><div><div class="text-xs text-slate-400">Files</div><div class="font-semibold text-ink text-sm">File Manager</div></div>
+    </a>
+  {% elif user.role in ('faculty',) %}
     <a href="{{ url_for('notices') }}"      class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
       <span class="text-2xl">📢</span><div><div class="text-xs text-slate-400">Notices</div><div class="font-semibold text-ink text-sm">Post / View</div></div>
     </a>
@@ -189,6 +285,37 @@
     </table>
   </div>
 </div>
+
+{% if user.role == 'admin' and today_summary %}
+<!-- Today's Summary — SUPER ADMIN ONLY, below the Students by Department chart.
+     Replaces the old Role Distribution section. Every figure is a live
+     COUNT(*) from the DB for "today"; clicking a row jumps to that module. -->
+<div class="bg-white rounded-lg border border-slate-200 p-5 mt-5">
+  <h2 class="text-sm font-semibold text-ink mb-4">Today's Summary</h2>
+  <div class="divide-y divide-slate-100">
+    <a href="{{ url_for('students') }}" class="flex items-center justify-between py-2.5 hover:bg-slate-50 -mx-2 px-2 rounded transition">
+      <span class="text-sm text-slate-600">✓ New Student Registrations</span>
+      <span class="text-sm font-semibold text-ink">{{ today_summary.students_today }}</span>
+    </a>
+    <a href="{{ url_for('pending_users') }}" class="flex items-center justify-between py-2.5 hover:bg-slate-50 -mx-2 px-2 rounded transition">
+      <span class="text-sm text-slate-600">✓ Faculty Approved</span>
+      <span class="text-sm font-semibold text-ink">{{ today_summary.faculty_approved_today }}</span>
+    </a>
+    <a href="{{ url_for('notices') }}" class="flex items-center justify-between py-2.5 hover:bg-slate-50 -mx-2 px-2 rounded transition">
+      <span class="text-sm text-slate-600">✓ Notices Published</span>
+      <span class="text-sm font-semibold text-ink">{{ today_summary.notices_today }}</span>
+    </a>
+    <a href="{{ url_for('leaves') }}" class="flex items-center justify-between py-2.5 hover:bg-slate-50 -mx-2 px-2 rounded transition">
+      <span class="text-sm text-slate-600">✓ Leaves Pending</span>
+      <span class="text-sm font-semibold {{ 'text-alert' if today_summary.leaves_pending else 'text-ink' }}">{{ today_summary.leaves_pending }}</span>
+    </a>
+    <a href="{{ url_for('suspicious_activity') }}" class="flex items-center justify-between py-2.5 hover:bg-slate-50 -mx-2 px-2 rounded transition">
+      <span class="text-sm text-slate-600">✓ Security Breaches</span>
+      <span class="text-sm font-semibold {{ 'text-alert' if today_summary.breaches_today else 'text-ink' }}">{{ today_summary.breaches_today }}</span>
+    </a>
+  </div>
+</div>
+{% endif %}
 
 <!-- Failed logins — ADMIN & ACCESS MANAGER (both need visibility into
      failed sign-in attempts for IAM/security purposes; backend already
