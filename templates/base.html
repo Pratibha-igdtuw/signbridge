@@ -489,26 +489,13 @@
 
       <details class="sidebar-dropdown">
         <summary>
-          <span class="flex items-center gap-2">💰 Finance & Users</span>
+          <span class="flex items-center gap-2">💰 Finance</span>
           <span class="arrow">⌄</span>
         </summary>
         <div class="submenu">
           {{ nav('fee_status', 'Fee Status', '💰') }}
           {{ nav('courses', 'Courses & Enrollment', '📚') }}
-          {{ nav('bulk_upload_students', 'Bulk Student Upload', '📥') }}
           {{ nav('files', 'File Manager', '📁') }}
-          {{ nav('users_list', 'User Accounts', '🛡️') }}
-          {{ nav('role_management', 'Role Management', '🧩') }}
-          {{ nav('password_reset', 'Password Reset', '🔑') }}
-          {% if has_endpoint('pending_users') %}
-          <a href="{{ url_for('pending_users') }}" class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
-                {{ 'nav-active' if request.endpoint == 'pending_users' else '' }}">
-            <span class="flex items-center gap-2">⏳ Pending Approvals</span>
-            {% if pending_count > 0 %}
-            <span class="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">{{ pending_count }}</span>
-            {% endif %}
-          </a>
-          {% endif %}
         </div>
       </details>
 
@@ -709,7 +696,7 @@
         <h1 class="text-lg sm:text-xl font-semibold text-ink truncate">{% block heading %}{% endblock %}</h1>
       </div>
       <div class="flex items-center gap-3 shrink-0">
-        {% if user and user.role == 'admin' and pending_count > 0 and has_endpoint('pending_users') %}
+        {% if user and user.role == 'access_manager' and pending_count > 0 and has_endpoint('pending_users') %}
         <a href="{{ url_for('pending_users') }}"
            class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-800 text-xs font-medium rounded-full hover:bg-amber-200 transition">
           <span>⏳</span> {{ pending_count }} pending approval{{ 's' if pending_count != 1 else '' }}

@@ -178,8 +178,12 @@
             <div id="menu-{{ s.id }}"
                  class="hidden absolute right-4 mt-1 w-56 bg-white border border-slate-200 rounded-lg
                         shadow-lg z-20 text-left overflow-hidden">
-              <a href="{{ url_for('student_profile', sid=s.id) }}"
+              <a href="{{ url_for('student_edit_info', sid=s.id) }}"
                  class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                ✏️ Edit Student Information
+              </a>
+              <a href="{{ url_for('student_profile', sid=s.id) }}"
+                 class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 border-t border-slate-100">
                 👁️ View Student Profile
               </a>
               {% if s.acct_user_id %}

@@ -890,6 +890,26 @@ def migrate_v12(conn):
     conn.commit()
 
 
+def migrate_v13(conn):
+    """
+    v13: adds 'status' to students -- the Student Status field (Active /
+    Suspended / Graduated) shown in the Access Manager's "Edit Student
+    Information" feature. This is deliberately separate from
+    users.status (login-account status: active/suspended/pending), which
+    already powers the existing account Suspend/Activate actions on the
+    Users page -- this column instead tracks the *student record's*
+    standing (e.g. a graduated student whose login may still exist for
+    records access). Idempotent (try/except, same pattern as migrate_v3).
+    """
+    cur = conn.cursor()
+    try:
+        cur.execute("ALTER TABLE students ADD COLUMN status TEXT DEFAULT 'Active'")
+    except Exception:
+        pass  # column already exists
+    cur.execute("UPDATE students SET status='Active' WHERE status IS NULL")
+    conn.commit()
+
+
 def seed_access_manager():
     """
     Seed one Access Manager demo account, separately from seed() — seed()
@@ -931,4 +951,5 @@ if __name__ == "__main__":
     backfill_user_id()
     seed_timetable()
     migrate_v3(get_connection())
+    migrate_v13(get_connection())
     print("Database initialized and seeded at", Config.DB_PATH)

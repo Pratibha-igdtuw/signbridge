@@ -164,6 +164,7 @@ db.migrate_v9(_migration_conn)  # suspicious_activities table (Forensics)
 db.migrate_v10(_migration_conn) # approved_at column (Today's Summary widget)
 db.migrate_v11(_migration_conn) # normalize AI&ML -> AIML department code
 db.migrate_v12(_migration_conn) # fix 3 stale students: year/department mismatch
+db.migrate_v13(_migration_conn) # status column on students (Edit Student Information)
 _migration_conn.close()
 db.seed()
 db.seed_extras()
@@ -202,7 +203,7 @@ This link expires in 30 minutes.
 def inject_user():
     u = current_user()
     pending_count = 0
-    if u and u["role"] in ("admin", "access_manager"):
+    if u and u["role"] == "access_manager":
         try:
             row = db.query_one("SELECT COUNT(*) AS c FROM users WHERE status = 'pending'")
             pending_count = row["c"] if row else 0
@@ -598,42 +599,58 @@ def profile():
     return render_template("profile.html", user_db=user_db)
 
 
+def _safe_next_redirect(default_endpoint, **default_kwargs):
+    """
+    Reads an optional 'next' field from the form/query string and redirects
+    there if it's a safe same-site path; otherwise falls back to the given
+    default endpoint. Lets shared routes (lock/unlock/reset-password) be
+    triggered from more than one page (Users Accounts, Student Profile...)
+    without duplicating their logic.
+    """
+    nxt = request.form.get("next") or request.args.get("next")
+    if nxt and nxt.startswith("/") and not nxt.startswith("//"):
+        return redirect(nxt)
+    return redirect(url_for(default_endpoint, **default_kwargs))
+
+
 # ============================================================================
 # Admin & Access Manager: lock / unlock user accounts
 # ============================================================================
 @app.route("/users/<int:uid>/lock", methods=["POST"])
-@role_required("admin", "access_manager")
+@role_required("access_manager")
 def user_lock(uid):
     me = current_user()
+    reason = (request.form.get("reason") or "").strip()
     if uid == me["id"]:
         flash("You cannot lock your own account.", "error")
-        return redirect(url_for("users_list"))
+        return _safe_next_redirect("users_list")
 
     user = query_one("SELECT username, role, is_active FROM users WHERE id = ?", (uid,))
     if not user:
         abort(404)
     if not user["is_active"]:
         flash(f"Account '{user['username']}' is already locked.", "error")
-        return redirect(url_for("users_list"))
+        return _safe_next_redirect("users_list")
     if user["role"] == "admin":
         admin_count = query_one("SELECT COUNT(*) c FROM users WHERE role = 'admin'")["c"]
         if admin_count <= 1:
             flash("Cannot lock this account — at least one Super Admin "
                   "must remain active in the system.", "error")
-            return redirect(url_for("users_list"))
+            return _safe_next_redirect("users_list")
 
     execute("UPDATE users SET is_active = 0 WHERE id = ?", (uid,))
     fz.log_activity(
         request, me, "account_locked", "auth",
         f"administrator={me['username']} target={user['username']} "
         f"action=Account Locked previous_status=Active new_status=Locked"
+        + (f" reason={reason!r}" if reason else "")
     )
     flash(f"Account '{user['username']}' has been locked.", "success")
-    return redirect(url_for("users_list"))
+    return _safe_next_redirect("users_list")
 
 
 @app.route("/users/<int:uid>/unlock", methods=["POST"])
-@role_required("admin", "access_manager")
+@role_required("access_manager")
 def user_unlock(uid):
     me = current_user()
     user = query_one("SELECT username, is_active FROM users WHERE id = ?", (uid,))
@@ -641,7 +658,7 @@ def user_unlock(uid):
         abort(404)
     if user["is_active"]:
         flash(f"Account '{user['username']}' is already active.", "error")
-        return redirect(url_for("users_list"))
+        return _safe_next_redirect("users_list")
 
     execute("UPDATE users SET is_active = 1 WHERE id = ?", (uid,))
     fz.log_activity(
@@ -650,11 +667,11 @@ def user_unlock(uid):
         f"action=Account Unlocked previous_status=Locked new_status=Active"
     )
     flash(f"Account '{user['username']}' has been unlocked.", "success")
-    return redirect(url_for("users_list"))
+    return _safe_next_redirect("users_list")
 
 
 @app.route("/users")
-@role_required("admin", "access_manager") 
+@role_required("access_manager") 
 def users_list():
     users = query_all("""
     SELECT id, username, full_name, role, email, is_active, status, created_at
@@ -677,7 +694,7 @@ def users_list():
 # Manager's Password Reset feature.
 # ============================================================================
 @app.route("/users/<int:uid>/edit", methods=["GET", "POST"])
-@role_required("admin", "access_manager")
+@role_required("access_manager")
 def user_edit(uid):
     target = query_one("SELECT * FROM users WHERE id = ?", (uid,))
     if not target:
@@ -740,7 +757,7 @@ ROLE_LABELS = {
 
 
 @app.route("/users/roles")
-@role_required("admin", "access_manager")
+@role_required("access_manager")
 def role_management():
     users = query_all("""
     SELECT id, username, full_name, role, email
@@ -758,7 +775,7 @@ def role_management():
 
 
 @app.route("/users/<int:uid>/role", methods=["POST"])
-@role_required("admin", "access_manager")
+@role_required("access_manager")
 def update_user_role(uid):
     new_role = (request.form.get("new_role") or "").strip()
     target = query_one("SELECT id, username, role FROM users WHERE id = ?", (uid,))
@@ -817,7 +834,7 @@ def _generate_temp_password(length=12):
 
 
 @app.route("/users/password-reset")
-@role_required("admin", "access_manager")
+@role_required("access_manager")
 def password_reset():
     q = (request.args.get("q") or "").strip()
     results = []
@@ -834,7 +851,7 @@ def password_reset():
 
 
 @app.route("/users/<int:uid>/reset-password", methods=["POST"])
-@role_required("admin", "access_manager")
+@role_required("access_manager")
 def admin_reset_password(uid):
     q = request.form.get("q") or ""
     target = query_one("SELECT id, username, full_name FROM users WHERE id = ?", (uid,))
@@ -844,13 +861,13 @@ def admin_reset_password(uid):
     mode = request.form.get("mode")  # "manual" or "generate"
     force_change = 1 if request.form.get("force_change") == "on" else 0
 
-    if mode == "generate":
+    if mode == "generate" or not mode:
         new_password = _generate_temp_password()
     else:
         new_password = request.form.get("temp_password") or ""
         if len(new_password) < 8:
             flash("Temporary password must be at least 8 characters.", "error")
-            return redirect(url_for("password_reset", q=q))
+            return _safe_next_redirect("password_reset", q=q)
 
     # Hash using the same password hashing implementation used everywhere
     # else in the app (Werkzeug PBKDF2 via generate_password_hash).
@@ -870,7 +887,7 @@ def admin_reset_password(uid):
     flash(f"Password for '{target['username']}' has been reset to: {new_password}"
           + (" — the user must change it on next login." if force_change else "")
           + " Share this securely; it will not be shown again.", "success")
-    return redirect(url_for("password_reset", q=q))
+    return _safe_next_redirect("password_reset", q=q)
 
 
 # ============================================================================
@@ -1398,7 +1415,7 @@ def verify_2fa():
 
 # ── Registration Approval (Admin only) ────────────────────────────────────
 @app.route("/users/pending")
-@role_required("admin","access_manager")
+@role_required("access_manager")
 def pending_users():
     try:
         users = query_all(
@@ -1420,7 +1437,7 @@ def pending_users():
 
 
 @app.route("/users/<int:uid>/approve", methods=["POST"])
-@role_required("admin","access_manager")
+@role_required("access_manager")
 def user_approve(uid):
     user = query_one("SELECT * FROM users WHERE id=?", (uid,))
     if not user:
@@ -1439,7 +1456,7 @@ def user_approve(uid):
 
 
 @app.route("/users/<int:uid>/suspend", methods=["POST"])
-@role_required("admin","access_manager")
+@role_required("access_manager")
 def user_suspend(uid):
     me = current_user()
     if uid == me["id"]:
@@ -1465,7 +1482,7 @@ def user_suspend(uid):
 
 
 @app.route("/users/<int:uid>/activate", methods=["POST"])
-@role_required("admin","access_manager")
+@role_required("access_manager")
 def user_activate(uid):
     me = current_user()
     user = query_one("SELECT username FROM users WHERE id=?", (uid,))
@@ -2114,6 +2131,90 @@ def student_security_events(sid):
                      f"id={sid} roll={student['roll_number']}")
     return render_template("student_security_events.html", student=student, rows=rows,
                            date=date_, severity=severity, status=status)
+
+
+# ============================================================================
+# Access Manager: Edit Student Information
+# Lets the Access Manager correct administrative details on a student's
+# record (name/contact/roll/programme/department/year/section/status).
+# Deliberately excludes academic data (attendance, marks, internal
+# assessment, SGPA/CGPA, results), fee status, login password and security
+# settings -- those stay owned by Faculty/Admin and are never editable or
+# even shown here. Restricted to access_manager via @role_required, which
+# already 403s + logs a Suspicious Activity entry for any other role that
+# hits this URL directly (see auth.role_required).
+# ============================================================================
+_STUDENT_INFO_FIELD_LABELS = {
+    "full_name": "Full Name", "email": "Email Address", "phone": "Phone Number",
+    "roll_number": "Roll Number", "programme": "Programme", "department": "Department",
+    "year": "Academic Year", "section": "Section", "status": "Student Status",
+}
+
+
+def _student_info_diff(old_row, cleaned):
+    """Build a human-readable 'Field: old -> new' list of only the fields that changed."""
+    changes = []
+    for field, label in _STUDENT_INFO_FIELD_LABELS.items():
+        old_val = old_row[field] if field in old_row.keys() else None
+        new_val = cleaned[field]
+        old_norm = "" if old_val is None else str(old_val)
+        new_norm = "" if new_val is None else str(new_val)
+        if old_norm != new_norm:
+            changes.append(f"{label}: {old_norm or '—'} \u2192 {new_norm or '—'}")
+    return changes
+
+
+@app.route("/students/<int:sid>/edit-info", methods=["GET", "POST"])
+@role_required("access_manager")
+def student_edit_info(sid):
+    student = query_one("SELECT * FROM students WHERE id = ?", (sid,))
+    if not student:
+        abort(404)
+
+    if request.method == "POST":
+        cleaned, errors = sec.validate_student_info_edit(request.form)
+
+        for field in ("roll_number", "full_name", "email"):
+            if fz.guard_input(request, current_user(), f"student_info.{field}",
+                              request.form.get(field, "")):
+                errors.append("Input rejected.")
+                break
+
+        clash = query_one("SELECT id FROM students WHERE roll_number = ? AND id != ?",
+                          (cleaned["roll_number"], sid))
+        if clash:
+            errors.append("Another student already has that roll number.")
+
+        if errors:
+            for e in errors: flash(e, "error")
+            return render_template("student_edit_info.html", student=student, form=request.form,
+                                   status_choices=sec.STUDENT_STATUS_CHOICES)
+
+        changes = _student_info_diff(student, cleaned)
+
+        execute(
+            "UPDATE students SET roll_number=?, full_name=?, email=?, phone=?, "
+            "programme=?, department=?, year=?, section=?, status=?, "
+            "updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (cleaned["roll_number"], cleaned["full_name"], cleaned["email"],
+             cleaned["phone"], cleaned["programme"], cleaned["department"],
+             cleaned["year"], cleaned["section"], cleaned["status"], sid),
+        )
+
+        actor = current_user()
+        if changes:
+            fz.log_activity(
+                request, actor, "Student Information Updated", "Student Information",
+                f"role={actor['role']} student_roll={cleaned['roll_number']} "
+                f"fields_modified=[{', '.join(changes)}] status=Success"
+            )
+            flash(f"Student information for {cleaned['full_name']} ({cleaned['roll_number']}) updated.", "success")
+        else:
+            flash("No changes were made.", "success")
+        return redirect(url_for("students"))
+
+    return render_template("student_edit_info.html", student=student, form=student,
+                           status_choices=sec.STUDENT_STATUS_CHOICES)
 
 
 # ============================================================================
@@ -2832,7 +2933,7 @@ def grievance_close(gid):
 # Admin: Bulk Student Registration via CSV
 # ============================================================================
 @app.route("/students/bulk-upload", methods=["GET", "POST"])
-@role_required("admin", "access_manager")
+@role_required("access_manager")
 def bulk_upload_students():
     results_log = []
     if request.method == "POST":
@@ -2950,7 +3051,7 @@ def bulk_upload_students():
 
 
 @app.route("/students/bulk-upload/template")
-@role_required("admin", "access_manager")
+@role_required("access_manager")
 def bulk_upload_template():
     """Download a sample CSV template."""
     import csv, io
@@ -3330,7 +3431,7 @@ def low_attendance_notify_branch(dept):
 # Admin + Access Manager: create staff accounts & delete users
 # ============================================================================
 @app.route("/users/create", methods=["POST"])
-@role_required("admin", "access_manager")
+@role_required("access_manager")
 def admin_create_user():
     actor     = current_user()
     full_name = (request.form.get("full_name") or "").strip()
@@ -3377,7 +3478,7 @@ def admin_create_user():
 
 
 @app.route("/users/<int:uid>/delete", methods=["POST"])
-@role_required("admin")
+@role_required("access_manager")
 def admin_delete_user(uid):
     me = current_user()
     if uid == me["id"]:

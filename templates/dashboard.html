@@ -59,8 +59,8 @@
 </div>
 {% endif %}
 
-<!-- Locked accounts — ADMIN & ACCESS MANAGER (both can unlock accounts) -->
-{% if user.role in ('admin', 'access_manager') and locked_count > 0 %}
+<!-- Locked accounts — ACCESS MANAGER ONLY (owns unlocking accounts) -->
+{% if user.role == 'access_manager' and locked_count > 0 %}
 <div class="mt-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 flex items-center justify-between">
   <span>⚠ <strong>{{ locked_count }}</strong> account{{ 's are' if locked_count != 1 else ' is' }} locked.</span>
   <a href="{{ url_for('users_list') }}" class="underline hover:text-amber-900">Manage →</a>
@@ -299,10 +299,10 @@
       <span class="text-sm text-slate-600">✓ New Student Registrations</span>
       <span class="text-sm font-semibold text-ink">{{ today_summary.students_today }}</span>
     </a>
-    <a href="{{ url_for('pending_users') }}" class="flex items-center justify-between py-2.5 hover:bg-slate-50 -mx-2 px-2 rounded transition">
+    <div class="flex items-center justify-between py-2.5 -mx-2 px-2">
       <span class="text-sm text-slate-600">✓ Faculty Approved</span>
       <span class="text-sm font-semibold text-ink">{{ today_summary.faculty_approved_today }}</span>
-    </a>
+    </div>
     <a href="{{ url_for('notices') }}" class="flex items-center justify-between py-2.5 hover:bg-slate-50 -mx-2 px-2 rounded transition">
       <span class="text-sm text-slate-600">✓ Notices Published</span>
       <span class="text-sm font-semibold text-ink">{{ today_summary.notices_today }}</span>

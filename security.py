@@ -131,6 +131,61 @@ def validate_student(form):
     return cleaned, errors
 
 
+STUDENT_STATUS_CHOICES = ("Active", "Suspended", "Graduated")
+
+
+def validate_student_info_edit(form):
+    """
+    Validate the fields the Access Manager is allowed to edit from the
+    Student Information module's "Edit Student Information" page. This is
+    a deliberately narrower field set than validate_student() (no CGPA,
+    no semester) -- attendance/marks/results/fees/password/security are
+    owned by Faculty/Admin and never appear on this form at all, so there
+    is nothing to validate for them here.
+    """
+    errors = []
+    roll = (form.get("roll_number") or "").strip()
+    name = (form.get("full_name") or "").strip()
+    email = (form.get("email") or "").strip()
+    phone = (form.get("phone") or "").strip()
+    programme = (form.get("programme") or "").strip()
+    dept = (form.get("department") or "").strip().upper()
+    year = (form.get("year") or "").strip()
+    section = (form.get("section") or "").strip().upper()
+    status = (form.get("status") or "").strip()
+
+    if not _ROLL.match(roll):
+        errors.append("Roll number must be 4-20 letters/digits.")
+    if not _NAME.match(name):
+        errors.append("Name must be 2-60 letters.")
+    if not _EMAIL.match(email):
+        errors.append("Email is not valid.")
+    if dept not in ALLOWED_DEPARTMENTS:
+        errors.append(f"Department must be one of {', '.join(sorted(ALLOWED_DEPARTMENTS))}.")
+    if not section:
+        errors.append("Section is required.")
+    elif not _SECTION.match(section):
+        errors.append("Section must be 1-2 letters/digits (e.g. A, B, C1).")
+    try:
+        year_i = int(year)
+        if year_i < 1 or year_i > 5:
+            errors.append("Academic year must be between 1 and 5.")
+    except ValueError:
+        year_i = None
+        errors.append("Academic year must be a number.")
+    if phone and not _PHONE.match(phone):
+        errors.append("Phone must be 10 digits.")
+    if status not in STUDENT_STATUS_CHOICES:
+        errors.append(f"Status must be one of {', '.join(STUDENT_STATUS_CHOICES)}.")
+
+    cleaned = {
+        "roll_number": roll, "full_name": name, "email": email, "phone": phone,
+        "programme": programme or None, "department": dept, "year": year_i,
+        "section": section, "status": status,
+    }
+    return cleaned, errors
+
+
 def validate_registration(form):
     errors = []
     username = (form.get("username") or "").strip()
