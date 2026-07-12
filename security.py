@@ -22,7 +22,7 @@ ALLOWED_SORT_COLUMNS = {
     "roll_number", "full_name", "department", "year", "section", "cgpa", "created_at",
 }
 ALLOWED_SORT_DIRECTIONS = {"ASC", "DESC"}
-ALLOWED_DEPARTMENTS = {"CSE", "ME", "ECE", "CE", "EE", "IT", "AIML"}
+ALLOWED_DEPARTMENTS = {"CSE", "ME", "ECE", "CE", "EE", "IT", "AIML", "MAE", "MAC"}
 ALLOWED_ROLES = {"admin", "faculty", "student"}
 
 

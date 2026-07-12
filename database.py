@@ -851,6 +851,45 @@ def migrate_v10(conn):
     conn.commit()
 
 
+def migrate_v11(conn):
+    """
+    v11: normalizes the department code for AI & Machine Learning.
+    seed_igdtuw_data.py used to seed it as "AI&ML" while every other part
+    of the app (security.py's ALLOWED_DEPARTMENTS, the student form's
+    department list) uses "AIML" — so students/courses ended up split
+    across two department buckets that were actually the same department.
+    Idempotent (a plain UPDATE; running it again is a no-op).
+    """
+    cur = conn.cursor()
+    cur.execute("UPDATE students SET department = 'AIML' WHERE department = 'AI&ML'")
+    cur.execute("UPDATE courses  SET department = 'AIML' WHERE department = 'AI&ML'")
+    conn.commit()
+
+
+def migrate_v12(conn):
+    """
+    v12: fixes 3 specific stale students from the original 2026-06-25 demo
+    batch whose `year` didn't match the semesters of their posted results
+    (reviewed with the user before applying this fix):
+      - CU22BCS001 (Aarav Singh): year 3 -> 2 (results are for semesters 3 & 4)
+      - CU22BCS002 (Diya Patel):  year 3 -> 2 (results are for semesters 3 & 4)
+      - CU21BME045 (Kabir Khan):  year 4 -> 2, department 'ME' -> 'MAE'
+        ('ME' isn't a real department code in this app; the roll number
+        prefix 'BME' and the stored department both point to Mechanical,
+        which is coded 'MAE' — Mechanical and Automation Engineering — in
+        the current department model)
+    Matched by roll_number (unique, stable) rather than id, so this also
+    corrects the same rows on an already-deployed database, not just a
+    fresh one. Idempotent — re-running is a no-op once corrected.
+    """
+    cur = conn.cursor()
+    cur.execute("UPDATE students SET year = 2 WHERE roll_number = 'CU22BCS001' AND year != 2")
+    cur.execute("UPDATE students SET year = 2 WHERE roll_number = 'CU22BCS002' AND year != 2")
+    cur.execute("UPDATE students SET year = 2, department = 'MAE' "
+                "WHERE roll_number = 'CU21BME045'")
+    conn.commit()
+
+
 def seed_access_manager():
     """
     Seed one Access Manager demo account, separately from seed() — seed()

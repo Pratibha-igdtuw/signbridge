@@ -31,6 +31,7 @@ import qrcode
 from flask import (Flask, render_template, request, redirect, url_for, session,
                    flash, jsonify, Response, abort)
 from flask_wtf import CSRFProtect
+from flask_wtf.csrf import CSRFError
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -101,6 +102,41 @@ mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
 csrf = CSRFProtect(app)
 
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    """
+    Gracefully handle an expired/missing CSRF session — e.g. a user who left
+    the login page open for a long time (past the session lifetime) before
+    submitting the form. This is a normal session-timeout scenario, not a
+    CSRF attack, so instead of Flask's default "400 Bad Request" page we:
+      1. Log the event (informational, not flagged as suspicious activity).
+      2. Clear the stale session so a brand-new session/CSRF token is
+         issued on the next request.
+      3. Flash a friendly message and redirect back to the login page.
+
+    CSRF protection itself is untouched — this only changes what happens
+    *after* Flask-WTF has already rejected an invalid/expired token.
+    """
+    app.logger.warning("Login attempt rejected due to expired CSRF session.")
+    try:
+        fz.log_activity(
+            request, None,
+            "csrf_session_expired",
+            "auth",
+            "Login attempt rejected due to expired CSRF session.",
+        )
+    except Exception:
+        pass
+
+    # Drop the stale session entirely so a fresh session (and CSRF token)
+    # is generated automatically when the login page is re-rendered.
+    session.clear()
+
+    flash("Your session expired due to inactivity. Please log in again.", "warning")
+    return redirect(url_for("login"))
+
+
 app.register_blueprint(syllabus_bp)
 app.register_blueprint(materials_bp)
 app.register_blueprint(announcements_bp)
@@ -126,6 +162,8 @@ db.migrate_v7(_migration_conn)  # logout_time column (Access Manager Login Histo
 db.migrate_v8(_migration_conn)  # programme column (User Accounts Edit)
 db.migrate_v9(_migration_conn)  # suspicious_activities table (Forensics)
 db.migrate_v10(_migration_conn) # approved_at column (Today's Summary widget)
+db.migrate_v11(_migration_conn) # normalize AI&ML -> AIML department code
+db.migrate_v12(_migration_conn) # fix 3 stale students: year/department mismatch
 _migration_conn.close()
 db.seed()
 db.seed_extras()
@@ -2419,7 +2457,8 @@ def results_export_pdf():
         html = render_template("pdf_marksheet.html", 
                              student=student,
                              semesters=semesters,
-                             cgpa=cgpa)
+                             cgpa=cgpa,
+                             generated_at=datetime.now())
     except Exception as e:
         print(f"[PDF] Template render error: {e}")
         flash("Error generating PDF. Template error.", "error")

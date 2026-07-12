@@ -63,7 +63,7 @@ IGDTUW_DEPARTMENTS = {
             6: ["Distributed Systems", "Containerization", "Microservices Architecture", "System Design"],
         }
     },
-    "AI&ML": {
+    "AIML": {
         "name": "Artificial Intelligence and Machine Learning",
         "prefix": "BAI",
         "semesters": {
@@ -197,7 +197,7 @@ DEPT_FACULTY_ACCOUNTS = {
     # (Dr. Priya Sharma) created in database.py:seed() already covers CSE.
     "ECE":   ("faculty_ece",  "faculty.ece@igdtuw.ac.in",  "Dr. Neha Kapoor"),
     "IT":    ("faculty_it",   "faculty.it@igdtuw.ac.in",   "Dr. Ritu Malhotra"),
-    "AI&ML": ("faculty_aiml", "faculty.aiml@igdtuw.ac.in", "Dr. Ananya Rao"),
+    "AIML": ("faculty_aiml", "faculty.aiml@igdtuw.ac.in", "Dr. Ananya Rao"),
     "MAE":   ("faculty_mae",  "faculty.mae@igdtuw.ac.in",  "Dr. Sunita Verma"),
     "MAC":   ("faculty_mac",  "faculty.mac@igdtuw.ac.in",  "Dr. Kavita Iyer"),
 }

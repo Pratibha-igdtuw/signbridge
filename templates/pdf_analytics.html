@@ -14,91 +14,120 @@
 
   .watermark {
     text-align: center;
-    opacity: 0.08;
-    font-size: 44px;
+    opacity: 0.06;
+    font-size: 36px;
     font-weight: 900;
     color: #0d9488;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
   }
 
   .header {
     text-align: center;
     border-bottom: 2px solid #0d9488;
     padding-bottom: 12px;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
   }
 
   .header h1 {
-    font-size: 18px;
+    font-size: 19px;
     font-weight: 700;
-    margin: 0 0 2px;
+    margin: 0 0 3px;
     color: #0f172a;
   }
 
+  .header .subtitle {
+    font-size: 11px;
+    font-weight: 600;
+    color: #0d9488;
+    margin: 0 0 4px;
+  }
+
   .header p {
-    font-size: 10px;
+    font-size: 9px;
     color: #64748b;
     margin: 0;
   }
 
-  .summary-grid {
+  .section-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  /* Summary cards — built as a table, not inline-block divs, since
+     xhtml2pdf's CSS support for inline-block/flex is unreliable and was
+     causing every card to stack in a single column instead of forming
+     a grid. Tables are xhtml2pdf's best-supported layout primitive. */
+  table.summary {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 6px;
+    margin-bottom: 22px;
+  }
+
+  table.summary td {
+    width: 33.3%;
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 4px;
-    padding: 12px 16px;
-    margin-bottom: 16px;
+    padding: 12px 14px;
+    vertical-align: top;
   }
 
-  .info-item {
-    display: inline-block;
-    width: 31%;
-    margin-bottom: 10px;
-  }
-
-  .info-item label {
-    font-size: 9px;
-    text-transform: uppercase;
-    color: #64748b;
-    letter-spacing: 0.08em;
+  table.summary .stat-label {
     display: block;
-    font-weight: bold;
-  }
-
-  .info-item span {
-    font-size: 14px;
+    font-size: 8.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
     font-weight: 700;
-    color: #0f172a;
+    margin-bottom: 4px;
   }
 
-  table {
+  table.summary .stat-value {
+    display: block;
+    font-size: 20px;
+    font-weight: 700;
+    color: #0d9488;
+  }
+
+  table.data {
     width: 100%;
     border-collapse: collapse;
     margin-bottom: 16px;
   }
 
-  th {
-    background: #f1f5f9;
-    padding: 7px 10px;
+  table.data th {
+    background: #0f172a;
+    color: #ffffff;
+    padding: 8px 10px;
     font-size: 9px;
     text-transform: uppercase;
-    color: #475569;
-    border: 1px solid #e2e8f0;
+    letter-spacing: 0.04em;
     text-align: left;
     font-weight: 700;
   }
 
-  td {
+  table.data td {
     padding: 7px 10px;
-    border: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
     font-size: 11px;
   }
 
-  tbody tr:nth-child(even) td {
+  table.data tbody tr:nth-child(even) td {
     background: #f8fafc;
   }
 
   .numeric-cell {
     text-align: center;
+  }
+
+  .dept-name {
+    font-weight: 700;
+    color: #0f172a;
   }
 
   .footer {
@@ -117,38 +146,45 @@
 <div class="watermark">IDon Portal — Confidential</div>
 
 <div class="header">
-  <h1>IDon Portal — University Analytics Report</h1>
+  <h1>University Analytics Report</h1>
+  <p class="subtitle">IDon Portal — Secure Student Management System</p>
   <p>Indira Gandhi Delhi Technical University for Women (IGDTUW) | ISEA Project Phase-III</p>
 </div>
 
-<div class="summary-grid">
-  <div class="info-item">
-    <label>Total Students</label>
-    <span>{{ summary.total_students }}</span>
-  </div>
-  <div class="info-item">
-    <label>Total Faculty</label>
-    <span>{{ summary.total_faculty }}</span>
-  </div>
-  <div class="info-item">
-    <label>Total Departments</label>
-    <span>{{ summary.total_departments }}</span>
-  </div>
-  <div class="info-item">
-    <label>Overall Attendance</label>
-    <span>{{ summary.overall_attendance if summary.overall_attendance is not none else '—' }}%</span>
-  </div>
-  <div class="info-item">
-    <label>Average CGPA</label>
-    <span>{{ summary.avg_cgpa if summary.avg_cgpa is not none else '—' }}</span>
-  </div>
-  <div class="info-item">
-    <label>Overall Pass %</label>
-    <span>{{ summary.overall_pass_pct if summary.overall_pass_pct is not none else '—' }}%</span>
-  </div>
-</div>
+<div class="section-title">Institution Summary</div>
+<table class="summary">
+  <tr>
+    <td>
+      <span class="stat-label">Total Students</span>
+      <span class="stat-value">{{ summary.total_students }}</span>
+    </td>
+    <td>
+      <span class="stat-label">Total Faculty</span>
+      <span class="stat-value">{{ summary.total_faculty }}</span>
+    </td>
+    <td>
+      <span class="stat-label">Total Departments</span>
+      <span class="stat-value">{{ summary.total_departments }}</span>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <span class="stat-label">Overall Attendance</span>
+      <span class="stat-value">{{ summary.overall_attendance if summary.overall_attendance is not none else '—' }}%</span>
+    </td>
+    <td>
+      <span class="stat-label">Average CGPA</span>
+      <span class="stat-value">{{ summary.avg_cgpa if summary.avg_cgpa is not none else '—' }}</span>
+    </td>
+    <td>
+      <span class="stat-label">Overall Pass %</span>
+      <span class="stat-value">{{ summary.overall_pass_pct if summary.overall_pass_pct is not none else '—' }}%</span>
+    </td>
+  </tr>
+</table>
 
-<table>
+<div class="section-title">Department-wise Breakdown</div>
+<table class="data">
   <thead>
     <tr>
       <th>Department</th>
@@ -160,7 +196,7 @@
   <tbody>
     {% for d in departments %}
     <tr>
-      <td>{{ d.department }}</td>
+      <td class="dept-name">{{ d.department }}</td>
       <td class="numeric-cell">{{ d.total_students }}</td>
       <td class="numeric-cell">{{ d.avg_cgpa if d.avg_cgpa is not none else '—' }}</td>
       <td class="numeric-cell">{{ d.attendance_pct if d.attendance_pct is not none else '—' }}%</td>
