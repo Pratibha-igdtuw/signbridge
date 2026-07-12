@@ -1159,9 +1159,7 @@ def attendance():
             )
         sid = request.args.get("student_id") or None
     else:
-        # Admin & Access Manager see all
-        students = query_all("SELECT * FROM students ORDER BY roll_number")
-        sid = request.args.get("student_id") or None
+         abort(403)
 
     if sid:
         selected_student = query_one("SELECT * FROM students WHERE id = ?", (sid,))
@@ -1183,7 +1181,7 @@ def attendance():
 
 
 @app.route("/attendance/mark", methods=["POST"])
-@role_required("admin", "faculty")
+@role_required("faculty")
 def attendance_mark():
     student_id = request.form.get("student_id")
     subject    = (request.form.get("subject") or "").strip()
@@ -1219,12 +1217,18 @@ def attendance_export_pdf():
         user_db = query_one("SELECT * FROM users WHERE id=?", (u["id"],))
         student = (query_one("SELECT * FROM students WHERE user_id=?", (u["id"],)) or
                    query_one("SELECT * FROM students WHERE email=?", (user_db["email"],)))
-    else:
-        # Admin/Faculty/Access Manager need explicit student_id
+    elif u["role"] == "faculty":
         if not student_id:
             flash("Please specify a student_id.", "error")
             return redirect(url_for("attendance"))
-        student = query_one("SELECT * FROM students WHERE id=?", (int(student_id),))
+
+        student = query_one(
+           "SELECT * FROM students WHERE id=?",
+           (int(student_id),)
+    )
+
+    else:
+         abort(403)
  
     if not student:
         flash("Student record not found.", "error")
@@ -1491,7 +1495,7 @@ def twofa_setup():
 @login_required
 def assignments():
     u = current_user()
-    if u["role"] in ("admin", "faculty"):
+    if u["role"] == "faculty":
         rows = query_all(
             "SELECT a.*, u.full_name uploader_name FROM assignments a "
             "LEFT JOIN users u ON a.uploaded_by = u.id ORDER BY a.id DESC"
@@ -1527,7 +1531,7 @@ def assignments():
 
 
 @app.route("/assignments/upload", methods=["POST"])
-@role_required("admin", "faculty")
+@role_required("faculty")
 def assignment_upload():
     title       = (request.form.get("title") or "").strip()
     description = (request.form.get("description") or "").strip()
@@ -1579,7 +1583,7 @@ def assignment_download(aid):
 
 
 @app.route("/assignments/<int:aid>/delete", methods=["POST"])
-@role_required("admin", "faculty")
+@role_required("faculty")
 def assignment_delete(aid):
     row = query_one("SELECT * FROM assignments WHERE id = ?", (aid,))
     if not row: abort(404)
@@ -1639,7 +1643,7 @@ def homework_submit(aid):
 
 
 @app.route("/assignments/<int:aid>/submissions")
-@role_required("admin", "faculty")
+@role_required("faculty")
 def homework_list(aid):
     assignment = query_one("SELECT * FROM assignments WHERE id = ?", (aid,))
     if not assignment: abort(404)
@@ -1654,7 +1658,7 @@ def homework_list(aid):
 
 
 @app.route("/homework/<int:hid>/download")
-@role_required("admin", "faculty")
+@role_required("faculty")
 def homework_download(hid):
     row = query_one("SELECT * FROM homework_submissions WHERE id = ?", (hid,))
     if not row: abort(404)
@@ -1683,8 +1687,8 @@ def students():
         q = ""
     col, dir_ = sec.safe_sort(sort, direction)
 
-    if u["role"] in ("admin", "access_manager"):
-        # Admin and Access Manager see all students
+    if u["role"] in ("access_manager"):
+        # Access Manager see all students
         if q:
             rows = query_all(
                 f"SELECT * FROM students WHERE roll_number LIKE ? OR full_name LIKE ? OR email LIKE ? ORDER BY {col} {dir_}",
@@ -3289,24 +3293,19 @@ def api_attendance_bulk_mark():
 # Attendance — Bulk Marking (mark all present + individual overrides)
 # ============================================================================
 @app.route("/attendance/bulk-mark", methods=["GET", "POST"])
-@role_required("admin", "faculty")
+@role_required("faculty")
 def attendance_bulk_mark():
     u = current_user()
     my_courses = []
     students = []
     course_filter = request.args.get("course_id") or request.form.get("course_id") or None
 
-    if u["role"] == "faculty":
-        my_courses = query_all(
-            "SELECT c.id, c.name, c.code, c.subject, c.semester, c.department, c.section "
-            "FROM courses c JOIN course_faculty cf ON cf.course_id=c.id "
-            "WHERE cf.faculty_id=? ORDER BY c.name",
-            (u["id"],)
-        )
-    else:
-        my_courses = query_all(
-            "SELECT id, name, code, subject, semester, department, section FROM courses ORDER BY name"
-        )
+    my_courses = query_all(
+    "SELECT c.id, c.name, c.code, c.subject, c.semester, c.department, c.section "
+    "FROM courses c JOIN course_faculty cf ON cf.course_id=c.id "
+    "WHERE cf.faculty_id=? ORDER BY c.name",
+    (u["id"],)
+)
 
     if course_filter:
         course_filter = int(course_filter)
@@ -3414,6 +3413,10 @@ def timetable():
 
     if u["role"] == "student":
         student_rec = get_student_record(u["id"])
+        print("Student Record:", student_rec)
+        print("Department:", dept)
+        print("Semester:", sem)
+        print("Section:", section)
         dept    = (student_rec["department"] if student_rec else None) or dept
         section = (student_rec["section"] if student_rec else None) or section
         if student_rec and student_rec["current_semester"]:
@@ -3430,6 +3433,11 @@ def timetable():
             "  WHEN 'Thursday' THEN 4 WHEN 'Friday' THEN 5 ELSE 6 END, t.start_time",
             (dept, sem, section)
         )
+        print("Department:", dept)
+        print("Semester:", sem)
+        print("Section:", section)
+        print("Rows found:", len(rows))
+        print(rows)
         departments, semesters = [], []
     elif u["role"] == "faculty":
         rows = query_all(

@@ -3,29 +3,26 @@
 {% block heading %}Assignments{% endblock %}
 {% block content %}
 
-{% if user.role in ('admin','faculty') %}
+{% if user.role == 'faculty' %}
 <!-- Upload assignment form -->
 <div class="bg-white rounded-lg border border-slate-200 p-5 mb-6">
   <h2 class="text-sm font-semibold text-ink mb-4">Upload New Assignment</h2>
   <form method="post" action="{{ url_for('assignment_upload') }}" enctype="multipart/form-data"
-        class="grid grid-cols-2 gap-4">
+    class="grid grid-cols-2 gap-4">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div>
       <label class="block text-xs font-medium text-slate-500 mb-1">Title <span class="text-red-500">*</span></label>
-      <input name="title" required placeholder="e.g. Lab 3 – SQL Injection"
-             class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+      <input name="title" required placeholder="e.g. Lab 3 – SQL Injection" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
                     focus:border-signal focus:ring-1 focus:ring-signal outline-none">
     </div>
     <div>
       <label class="block text-xs font-medium text-slate-500 mb-1">Subject <span class="text-red-500">*</span></label>
-      <input name="subject" required placeholder="e.g. DBMS"
-             class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+      <input name="subject" required placeholder="e.g. DBMS" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
                     focus:border-signal focus:ring-1 focus:ring-signal outline-none">
     </div>
     <div>
       <label class="block text-xs font-medium text-slate-500 mb-1">Department (optional)</label>
-      <input name="department" placeholder="e.g. CSE (blank = all)"
-             class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+      <input name="department" placeholder="e.g. CSE (blank = all)" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
                     focus:border-signal focus:ring-1 focus:ring-signal outline-none">
     </div>
     <div>
@@ -41,21 +38,18 @@
     </div>
     <div>
       <label class="block text-xs font-medium text-slate-500 mb-1">Due Date</label>
-      <input name="due_date" type="date"
-             class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+      <input name="due_date" type="date" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
                     focus:border-signal focus:ring-1 focus:ring-signal outline-none">
     </div>
     <div>
       <label class="block text-xs font-medium text-slate-500 mb-1">File <span class="text-red-500">*</span></label>
-      <input name="file" type="file" required
-             class="w-full text-sm file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border-0
+      <input name="file" type="file" required class="w-full text-sm file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border-0
                     file:bg-signal file:text-white file:text-sm file:font-medium
                     hover:file:bg-teal-700 file:cursor-pointer">
     </div>
     <div class="col-span-2">
       <label class="block text-xs font-medium text-slate-500 mb-1">Description</label>
-      <textarea name="description" rows="2" placeholder="Brief description or instructions…"
-                class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+      <textarea name="description" rows="2" placeholder="Brief description or instructions…" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
                        focus:border-signal focus:ring-1 focus:ring-signal outline-none"></textarea>
     </div>
     <div class="col-span-2">
@@ -93,35 +87,34 @@
           </div>
         </div>
         <div class="flex gap-2 shrink-0">
-          <a href="{{ url_for('assignment_download', aid=a.id) }}"
-             class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200
+          <a href="{{ url_for('assignment_download', aid=a.id) }}" class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200
                     text-slate-700 rounded-md text-xs font-medium transition">
             ⬇ Download
           </a>
-          {% if user.role in ('admin','faculty') %}
-          <a href="{{ url_for('homework_list', aid=a.id) }}"
-             class="inline-flex items-center gap-1 px-3 py-1.5 bg-teal-50 hover:bg-teal-100
+          {% if user.role == 'faculty' %}
+          <a href="{{ url_for('homework_list', aid=a.id) }}" class="inline-flex items-center gap-1 px-3 py-1.5 bg-teal-50 hover:bg-teal-100
                     text-teal-700 rounded-md text-xs font-medium transition">
             📋 Submissions
           </a>
           <form method="post" action="{{ url_for('assignment_delete', aid=a.id) }}"
-                onsubmit="return confirm('Delete this assignment?')">
+            onsubmit="return confirm('Delete this assignment?')">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-xs font-medium transition">
+            <button
+              class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-xs font-medium transition">
               🗑 Delete
             </button>
           </form>
           {% endif %}
           {% if user.role == 'student' %}
-            {% if a.id in submissions %}
-            <span class="inline-flex items-center gap-1 px-3 py-1.5 bg-teal-50 text-teal-600
+          {% if a.id in submissions %}
+          <span class="inline-flex items-center gap-1 px-3 py-1.5 bg-teal-50 text-teal-600
                          rounded-md text-xs font-medium">✓ Submitted</span>
-            {% else %}
-            <button onclick="document.getElementById('hw-modal-{{ a.id }}').classList.remove('hidden')"
-                    class="px-3 py-1.5 bg-ink hover:bg-steel text-white rounded-md text-xs font-medium transition">
-              📤 Submit Homework
-            </button>
-            {% endif %}
+          {% else %}
+          <button onclick="document.getElementById('hw-modal-{{ a.id }}').classList.remove('hidden')"
+            class="px-3 py-1.5 bg-ink hover:bg-steel text-white rounded-md text-xs font-medium transition">
+            📤 Submit Homework
+          </button>
+          {% endif %}
           {% endif %}
         </div>
       </div>
@@ -133,21 +126,21 @@
       <div class="bg-white rounded-lg border border-slate-200 p-6 w-full max-w-sm mx-4">
         <h3 class="font-semibold text-ink mb-1">Submit Homework</h3>
         <p class="text-xs text-slate-500 mb-4">{{ a.title }}</p>
-        <form method="post" action="{{ url_for('homework_submit', aid=a.id) }}" enctype="multipart/form-data" class="space-y-3">
+        <form method="post" action="{{ url_for('homework_submit', aid=a.id) }}" enctype="multipart/form-data"
+          class="space-y-3">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div>
             <label class="block text-xs font-medium text-slate-500 mb-1">Your Homework File</label>
-            <input name="file" type="file" required
-                   class="w-full text-sm file:mr-3 file:px-3 file:py-1 file:rounded file:border-0
+            <input name="file" type="file" required class="w-full text-sm file:mr-3 file:px-3 file:py-1 file:rounded file:border-0
                           file:bg-signal file:text-white file:text-xs hover:file:bg-teal-700 file:cursor-pointer">
           </div>
           <div class="flex gap-2">
-            <button class="flex-1 bg-signal hover:bg-teal-700 text-white text-sm font-medium py-2 rounded-md transition">
+            <button
+              class="flex-1 bg-signal hover:bg-teal-700 text-white text-sm font-medium py-2 rounded-md transition">
               Submit
             </button>
-            <button type="button"
-                    onclick="document.getElementById('hw-modal-{{ a.id }}').classList.add('hidden')"
-                    class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm py-2 rounded-md transition">
+            <button type="button" onclick="document.getElementById('hw-modal-{{ a.id }}').classList.add('hidden')"
+              class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm py-2 rounded-md transition">
               Cancel
             </button>
           </div>
@@ -160,7 +153,11 @@
   </div>
   {% else %}
   <div class="px-5 py-8 text-center text-sm text-slate-400">
-    {% if user.role in ('admin','faculty') %}No assignments uploaded yet.{% else %}No assignments available yet.{% endif %}
+    {% if user.role == 'faculty' %}
+    No assignments uploaded yet.
+    {% else %}
+    No assignments available yet.
+    {% endif %}
   </div>
   {% endif %}
 </div>

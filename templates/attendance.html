@@ -54,8 +54,8 @@
 <div class="grid lg:grid-cols-3 gap-6">
   <!-- Left: controls -->
   <div class="space-y-5">
-    {# Student selector (admin/faculty only) #}
-    {% if user.role in ('admin','faculty') %}
+    {# Student selector (faculty only) #}
+    {% if user.role == 'faculty' %}
     <div class="bg-white rounded-lg border border-slate-200 p-4">
       <h3 class="text-sm font-semibold text-ink mb-3">Select Student</h3>
 
@@ -90,8 +90,8 @@
     </div>
     {% endif %}
 
-    {# Mark attendance form (admin/faculty) #}
-    {% if user.role in ('admin','faculty') and selected_student %}
+    {# Mark attendance form (faculty) #}
+    {% if user.role == 'faculty' and selected_student %}
     <div class="bg-white rounded-lg border border-slate-200 p-4">
       <h3 class="text-sm font-semibold text-ink mb-3">Mark Attendance</h3>
       <form method="post" action="{{ url_for('attendance_mark') }}" class="space-y-3">
@@ -134,7 +134,7 @@
             selected_student.year }}</p>
         </div>
 
-        {% if selected_student %}
+        {% if selected_student and user.role in ['student', 'faculty'] %}
         <div class="mb-4 flex justify-end">
           <a href="{{ url_for('attendance_export_pdf', student_id=selected_student.id) }}"
             class="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition font-medium">
@@ -197,10 +197,12 @@
     </div>
     {% else %}
     <div class="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-400">
-      {% if user.role in ('admin','faculty') %}
+      {% if user.role == 'faculty' %}
       <p class="text-sm">Select a student to view attendance.</p>
-      {% else %}
+
+      {% elif user.role == 'student' %}
       <p class="text-sm">Your attendance record was not found. Contact your administrator.</p>
+
       {% endif %}
     </div>
     {% endif %}
