@@ -45,7 +45,8 @@
 </div>
 
 <div class="bg-white rounded-lg border border-slate-200 overflow-x-auto">
-  <table class="w-full text-sm evidence">
+  <div class="table-scroll">
+<table class="w-full text-sm evidence">
     <thead class="bg-slate-50 text-left text-xs uppercase eyebrow text-slate-400">
       <tr>
         {% for c in cols %}<th class="px-4 py-3 font-semibold whitespace-nowrap">{{ c.replace('_',' ') }}</th>{% endfor %}
@@ -76,5 +77,6 @@
       {% endfor %}
     </tbody>
   </table>
+</div>
 </div>
 {% endblock %}

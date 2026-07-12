@@ -269,7 +269,8 @@
     <h2 class="text-sm font-semibold text-ink mb-4">
       {% if user.role in ('admin', 'access_manager') %}Recent system activity{% else %}My recent activity{% endif %}
     </h2>
-    <table class="w-full text-sm evidence">
+    <div class="table-scroll">
+<table class="w-full text-sm evidence">
       <tbody class="divide-y divide-slate-100">
         {% for r in recent %}
           <tr>
@@ -283,6 +284,7 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
   </div>
 </div>
 
@@ -323,7 +325,8 @@
 {% if user.role in ('admin', 'access_manager') and failed %}
 <div class="bg-white rounded-lg border border-alert/30 p-5 mt-5">
   <h2 class="text-sm font-semibold text-alert mb-3">Recent failed sign-ins</h2>
-  <table class="w-full text-sm evidence">
+  <div class="table-scroll">
+<table class="w-full text-sm evidence">
     <tbody class="divide-y divide-slate-100">
       {% for f in failed %}
         <tr>
@@ -334,6 +337,7 @@
       {% endfor %}
     </tbody>
   </table>
+</div>
 </div>
 {% endif %}
 

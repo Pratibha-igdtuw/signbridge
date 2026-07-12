@@ -68,7 +68,8 @@
   </div>
 
   <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
-    <table class="w-full text-sm evidence">
+    <div class="table-scroll">
+<table class="w-full text-sm evidence">
       <thead class="bg-slate-50 text-left text-xs uppercase eyebrow text-slate-400">
         <tr>
           <th class="px-4 py-3 font-semibold w-8">
@@ -119,11 +120,210 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
   </div>
 </form>
+{% elif user.role == 'access_manager' %}
+<div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+  <div class="table-scroll">
+<table class="w-full text-sm evidence">
+    <thead class="bg-slate-50 text-left text-xs uppercase eyebrow text-slate-400">
+      <tr>
+        {% macro th(col, label) %}
+          {% set nd = 'ASC' if (sort==col and dir=='DESC') else 'DESC' %}
+          <th class="px-4 py-3 font-semibold">
+            <a href="{{ url_for('students', q=q, sort=col, dir=nd) }}" class="hover:text-steel">
+              {{ label }}{% if sort==col %} {{ '↓' if dir=='DESC' else '↑' }}{% endif %}
+            </a>
+          </th>
+        {% endmacro %}
+        {{ th('roll_number','Roll No') }}
+        {{ th('full_name','Name') }}
+        {{ th('department','Dept') }}
+        {{ th('year','Year') }}
+        {{ th('section','Sec') }}
+        {{ th('cgpa','CGPA') }}
+        <th class="px-4 py-3 font-semibold">Status</th>
+        <th class="px-4 py-3 font-semibold text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for s in students %}
+        <tr class="hover:bg-slate-50">
+          <td class="px-4 py-3 font-mono text-xs text-steel">{{ s.roll_number }}</td>
+          <td class="px-4 py-3 font-medium text-ink">{{ s.full_name }}<div class="text-xs text-slate-400 font-normal">{{ s.email }}</div></td>
+          <td class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-slate-100 text-xs">{{ s.department }}</span></td>
+          <td class="px-4 py-3">{{ s.year }}</td>
+          <td class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-slate-100 text-xs">{{ s.section }}</span></td>
+          <td class="px-4 py-3 font-mono">{{ '%.2f'|format(s.cgpa) if s.cgpa is not none else '—' }}</td>
+          <td class="px-4 py-3 whitespace-nowrap">
+            {% if not s.acct_user_id %}
+              <span class="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-500">No Login Account</span>
+            {% elif not s.acct_is_active %}
+              <span class="px-2 py-0.5 rounded text-xs bg-red-50 text-red-700">🔒 Locked</span>
+            {% elif s.acct_status == 'suspended' %}
+              <span class="px-2 py-0.5 rounded text-xs bg-orange-50 text-orange-700">🔴 Suspended</span>
+            {% elif s.acct_status == 'pending' %}
+              <span class="px-2 py-0.5 rounded text-xs bg-amber-50 text-amber-700">🟡 Pending Approval</span>
+            {% else %}
+              <span class="px-2 py-0.5 rounded text-xs bg-teal-50 text-teal-700">🟢 Active</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 text-right relative">
+            <button type="button" onclick="toggleStudentMenu(event, {{ s.id }})"
+                    class="w-8 h-8 inline-flex items-center justify-center rounded-md text-slate-500
+                           hover:bg-slate-100 hover:text-ink transition" aria-label="Row actions">
+              ⋮
+            </button>
+            <div id="menu-{{ s.id }}"
+                 class="hidden absolute right-4 mt-1 w-56 bg-white border border-slate-200 rounded-lg
+                        shadow-lg z-20 text-left overflow-hidden">
+              <a href="{{ url_for('student_profile', sid=s.id) }}"
+                 class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                👁️ View Student Profile
+              </a>
+              {% if s.acct_user_id %}
+                <button type="button" onclick="openResetModal({{ s.id }})"
+                        class="w-full text-left block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                  🔑 Reset Password
+                </button>
+                {% if not s.acct_is_active %}
+                  <button type="button" onclick="openLockModal({{ s.id }}, false)"
+                          class="w-full text-left block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                    🔓 Unlock Account
+                  </button>
+                {% else %}
+                  <button type="button" onclick="openLockModal({{ s.id }}, true)"
+                          class="w-full text-left block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                    🔒 Lock Account
+                  </button>
+                {% endif %}
+              {% endif %}
+              <a href="{{ url_for('student_login_history', sid=s.id) }}"
+                 class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 border-t border-slate-100">
+                📜 View Login History
+              </a>
+              <a href="{{ url_for('student_security_events', sid=s.id) }}"
+                 class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                🛡️ View Security Events
+              </a>
+            </div>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">
+          {% if q %}No students match “{{ q }}”.{% else %}No students yet.{% endif %}
+        </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+</div>
+
+<!-- Reset-password / Lock-unlock confirmation modals (one pair per row) -->
+{% for s in students %}
+<div id="reset-modal-{{ s.id }}" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-lg border border-slate-200 p-6 w-full max-w-md">
+    <h3 class="font-semibold text-ink mb-1">Reset Password</h3>
+    <p class="text-sm text-slate-500 mb-4">
+      Student: <strong class="text-ink">{{ s.full_name }}</strong> ({{ s.roll_number }})<br>
+      This will generate a temporary password and require the student to change it on next login.
+    </p>
+    <form method="post" action="{{ url_for('student_reset_password', sid=s.id) }}" class="flex gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <button type="button" onclick="closeModal('reset-modal-{{ s.id }}')"
+              class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm py-2 rounded-md transition">
+        Cancel
+      </button>
+      <button type="submit"
+              class="flex-1 bg-signal hover:bg-teal-700 text-white text-sm font-medium py-2 rounded-md transition">
+        Reset Password
+      </button>
+    </form>
+  </div>
+</div>
+
+<div id="lock-modal-{{ s.id }}" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-lg border border-slate-200 p-6 w-full max-w-md">
+    <h3 id="lock-modal-title-{{ s.id }}" class="font-semibold text-ink mb-1">Lock Account</h3>
+    <p id="lock-modal-desc-{{ s.id }}" class="text-sm text-slate-500 mb-3">
+      Student: <strong class="text-ink">{{ s.full_name }}</strong> ({{ s.roll_number }})<br>
+      This student will not be able to log in until the account is unlocked.
+    </p>
+    <form method="post" id="lock-form-{{ s.id }}" action="{{ url_for('student_lock', sid=s.id) }}" class="space-y-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <div id="lock-reason-wrap-{{ s.id }}">
+        <label class="block text-xs font-medium text-slate-500 mb-1">Reason</label>
+        <textarea name="reason" rows="2" placeholder="Optional — why is this account being locked?"
+                  class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                         focus:border-signal focus:ring-1 focus:ring-signal outline-none"></textarea>
+      </div>
+      <div class="flex gap-2">
+        <button type="button" onclick="closeModal('lock-modal-{{ s.id }}')"
+                class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm py-2 rounded-md transition">
+          Cancel
+        </button>
+        <button type="submit" id="lock-submit-{{ s.id }}"
+                class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-2 rounded-md transition">
+          Lock Account
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endfor %}
+
+<script>
+function toggleStudentMenu(evt, id) {
+  evt.stopPropagation();
+  document.querySelectorAll('[id^="menu-"]').forEach(m => {
+    if (m.id !== 'menu-' + id) m.classList.add('hidden');
+  });
+  document.getElementById('menu-' + id).classList.toggle('hidden');
+}
+document.addEventListener('click', () => {
+  document.querySelectorAll('[id^="menu-"]').forEach(m => m.classList.add('hidden'));
+});
+
+function closeModal(id) {
+  document.getElementById(id).classList.add('hidden');
+}
+function openResetModal(id) {
+  document.getElementById('menu-' + id).classList.add('hidden');
+  document.getElementById('reset-modal-' + id).classList.remove('hidden');
+}
+function openLockModal(id, isLock) {
+  document.getElementById('menu-' + id).classList.add('hidden');
+  const title = document.getElementById('lock-modal-title-' + id);
+  const desc  = document.getElementById('lock-modal-desc-' + id);
+  const btn   = document.getElementById('lock-submit-' + id);
+  const reasonWrap = document.getElementById('lock-reason-wrap-' + id);
+  const form  = document.getElementById('lock-form-' + id);
+  const nameLine = desc.querySelector('strong').outerHTML;
+  if (isLock) {
+    title.textContent = 'Lock Account';
+    desc.innerHTML = 'Student: ' + nameLine + '<br>This student will not be able to log in until the account is unlocked.';
+    reasonWrap.classList.remove('hidden');
+    btn.textContent = 'Lock Account';
+    btn.className = 'flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-2 rounded-md transition';
+    form.action = form.action.replace(/\/(lock|unlock)$/, '/lock');
+  } else {
+    title.textContent = 'Unlock Account';
+    desc.innerHTML = 'Student: ' + nameLine + '<br>This will restore the student\'s ability to log in immediately.';
+    reasonWrap.classList.add('hidden');
+    btn.textContent = 'Unlock Account';
+    btn.className = 'flex-1 bg-signal hover:bg-teal-700 text-white text-sm font-medium py-2 rounded-md transition';
+    form.action = form.action.replace(/\/(lock|unlock)$/, '/unlock');
+  }
+  document.getElementById('lock-modal-' + id).classList.remove('hidden');
+}
+</script>
 {% else %}
 <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
-  <table class="w-full text-sm evidence">
+  <div class="table-scroll">
+<table class="w-full text-sm evidence">
     <thead class="bg-slate-50 text-left text-xs uppercase eyebrow text-slate-400">
       <tr>
         {% macro th(col, label) %}
@@ -165,6 +365,7 @@
       {% endfor %}
     </tbody>
   </table>
+</div>
 </div>
 {% endif %}
 <p class="text-xs text-slate-400 mt-3">Showing {{ students|length }} record(s). Searches and sorts use parameterized queries with column whitelisting.</p>

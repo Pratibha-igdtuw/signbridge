@@ -11,7 +11,8 @@
     </div>
     <span class="text-xs text-slate-400">{{ all_users|length }} total</span>
   </div>
-  <table class="w-full text-sm evidence">
+  <div class="table-scroll">
+<table class="w-full text-sm evidence">
     <thead class="bg-slate-50 text-left text-xs uppercase eyebrow text-slate-400">
       <tr>
         <th class="px-4 py-3 font-semibold">Name</th>
@@ -57,6 +58,7 @@
       {% endfor %}
     </tbody>
   </table>
+</div>
 </div>
 <p class="text-xs text-slate-400 mt-3">
   ⚠ The last remaining <strong>Super Admin</strong> account cannot be changed to another role — this prevents the system from being locked out of Super Admin access.

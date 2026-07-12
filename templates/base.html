@@ -33,26 +33,19 @@
 
     /* Session countdown */
     #session-warn { display:none; }
-    /* Every data table in the app shares this class — make it scroll
-       within its own box on narrow screens instead of stretching (and
-       overflowing) the whole page. `overflow-x: auto` here also stops
-       this table from forcing its parent flex/grid column wider than
-       the viewport (an item's automatic min-size collapses to 0 once
-       it has non-visible overflow) — that collapse is driven by the
-       computed 'overflow' value alone, so it still applies here even
-       though we no longer change 'display'.
-       NOTE: an earlier version of this rule set display:block on the
-       <table> and display:table independently on thead/tbody to get
-       scrolling. That split the table into two separate column-width
-       computations — one for the header row, one for the body — so
-       whenever header text and cell content differed enough in length
-       (e.g. "LOGOUT TIME" over a short "—"), the header and body
-       columns drifted out of alignment. Leaving the table as a single
-       table box (its default display) keeps thead and tbody on one
-       shared column-width computation, so headers always line up with
-       their data, while overflow-x still makes long/narrow tables
-       scroll horizontally instead of overflowing the page. */
-    table.evidence { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+    /* Every data table in the app is now wrapped in <div class="table-scroll">
+       in its template — that's what actually makes it scroll horizontally
+       on narrow screens instead of overflowing the page or the table just
+       getting silently clipped by an overflow-hidden parent card.
+       NOTE: `overflow-x: auto` directly on the <table> element itself
+       (the previous approach here) does NOT reliably create a scrolling
+       viewport in real browsers — it silently does nothing, which is
+       exactly the missing-scrollbar bug that was reported. A dedicated
+       wrapper element is the only reliable way to get real horizontal
+       scroll while leaving the table's native column-width computation
+       untouched (so headers keep lining up with their data). */
+    .table-scroll { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+    table.evidence { max-width: 100%; }
   </style>
   <!-- Dark mode CSS variables -->
   <style>

@@ -63,7 +63,8 @@
     <h2 class="text-sm font-semibold text-ink">All Accounts</h2>
     <span class="text-xs text-slate-400">{{ all_users|length }} total</span>
   </div>
-  <table class="w-full text-sm evidence">
+  <div class="table-scroll">
+<table class="w-full text-sm evidence">
     <thead class="bg-slate-50 text-left text-xs uppercase eyebrow text-slate-400">
       <tr>
         <th class="px-4 py-3 font-semibold">Username</th>
@@ -163,6 +164,7 @@
       {% endfor %}
     </tbody>
   </table>
+</div>
 </div>
 <p class="text-xs text-slate-400 mt-3">
   Auto-lockout triggers after {{ config.MAX_FAILED_LOGINS }} failed attempts in {{ config.LOCKOUT_WINDOW_MINUTES }} minutes.

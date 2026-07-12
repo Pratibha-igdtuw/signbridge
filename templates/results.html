@@ -184,7 +184,8 @@
         {% endif %}
       </div>
       {% endif %}
-      <table class="w-full text-sm evidence border border-slate-100 rounded-lg overflow-hidden">
+      <div class="table-scroll">
+<table class="w-full text-sm evidence border border-slate-100 rounded-lg overflow-hidden">
         <thead class="bg-slate-50 text-xs eyebrow uppercase text-slate-400">
           <tr>
             <th class="px-3 py-2 text-left">Subject</th>
@@ -232,6 +233,7 @@
           {% if result_rows %}
         </tbody>
       </table>
+</div>
     </div>{% endif %}
     {% else %}
     <p class="text-sm text-slate-400 py-6 text-center">No results posted yet for this student.</p>

@@ -1726,14 +1726,29 @@ def students():
     col, dir_ = sec.safe_sort(sort, direction)
 
     if u["role"] in ("access_manager"):
-        # Access Manager see all students
+        # Access Manager sees all students, plus their linked login-account
+        # status (for the Status column / row actions). LEFT JOIN so students
+        # without a linked account (never registered / not yet backfilled)
+        # still show up.
+        acct_cols = (
+            "u.id AS acct_user_id, u.username AS acct_username, "
+            "u.is_active AS acct_is_active, u.status AS acct_status, "
+            "u.role AS acct_role"
+        )
         if q:
             rows = query_all(
-                f"SELECT * FROM students WHERE roll_number LIKE ? OR full_name LIKE ? OR email LIKE ? ORDER BY {col} {dir_}",
+                f"SELECT s.*, {acct_cols} FROM students s "
+                f"LEFT JOIN users u ON u.id = s.user_id "
+                f"WHERE s.roll_number LIKE ? OR s.full_name LIKE ? OR s.email LIKE ? "
+                f"ORDER BY s.{col} {dir_}",
                 (f"%{q}%", f"%{q}%", f"%{q}%"),
             )
         else:
-            rows = query_all(f"SELECT * FROM students ORDER BY {col} {dir_}")
+            rows = query_all(
+                f"SELECT s.*, {acct_cols} FROM students s "
+                f"LEFT JOIN users u ON u.id = s.user_id "
+                f"ORDER BY s.{col} {dir_}"
+            )
         my_courses = []
     elif u["role"] == "faculty":
         # Faculty sees only students enrolled in their courses
@@ -1897,6 +1912,208 @@ def student_bulk_delete():
                      f"count={len(found_ids)} ids={found_ids} rolls={rolls}")
     flash(f"Deleted {len(found_ids)} student(s).", "success")
     return redirect(url_for("students"))
+
+
+# ============================================================================
+# Access Manager: per-student row actions (profile, lock/unlock, password
+# reset, login history, security events). Restricted to access_manager only,
+# matching the new Actions-column dropdown on the Student Records page.
+#
+# These reuse the same underlying account fields/tables that already power
+# the general Users page (users.is_active for lock/unlock, users.status for
+# suspended/pending, login_history + suspicious_activities for the read-only
+# views) — no new columns or tables, no change to existing login/RBAC logic.
+# ============================================================================
+def _safe_next(url, default_endpoint="students"):
+    """Only allow same-site relative redirect targets (no open redirect)."""
+    if url and url.startswith("/") and not url.startswith("//"):
+        return url
+    return url_for(default_endpoint)
+
+
+def _student_with_account(sid):
+    """Student row plus its linked users-table account (if any), or None."""
+    return query_one(
+        "SELECT s.*, u.id AS acct_user_id, u.username AS acct_username, "
+        "u.email AS acct_email, u.is_active AS acct_is_active, "
+        "u.status AS acct_status, u.role AS acct_role, "
+        "u.programme AS acct_programme, u.force_password_change AS acct_force_pw_change "
+        "FROM students s LEFT JOIN users u ON u.id = s.user_id WHERE s.id = ?",
+        (sid,),
+    )
+
+
+@app.route("/students/<int:sid>")
+@role_required("access_manager")
+def student_profile(sid):
+    student = _student_with_account(sid)
+    if not student:
+        abort(404)
+
+    last_login = None
+    if student["acct_user_id"]:
+        last_login = query_one(
+            "SELECT timestamp FROM login_history WHERE user_id = ? AND status = 'success' "
+            "ORDER BY timestamp DESC LIMIT 1",
+            (student["acct_user_id"],),
+        )
+
+    fz.log_activity(request, current_user(), "view_profile", "students",
+                     f"id={sid} roll={student['roll_number']}")
+    return render_template("student_profile.html", student=student,
+                           last_login=last_login["timestamp"] if last_login else None,
+                           role_labels=ROLE_LABELS)
+
+
+@app.route("/students/<int:sid>/reset-password", methods=["POST"])
+@role_required("access_manager")
+def student_reset_password(sid):
+    next_url = _safe_next(request.form.get("next"), "students")
+    student = _student_with_account(sid)
+    if not student:
+        abort(404)
+    if not student["acct_user_id"]:
+        flash(f"{student['full_name']} does not have a login account yet — nothing to reset.", "error")
+        return redirect(next_url)
+
+    new_password = _generate_temp_password()
+    execute(
+        "UPDATE users SET password_hash = ?, force_password_change = 1, "
+        "last_password_change = CURRENT_TIMESTAMP WHERE id = ?",
+        (generate_password_hash(new_password), student["acct_user_id"]),
+    )
+
+    actor = current_user()
+    fz.log_activity(
+        request, actor, "password_reset", "students",
+        f"administrator={actor['username']} student={student['full_name']} "
+        f"roll={student['roll_number']} force_password_change=yes"
+    )
+    flash(
+        f"Password for {student['full_name']} ({student['roll_number']}) has been reset to: "
+        f"{new_password} — they must change it on next login. Share this securely; "
+        f"it will not be shown again.", "success"
+    )
+    return redirect(next_url)
+
+
+@app.route("/students/<int:sid>/lock", methods=["POST"])
+@role_required("access_manager")
+def student_lock(sid):
+    next_url = _safe_next(request.form.get("next"), "students")
+    reason = (request.form.get("reason") or "").strip()
+    student = _student_with_account(sid)
+    if not student:
+        abort(404)
+    if not student["acct_user_id"]:
+        flash(f"{student['full_name']} does not have a login account yet.", "error")
+        return redirect(next_url)
+    if not student["acct_is_active"]:
+        flash(f"{student['full_name']}'s account is already locked.", "error")
+        return redirect(next_url)
+
+    execute("UPDATE users SET is_active = 0 WHERE id = ?", (student["acct_user_id"],))
+    actor = current_user()
+    fz.log_activity(
+        request, actor, "account_locked", "students",
+        f"administrator={actor['username']} student={student['full_name']} "
+        f"roll={student['roll_number']} action=Account Locked"
+        + (f" reason={reason}" if reason else "")
+    )
+    flash(f"{student['full_name']}'s account has been locked.", "success")
+    return redirect(next_url)
+
+
+@app.route("/students/<int:sid>/unlock", methods=["POST"])
+@role_required("access_manager")
+def student_unlock(sid):
+    next_url = _safe_next(request.form.get("next"), "students")
+    student = _student_with_account(sid)
+    if not student:
+        abort(404)
+    if not student["acct_user_id"]:
+        flash(f"{student['full_name']} does not have a login account yet.", "error")
+        return redirect(next_url)
+    if student["acct_is_active"]:
+        flash(f"{student['full_name']}'s account is already active.", "error")
+        return redirect(next_url)
+
+    execute("UPDATE users SET is_active = 1 WHERE id = ?", (student["acct_user_id"],))
+    actor = current_user()
+    fz.log_activity(
+        request, actor, "account_unlocked", "students",
+        f"administrator={actor['username']} student={student['full_name']} "
+        f"roll={student['roll_number']} action=Account Unlocked"
+    )
+    flash(f"{student['full_name']}'s account has been unlocked.", "success")
+    return redirect(next_url)
+
+
+@app.route("/students/<int:sid>/login-history")
+@role_required("access_manager")
+def student_login_history(sid):
+    student = _student_with_account(sid)
+    if not student:
+        abort(404)
+
+    date_ = (request.args.get("date") or "").strip()
+    status = (request.args.get("status") or "").strip()
+    ip = (request.args.get("ip") or "").strip()
+
+    rows = []
+    if student["acct_user_id"]:
+        sql = ("SELECT timestamp, status, ip_address, user_agent FROM login_history "
+               "WHERE user_id = ?")
+        params = [student["acct_user_id"]]
+        if date_:
+            sql += " AND date(timestamp) = ?"
+            params.append(date_)
+        if status in ("success", "failed", "locked"):
+            sql += " AND status = ?"
+            params.append(status)
+        if ip:
+            sql += " AND ip_address LIKE ?"
+            params.append(f"%{ip}%")
+        sql += " ORDER BY timestamp DESC LIMIT 500"
+        rows = query_all(sql, tuple(params))
+
+    fz.log_activity(request, current_user(), "view_login_history", "students",
+                     f"id={sid} roll={student['roll_number']}")
+    return render_template("student_login_history.html", student=student, rows=rows,
+                           date=date_, status=status, ip=ip)
+
+
+@app.route("/students/<int:sid>/security-events")
+@role_required("access_manager")
+def student_security_events(sid):
+    student = _student_with_account(sid)
+    if not student:
+        abort(404)
+
+    date_ = (request.args.get("date") or "").strip()
+    severity = (request.args.get("severity") or "").strip()
+    status = (request.args.get("status") or "").strip()
+
+    rows = []
+    if student["acct_user_id"]:
+        sql = "SELECT * FROM suspicious_activities WHERE user_id = ?"
+        params = [student["acct_user_id"]]
+        if date_:
+            sql += " AND date(timestamp) = ?"
+            params.append(date_)
+        if severity in ("Low", "Medium", "High"):
+            sql += " AND severity = ?"
+            params.append(severity)
+        if status in ("Open", "Reviewed"):
+            sql += " AND status = ?"
+            params.append(status)
+        sql += " ORDER BY timestamp DESC LIMIT 500"
+        rows = query_all(sql, tuple(params))
+
+    fz.log_activity(request, current_user(), "view_security_events", "students",
+                     f"id={sid} roll={student['roll_number']}")
+    return render_template("student_security_events.html", student=student, rows=rows,
+                           date=date_, severity=severity, status=status)
 
 
 # ============================================================================

@@ -155,7 +155,8 @@
       </div>
 
       {% if att_data %}
-      <table class="w-full text-sm evidence">
+      <div class="table-scroll">
+<table class="w-full text-sm evidence">
         <thead>
           <tr class="border-b border-slate-200">
             <th class="text-left py-2 font-medium text-slate-500 text-xs">Subject</th>
@@ -191,6 +192,7 @@
           {% endfor %}
         </tbody>
       </table>
+</div>
       {% else %}
       <p class="text-sm text-slate-400">No attendance records found for this student.</p>
       {% endif %}

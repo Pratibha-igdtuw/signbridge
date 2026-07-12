@@ -114,7 +114,8 @@
         {{ selected_student.full_name }} · {{ selected_student.roll_number }}
       </h2>
       {% if fee_rows %}
-      <table class="w-full text-sm evidence">
+      <div class="table-scroll">
+<table class="w-full text-sm evidence">
         <thead class="bg-slate-50 text-xs eyebrow uppercase text-slate-400">
           <tr>
             <th class="px-4 py-3 text-left">Semester</th>
@@ -152,6 +153,7 @@
           {% endfor %}
         </tbody>
       </table>
+</div>
       {% else %}
       <p class="text-sm text-slate-400 py-6 text-center">No fee records found for this student.</p>
       {% endif %}
