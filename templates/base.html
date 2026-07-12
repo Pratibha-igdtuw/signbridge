@@ -422,7 +422,7 @@
         <div class="text-white font-semibold text-lg leading-tight mt-1">Secure&nbsp;SMS</div>
         <div class="mt-1">
           {% if user.role == 'admin' %}
-            <span class="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full font-semibold">ADMIN</span>
+            <span class="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full font-semibold"> SUPER ADMIN</span>
           {% elif user.role == 'faculty' %}
             <span class="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-semibold">FACULTY</span>
           {% elif user.role == 'access_manager' %}
@@ -507,7 +507,6 @@
           {{ nav('users_list', 'User Accounts', '🛡️') }}
           {{ nav('role_management', 'Role Management', '🧩') }}
           {{ nav('password_reset', 'Password Reset', '🔑') }}
-          {{ nav('login_history', 'Login History', '🕘') }}
           {% if has_endpoint('pending_users') %}
           <a href="{{ url_for('pending_users') }}" class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/5 hover:text-white transition
                 {{ 'nav-active' if request.endpoint == 'pending_users' else '' }}">

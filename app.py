@@ -887,7 +887,7 @@ LOGIN_HISTORY_STATUSES = ("success", "failed", "locked")
 
 
 @app.route("/users/login-history")
-@role_required("admin", "access_manager")
+@role_required("access_manager")
 def login_history():
     q          = (request.args.get("q") or "").strip()
     role       = (request.args.get("role") or "").strip()
