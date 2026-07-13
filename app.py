@@ -422,8 +422,8 @@ def login():
             fz.log_login(request, user["id"], username, "success", user["role"])
             fz.log_activity(request, dict(user), "login", "auth")
             flash(f"Welcome back, {user['full_name']}.", "success")
-            if not user["profile_complete"]:
-               return redirect(url_for("profile_setup"))
+          #  if not user["profile_complete"]:
+          #     return redirect(url_for("profile_setup"))
 
             if user["role"] == "student":
                 return redirect(url_for("student_dashboard"))
@@ -1131,7 +1131,7 @@ def student_dashboard():
     recent_activity = []
 
     now_date = datetime.now().strftime("%d %b %Y")
-
+    print("Student Dashboard Loaded")
     return render_template(
         "student_dashboard.html",
         user=user,
@@ -3638,8 +3638,10 @@ def api_attendance_bulk_mark():
                 (int(sid), subject, date_val, status, u["id"])
             )
             count += 1
-        except Exception:
-            pass
+        except Exception as e:
+            print("Attendance Error:", e)
+            import traceback
+            traceback.print_exc()
 
     fz.log_activity(request, u, "bulk_attendance", "attendance",
                     f"course_id={course_id} subject={subject} date={date_val} count={count}")
