@@ -379,7 +379,7 @@ def login():
             return render_template("login.html")
         if user and status == "pending":
             fz.log_login(request, user["id"], username, "locked", user["role"])
-            flash("This account is awaiting admin approval.", "error")
+            flash("This account is awaiting access manager approval.", "error")
             return render_template("login.html")
 
         # ── Brute-force lockout: too many recent failed attempts ───────────
