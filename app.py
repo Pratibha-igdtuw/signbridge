@@ -303,7 +303,7 @@ def register():
         fz.log_activity(request, {"id": uid, "username": cleaned["username"]},
                         "register", "auth", f"role={cleaned['role']}")
         flash(
-            "Registration successful. Your account is awaiting admin approval.",
+            "Registration successful. Your account is awaiting access manager approval.",
              "success",
 )
         return redirect(url_for("login"))
