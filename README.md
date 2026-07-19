@@ -1,49 +1,57 @@
-# IDon Portal — Secure SMS v2
+# SignBridge — Backend
 
-## New Features Added
+A full-stack accessibility app that bridges sign language and speech in real time.
+The frontend runs entirely in the browser (MediaPipe Hands + Web Speech API); this
+backend gives it real user accounts, persistent conversation history, a custom sign
+vocabulary, and usage analytics.
 
-### From your WhatsApp notes:
-1. **Session management** — already in v1, now surfaced in Login History with entry_hash + username + role per row
-2. **Attendance tracking** — `/attendance` page with per-subject stats and ⚠️ < 75% alert banner
-3. **SGPA Calculator** — `/sgpa` — fully client-side, grade → points reference table, 5 subjects by default
-4. **Assignments by faculty + Homework by students** — `/assignments`; faculty upload with dept/year filter; students submit from modal; faculty see all submissions
-5. **Password eye toggle** — login, register, and change-password all have 👁️ / 🙈 toggle
-6. **Login History with entry_hash, username, role** — SHA-256 tamper-evident hash in every login row; visible in `/audit/logins`
-7. **Profile setup on first login** — new users are redirected to `/profile/setup` to fill: name, email, contact no., branch, university, year
-8. **Change password** — available in `/profile` settings page
-9. **Students removed from Dashboard sidebar** — students land directly on Attendance; no dashboard link in their nav
+## Features
+- **Auth**: registration, login, logout, session-based auth, rate-limited login/register,
+  password strength validation, login-attempt logging (`login_events` table).
+- **Translation logging**: every recognized sign and every transcribed voice line is saved
+  to the database under a `Conversation`, so history survives a page refresh.
+- **Custom gestures**: each user can add their own sign → word mappings on top of the
+  6 built-in gestures (Hello, Yes, Wait, Peace, Thank you, I love you).
+- **Analytics dashboard**: total translations, sign vs. voice split, most-used signs,
+  login count — all computed live from the database.
+- **Tests**: 15 pytest tests covering auth and the API (`tests/`), all passing.
 
-### Extra features included:
-- **Dashboard low-attendance table** — admin/faculty see all students < 75% attendance at a glance
-- **Profile page** — edit personal info and change password from one place
-- **Role-aware navigation** — sidebar adapts per role (admin/faculty/student)
+## Project structure
+```
+signbridge/
+├── app.py                 # Flask app factory, blueprint registration
+├── config.py               # Config + TestConfig
+├── database.py               # SQLAlchemy models (User, Conversation, Translation, Gesture, LoginEvent)
+├── security.py                # Rate limiter + validators
+├── auth.py                     # Register / login / logout / session guard
+├── translate_routes.py          # Translation logging + history API
+├── gesture_routes.py              # Custom gesture CRUD
+├── analytics.py                    # Stats API + page routes
+├── templates/                       # Jinja2 pages (login, register, dashboard, history, gestures, analytics)
+├── static/
+│   ├── css/style.css                  # Shared styling
+│   └── js/app.js                       # Camera, MediaPipe hand-sign detection, TTS/STT, API calls
+├── tests/                                # pytest suite
+└── requirements.txt
+```
 
-## Setup
-
+## Running it locally
 ```bash
 pip install -r requirements.txt
 python app.py
 ```
+Then open **http://127.0.0.1:5000** in Chrome, create an account, and click
+"Start Camera" (grant camera + mic permission) to try live sign-to-speech and
+speech-to-text translation.
 
-## Demo accounts
-| Role    | Username | Password   |
-|---------|----------|------------|
-| Admin   | admin    | Admin@123  |
-| Faculty | faculty  | Faculty@123|
-| Student | student  | Student@123|
+## Running the tests
+```bash
+python -m pytest tests/ -v
+```
 
-## Routes
-| Route | Access | Purpose |
-|-------|--------|---------|
-| `/` | All | Redirect by role |
-| `/login` | Public | Sign in |
-| `/register` | Public | Create account |
-| `/profile/setup` | Logged in (first login) | Complete profile |
-| `/profile` | Logged in | Edit info + change password |
-| `/dashboard` | Admin, Faculty | Stats, charts, alerts |
-| `/attendance` | All | View/mark attendance |
-| `/sgpa` | All | SGPA calculator |
-| `/assignments` | All | Upload (faculty) / Submit homework (student) |
-| `/students` | All | CRUD student records |
-| `/files` | Admin, Faculty | General file management |
-| `/audit/*` | Admin only | Forensic audit logs |
+## Notes for your abstract / demo
+- Gesture recognition is landmark-geometry based (counts extended fingers via
+  MediaPipe Hands), not a trained neural network — this keeps it fully offline and
+  dependency-light, and is easy to explain to judges without needing a big dataset.
+- For a real deployment, set `SECRET_KEY` as an environment variable and swap the
+  in-memory rate-limiter storage for Redis.

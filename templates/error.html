@@ -1,19 +1,17 @@
-{% extends "base.html" %}
-{% block title %}Error {{ code }}{% endblock %}
-{% block heading %}Something went wrong{% endblock %}
-{% block content %}
-<div class="bg-white rounded-lg border border-slate-200 p-10 text-center max-w-lg">
-  <div class="text-5xl font-mono font-semibold text-slate-300">{{ code }}</div>
-  <p class="text-steel mt-3">{{ message }}</p>
-  <a href="{{ url_for('dashboard') }}" class="inline-block mt-5 text-signal hover:underline text-sm">← Back to dashboard</a>
-</div>
-{% endblock %}
-{% block auth %}
-<div class="min-h-screen flex items-center justify-center bg-slate-100">
-  <div class="text-center">
-    <div class="text-5xl font-mono font-semibold text-slate-300">{{ code }}</div>
-    <p class="text-steel mt-3">{{ message }}</p>
-    <a href="{{ url_for('login') }}" class="inline-block mt-5 text-signal hover:underline text-sm">← Sign in</a>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>SignBridge</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div class="error-shell">
+  <div>
+    <h1 class="display">Sign<span style="color:var(--lav-600)">Bridge</span></h1>
+    <p style="color:var(--muted)">{{ message }}</p>
+    <a href="/" class="btn btn-outline">Go home</a>
   </div>
 </div>
-{% endblock %}
+</body>
+</html>

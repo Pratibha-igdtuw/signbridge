@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Gestures — SignBridge{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>Gesture Vocabulary <b>· Built-in + your custom signs</b></h2>
+  <div class="gesture-list" id="gestureList"></div>
+
+  <h2 style="margin-top:26px;">Add a Custom Gesture</h2>
+  <p style="color:var(--muted); font-size:13px; margin-top:-6px;">
+    Give it a short code name, the word it should speak, and an emoji to represent it in the legend.
+  </p>
+  <form class="inline-form" id="addGestureForm">
+    <input type="text" id="gKey" placeholder="Code, e.g. OK_SIGN" required />
+    <input type="text" id="gWord" placeholder="Word, e.g. Okay" required />
+    <input type="text" id="gEmoji" placeholder="Emoji 👌" maxlength="4" />
+    <button type="submit" class="btn btn-primary">Add gesture</button>
+  </form>
+  <div class="error-box" id="gestureError"></div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadGestures(){
+  const list = document.getElementById('gestureList');
+  const res = await fetch('/api/gestures');
+  const gestures = await res.json();
+  list.innerHTML = gestures.map(g => `
+    <div class="gesture-item">
+      <span>${g.emoji} <strong>${g.word}</strong> <span style="color:var(--muted)">(${g.gesture_key})</span></span>
+      <span class="tag">${g.is_custom ? 'Custom' : 'Built-in'}</span>
+    </div>
+  `).join('');
+}
+loadGestures();
+
+document.getElementById('addGestureForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const errorBox = document.getElementById('gestureError');
+  errorBox.classList.remove('show');
+  const gesture_key = document.getElementById('gKey').value;
+  const word = document.getElementById('gWord').value;
+  const emoji = document.getElementById('gEmoji').value || '🖐️';
+
+  const res = await fetch('/api/gestures', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({gesture_key, word, emoji})
+  });
+  const data = await res.json();
+  if(!res.ok){
+    errorBox.textContent = data.error || 'Could not add gesture.';
+    errorBox.classList.add('show');
+    return;
+  }
+  document.getElementById('addGestureForm').reset();
+  loadGestures();
+});
+</script>
+{% endblock %}

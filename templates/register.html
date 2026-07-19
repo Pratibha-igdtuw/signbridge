@@ -1,104 +1,84 @@
-{% extends "base.html" %}
-{% block title %}Register{% endblock %}
-{% block auth %}
-<div class="min-h-screen flex items-center justify-center bg-slate-100 p-8">
-  <div class="w-full max-w-md">
-    <div class="eyebrow text-[11px] uppercase text-signal font-semibold">IDon Portal</div>
-    <h2 class="text-2xl font-semibold text-ink mt-1">Student Registration</h2>
-    <p class="text-sm text-slate-500 mt-1">Faculty and admin accounts are created by the system administrator.</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Create account — SignBridge</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div class="auth-shell">
+  <div class="auth-card">
+    <svg width="0" height="0" style="position:absolute">
+      <defs>
+        <linearGradient id="markGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#9B87E0"/>
+          <stop offset="100%" stop-color="#5F4BB0"/>
+        </linearGradient>
+        <symbol id="markIcon" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="11" fill="url(#markGrad)"/>
+          <circle cx="12" cy="20" r="4" fill="#fff"/>
+          <circle cx="28" cy="20" r="4" fill="#fff"/>
+          <path d="M16 20 Q20 12 24 20" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+          <path d="M16 20 Q20 28 24 20" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" opacity="0.55"/>
+        </symbol>
+      </defs>
+    </svg>
+    <h1 class="display"><svg class="mark" style="margin-right:8px;"><use href="#markIcon"/></svg>Sign<span style="color:var(--lav-600)">Bridge</span></h1>
+    <p class="sub">Create an account to start translating.</p>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for category, msg in messages %}
-        <div class="mt-4 px-4 py-2.5 rounded-md text-sm border
-                    {{ 'bg-teal-50 border-teal-200 text-teal-800' if category=='success'
-                       else 'bg-red-50 border-red-200 text-red-800' }}">{{ msg }}</div>
-      {% endfor %}
-    {% endwith %}
+    <div class="error-box" id="errorBox"></div>
 
-    <form method="post" class="mt-6 space-y-4 bg-white border border-slate-200 rounded-lg p-6">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="role" value="student">
-      <div>
-        <label class="block text-sm font-medium text-steel mb-1">Full name</label>
-        <input name="full_name" value="{{ form.full_name or '' }}" required
-               class="w-full rounded-md border border-slate-300 bg-white text-ink px-3 py-2 text-sm
-                      focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+    <form id="registerForm">
+      <div class="field">
+        <label for="name">Full name</label>
+        <input type="text" id="name" required autocomplete="name" />
       </div>
-      <div>
-        <label class="block text-sm font-medium text-steel mb-1">Username</label>
-        <input name="username" value="{{ form.username or '' }}" required
-               class="w-full rounded-md border border-slate-300 bg-white text-ink px-3 py-2 text-sm
-                      focus:border-signal focus:ring-1 focus:ring-signal outline-none">
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" required autocomplete="email" />
       </div>
-      <div>
-        <label class="block text-sm font-medium text-steel mb-1">Email</label>
-        <input name="email" type="email" value="{{ form.email or '' }}" required
-               placeholder="yourname@igdtuw.ac.in"
-               class="w-full rounded-md border border-slate-300 bg-white text-ink px-3 py-2 text-sm
-                      focus:border-signal focus:ring-1 focus:ring-signal outline-none">
-        <p class="text-xs text-slate-400 mt-1">Must be your IGDTUW college email (@igdtuw.ac.in)</p>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" required autocomplete="new-password" />
+        <div class="hint">At least 8 characters, one uppercase letter, one number.</div>
       </div>
-      <div>
-        <label class="block text-sm font-medium text-steel mb-1">Password</label>
-        <div class="relative">
-          <input id="pw" name="password" type="password" required
-                 class="w-full rounded-md border border-slate-300 bg-white text-ink px-3 py-2 pr-10 text-sm
-                        focus:border-signal focus:ring-1 focus:ring-signal outline-none">
-          <button type="button" onclick="toggleEye('pw','eye-reg')"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
-            <span id="eye-reg">👁️</span>
-          </button>
-        </div>
-        <div class="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-          <div id="pw-bar" class="h-full rounded-full transition-all duration-300 w-0"></div>
-        </div>
-        <p id="pw-label" class="text-xs text-slate-400 mt-1">Min 8 chars · uppercase · lowercase · digit</p>
-      </div>
-      <button class="w-full bg-signal hover:bg-teal-700 text-white font-medium
-                     rounded-md py-2.5 text-sm transition">Create student account</button>
+      <button type="submit" class="btn btn-primary btn-full">Create account</button>
     </form>
 
-    <p class="text-sm text-slate-500 mt-4 text-center">
-      Already registered? <a href="{{ url_for('login') }}" class="text-signal hover:underline">Sign in</a>
-    </p>
+    <div class="switch-link">Already have an account? <a href="/login">Log in</a></div>
   </div>
 </div>
 
 <script>
-function toggleEye(inputId, iconId) {
-  const inp = document.getElementById(inputId);
-  const ico = document.getElementById(iconId);
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-  ico.textContent = inp.type === 'password' ? '👁️' : '🙈';
-}
-const pw = document.getElementById('pw');
-const bar = document.getElementById('pw-bar');
-const label = document.getElementById('pw-label');
-function score(v) {
-  let s = 0;
-  if (v.length >= 8) s++;
-  if (v.length >= 12) s++;
-  if (/[A-Z]/.test(v)) s++;
-  if (/[a-z]/.test(v)) s++;
-  if (/\d/.test(v)) s++;
-  if (/[^A-Za-z0-9]/.test(v)) s++;
-  return s;
-}
-const levels = [
-  { w:'0%',   bg:'bg-slate-200', text:'Enter a password' },
-  { w:'20%',  bg:'bg-red-400',   text:'Very weak' },
-  { w:'40%',  bg:'bg-orange-400',text:'Weak' },
-  { w:'60%',  bg:'bg-yellow-400',text:'Fair' },
-  { w:'80%',  bg:'bg-teal-400',  text:'Strong' },
-  { w:'100%', bg:'bg-teal-600',  text:'Very strong ✓' },
-];
-pw.addEventListener('input', () => {
-  const s = Math.min(score(pw.value), 5);
-  const l = pw.value ? levels[s] : levels[0];
-  bar.style.width = l.w;
-  bar.className = `h-full rounded-full transition-all duration-300 ${l.bg}`;
-  label.textContent = l.text;
-  label.className = `text-xs mt-1 ${s < 3 ? 'text-red-500' : s < 4 ? 'text-yellow-600' : 'text-teal-600'}`;
+const form = document.getElementById('registerForm');
+const errorBox = document.getElementById('errorBox');
+
+form.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  errorBox.classList.remove('show');
+  const name = document.getElementById('name').value;
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+
+  try{
+    const res = await fetch('/api/auth/register', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, email, password})
+    });
+    const data = await res.json();
+    if(!res.ok){
+      errorBox.textContent = data.error || 'Something went wrong.';
+      errorBox.classList.add('show');
+      return;
+    }
+    window.location.href = '/dashboard';
+  }catch(err){
+    errorBox.textContent = 'Could not reach the server. Please try again.';
+    errorBox.classList.add('show');
+  }
 });
 </script>
-{% endblock %}
+</body>
+</html>

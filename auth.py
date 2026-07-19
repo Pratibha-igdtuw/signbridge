@@ -1,137 +1,134 @@
-"""
-Authentication & access control — v3.
-
-  - Password hashing      -> Werkzeug PBKDF2
-  - Session management     -> Flask signed-cookie + idle timeout
-  - JWT Authentication     -> issued for the API layer (/api/*)
-  - RBAC                   -> login_required / role_required decorators
-
-Session idle timeout: every request refreshes a `_last_active` timestamp in
-the session; if the gap since the last request exceeds SESSION_TIMEOUT_SECONDS
-the session is expired and the user is redirected to login.
-"""
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from functools import wraps
-from time import time
-from database import execute, query_one
-import jwt
-from flask import session, redirect, url_for, flash, request, jsonify, abort
 
-from config import Config
-import forensics as fz
+from flask import Blueprint, request, jsonify, session, render_template, redirect, url_for
 
+from database import db, User, LoginEvent
+from security import limiter, is_valid_email, is_strong_password
 
-# ----------------------------- JWT helpers ----------------------------------
-def issue_jwt(user):
-    payload = {
-        "sub": user["id"],
-        "username": user["username"],
-        "role": user["role"],
-        "iat": datetime.now(timezone.utc),
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=Config.JWT_EXPIRY_MINUTES),
-    }
-    return jwt.encode(payload, Config.JWT_SECRET, algorithm="HS256")
+auth_bp = Blueprint('auth', __name__)
 
 
-def decode_jwt(token):
-    try:
-        return jwt.decode(token, Config.JWT_SECRET, algorithms=["HS256"])
-    except jwt.PyJWTError:
-        return None
+def login_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if 'user_id' not in session:
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Authentication required'}), 401
+            return redirect(url_for('auth.login_page'))
+        return f(*args, **kwargs)
+    return wrapper
 
 
 def current_user():
-    """The logged-in web user as a plain dict, or None."""
-    if "user_id" in session:
-        return {
-            "id": session["user_id"],
-            "username": session.get("username"),
-            "role": session.get("role"),
-            "full_name": session.get("full_name"),
+    uid = session.get('user_id')
+    return User.query.get(uid) if uid else None
+
+
+# ---------- Pages ----------
+
+@auth_bp.route('/login', methods=['GET'])
+def login_page():
+    if current_user():
+        return redirect(url_for('analytics.dashboard_page'))
+    return render_template('login.html')
+
+
+@auth_bp.route('/register', methods=['GET'])
+def register_page():
+    if current_user():
+        return redirect(url_for('analytics.dashboard_page'))
+    return render_template('register.html')
+
+
+# ---------- API ----------
+
+@auth_bp.route('/api/auth/register', methods=['POST'])
+@limiter.limit('10 per hour')
+def register():
+    data = request.get_json(force=True, silent=True) or {}
+    name = (data.get('name') or '').strip()
+    email = (data.get('email') or '').strip().lower()
+    password = data.get('password') or ''
+
+    if not name:
+        return jsonify({'error': 'Name is required'}), 400
+    if not is_valid_email(email):
+        return jsonify({'error': 'Please provide a valid email address'}), 400
+    ok, msg = is_strong_password(password)
+    if not ok:
+        return jsonify({'error': msg}), 400
+    if User.query.filter_by(email=email).first():
+        return jsonify({'error': 'An account with this email already exists'}), 409
+
+    user = User(name=name, email=email, role='user')
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+
+    session.clear()
+    session['user_id'] = user.id
+    session.permanent = True
+    return jsonify({'message': 'Account created', 'user': user.to_dict()}), 201
+
+
+@auth_bp.route('/api/auth/login', methods=['POST'])
+@limiter.limit('10 per minute')
+def login():
+    data = request.get_json(force=True, silent=True) or {}
+    email = (data.get('email') or '').strip().lower()
+    password = data.get('password') or ''
+    ip = request.remote_addr
+
+    user = User.query.filter_by(email=email).first()
+    success = bool(user and user.check_password(password))
+
+    db.session.add(LoginEvent(
+        user_id=user.id if user else None,
+        email_attempted=email,
+        ip_address=ip,
+        success=success,
+    ))
+    db.session.commit()
+
+    if not success:
+        return jsonify({'error': 'Invalid email or password'}), 401
+
+    user.last_login = datetime.utcnow()
+    db.session.commit()
+    session.clear()
+    session['user_id'] = user.id
+    session.permanent = True
+    return jsonify({'message': 'Logged in', 'user': user.to_dict()})
+
+
+@auth_bp.route('/api/auth/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return jsonify({'message': 'Logged out'})
+
+
+@auth_bp.route('/api/auth/me', methods=['GET'])
+def me():
+    user = current_user()
+    return jsonify({'user': user.to_dict() if user else None})
+
+
+@auth_bp.route('/api/auth/login-history', methods=['GET'])
+@login_required
+def login_history():
+    user = current_user()
+    events = (
+        LoginEvent.query.filter_by(user_id=user.id)
+        .order_by(LoginEvent.id.desc())
+        .limit(25)
+        .all()
+    )
+    return jsonify([
+        {
+            'ip_address': e.ip_address,
+            'success': e.success,
+            'created_at': e.created_at.isoformat(),
         }
-    return None
-
-
-# ----------------------- Session idle-timeout check ------------------------
-def _check_session_timeout():
-    """Return True if session has expired due to inactivity."""
-    last = session.get("_last_active")
-    now = int(time())
-    if last and (now - last) > Config.SESSION_TIMEOUT_SECONDS:
-        session.clear()
-        return True
-    session["_last_active"] = now
-    return False
-
-
-# --------------------------- Web (session) guards ---------------------------
-def login_required(view):
-    @wraps(view)
-    def wrapped(*args, **kwargs):
-        if "user_id" not in session:
-            flash("Please sign in to continue.", "error")
-            return redirect(url_for("login"))
-        if _check_session_timeout():
-            flash("Your session expired due to inactivity. Please sign in again.", "error")
-            return redirect(url_for("login"))
-        if session.get("must_change_password") and view.__name__ not in ("profile", "logout"):
-            flash("You must change your password before continuing.", "error")
-            return redirect(url_for("profile"))
-        return view(*args, **kwargs)
-    return wrapped
-
-
-def role_required(*roles):
-    def decorator(view):
-        @wraps(view)
-        def wrapped(*args, **kwargs):
-            if "user_id" not in session:
-                flash("Please sign in to continue.", "error")
-                return redirect(url_for("login"))
-            if _check_session_timeout():
-                flash("Your session expired due to inactivity. Please sign in again.", "error")
-                return redirect(url_for("login"))
-            if session.get("must_change_password") and view.__name__ not in ("profile", "logout"):
-                flash("You must change your password before continuing.", "error")
-                return redirect(url_for("profile"))
-            if session.get("role") not in roles:
-                actor = {
-                    "id": session.get("user_id"),
-                    "username": session.get("username"),
-                    "role": session.get("role"),
-                }
-                fz.record_suspicious_activity(
-                    request, actor, "Unauthorized Route Access",
-                    f"Unauthorized Role-based Access Attempt "
-                    f"(role={actor['role']!r} tried to access {request.path}).",
-                    "High", "Blocked", dedup_minutes=5,
-                )
-                flash("You do not have permission to access that page.", "error")
-                role = session.get("role")
-                if role == "student":
-                    return redirect(url_for("attendance"))
-                # admin/faculty hitting wrong route
-                abort(403)
-            return view(*args, **kwargs)
-        return wrapped
-    return decorator
-
-
-# --------------------------- API (JWT) guard --------------------------------
-def jwt_required(*roles):
-    def decorator(view):
-        @wraps(view)
-        def wrapped(*args, **kwargs):
-            auth = request.headers.get("Authorization", "")
-            if not auth.startswith("Bearer "):
-                return jsonify({"error": "Missing bearer token"}), 401
-            data = decode_jwt(auth.split(" ", 1)[1])
-            if not data:
-                return jsonify({"error": "Invalid or expired token"}), 401
-            if roles and data.get("role") not in roles:
-                return jsonify({"error": "Forbidden"}), 403
-            request.jwt_user = {"id": data["sub"], "username": data["username"],
-                                "role": data["role"]}
-            return view(*args, **kwargs)
-        return wrapped
-    return decorator
+        for e in events
+    ])

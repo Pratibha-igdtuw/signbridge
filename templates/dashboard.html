@@ -1,376 +1,72 @@
 {% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
-{% block heading %}Dashboard{% endblock %}
+{% block title %}Translate — SignBridge{% endblock %}
 {% block content %}
 
-{% if user.role == 'admin' %}
-<p class="text-xs text-slate-400 -mt-2 mb-4">Super Admin Dashboard – Monitor system health, security events, academic configuration, and overall platform operations.</p>
-{% endif %}
+<div class="bridge">
+  <div class="node" id="nodeDeaf">🤟</div>
+  <div class="span-line"></div>
+  <div class="node" id="nodeHearing">🔊</div>
+</div>
 
-{% if user.role == 'admin' and high_open_count and high_open_count > 0 %}
-<a href="{{ url_for('suspicious_activity', severity='High', status='Open') }}"
-   class="block mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition">
-  <div class="flex items-center justify-between">
-    <span class="text-sm font-semibold text-red-700">
-      ⚠ {{ high_open_count }} High Severity Security Event{{ 's' if high_open_count != 1 else '' }} Require{{ '' if high_open_count != 1 else 's' }} Review
-    </span>
-    <span class="text-xs text-red-600 underline whitespace-nowrap">View Suspicious Activity →</span>
-  </div>
-</a>
-{% endif %}
-
-<!-- Stat cards — admin, faculty, and access_manager each get their own set -->
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-  {% macro stat(label, value, accent) %}
-    <div class="bg-white rounded-lg border border-slate-200 p-5">
-      <div class="eyebrow uppercase text-[10px] text-slate-400 font-semibold">{{ label }}</div>
-      <div class="text-3xl font-semibold mt-2 {{ accent }}">{{ value }}</div>
+<div class="grid">
+  <div class="card">
+    <h2>Sign Recognition <b>· Sign → Speech</b></h2>
+    <div class="cam-box" id="camBox">
+      <video id="video" playsinline autoplay muted></video>
+      <canvas id="overlay"></canvas>
+      <div class="cam-off" id="camOff">Camera is off. Click "Start Camera" and allow access to begin recognizing hand signs.</div>
     </div>
-  {% endmacro %}
-  {% if user.role == 'admin' %}
-    {# Super Admin: system administration + security oversight, not IAM #}
-    {{ stat('Total Students', stats.students, 'text-ink') }}
-    {{ stat('Total Faculty', stats.faculty, 'text-ink') }}
-    {{ stat('Active System Users', stats.active_users, 'text-ink') }}
-    {{ stat('Security Alerts', stats.alerts, 'text-alert' if stats.alerts else 'text-ink') }}
-  {% elif user.role == 'access_manager' %}
-    {{ stat('Students', stats.students, 'text-ink') }}
-    {{ stat('Logins Today', stats.logins_today, 'text-signal') }}
-    {# Access Manager owns Identity & Access Management — show IAM-relevant
-       counts (total users, pending approvals), never security-internal
-       stats like injection alerts, and never student self-service stats. #}
-    {{ stat('System Users', stats.users, 'text-ink') }}
-    {{ stat('Pending Approvals', stats.pending, 'text-alert' if stats.pending else 'text-ink') }}
-  {% else %}
-    {{ stat('Students', stats.students, 'text-ink') }}
-    {{ stat('Logins Today', stats.logins_today, 'text-signal') }}
-    {# Faculty sees subject/assignment counts instead of internal security stats #}
-    {{ stat('Assignments', stats.assignments, 'text-ink') }}
-    {{ stat('Subjects Tracked', stats.subjects, 'text-ink') }}
-  {% endif %}
-</div>
-
-{% if user.role == 'admin' %}
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-  {{ stat('Locked Accounts', locked_count, 'text-alert' if locked_count else 'text-ink') }}
-  {{ stat('Failed Logins Today', stats.failed_today, 'text-alert' if stats.failed_today else 'text-ink') }}
-  {{ stat('Active Notices', stats.active_notices, 'text-ink') }}
-  {{ stat('Pending Grievances', open_grievances, 'text-alert' if open_grievances else 'text-ink') }}
-</div>
-{% endif %}
-
-<!-- Locked accounts — ACCESS MANAGER ONLY (owns unlocking accounts) -->
-{% if user.role == 'access_manager' and locked_count > 0 %}
-<div class="mt-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 flex items-center justify-between">
-  <span>⚠ <strong>{{ locked_count }}</strong> account{{ 's are' if locked_count != 1 else ' is' }} locked.</span>
-  <a href="{{ url_for('users_list') }}" class="underline hover:text-amber-900">Manage →</a>
-</div>
-{% endif %}
-
-<!-- System Health & Security Overview — SUPER ADMIN ONLY. Replaces the
-     academic "low attendance" table on this role's dashboard: attendance
-     management belongs to Faculty, while system health/security oversight
-     belongs to the Super Admin. -->
-{% if user.role == 'admin' and health %}
-<div class="mt-4 bg-white rounded-lg border border-slate-200 p-5">
-  <div class="flex items-center justify-between mb-4">
-    <h2 class="text-sm font-semibold text-ink">🖥️ System Health &amp; Security Overview</h2>
-    <a href="{{ url_for('audit_activity') }}" class="text-xs bg-signal hover:bg-teal-700 text-white px-3 py-1.5 rounded-md transition">View Security Dashboard →</a>
-  </div>
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-    <div class="px-3 py-2.5 rounded-md bg-slate-50 border border-slate-100">
-      <div class="text-[10px] uppercase text-slate-400 font-semibold">Database Connection</div>
-      <div class="text-sm font-semibold mt-1 text-teal-600">✔ {{ health.db_status }}</div>
+    <div class="row">
+      <button class="btn btn-primary" id="startCam">Start Camera</button>
+      <button class="btn btn-outline" id="stopCam" disabled>Stop Camera</button>
     </div>
-    <div class="px-3 py-2.5 rounded-md bg-slate-50 border border-slate-100">
-      <div class="text-[10px] uppercase text-slate-400 font-semibold">Audit Trail</div>
-      <div class="text-sm font-semibold mt-1 {{ 'text-teal-600' if health.audit_trail_status == 'Active' else 'text-alert' }}">
-        {{ '✔' if health.audit_trail_status == 'Active' else '⚠' }} {{ health.audit_trail_status }}
+    <div class="gesture-readout">
+      <div>
+        <div class="label">Detected Sign</div>
+        <div class="value" id="gestureLabel">—</div>
       </div>
+      <button class="btn btn-outline" id="muteBtn">🔊 Speak: On</button>
     </div>
-    <div class="px-3 py-2.5 rounded-md bg-slate-50 border border-slate-100">
-      <div class="text-[10px] uppercase text-slate-400 font-semibold">Backup Status</div>
-      <div class="text-sm font-semibold mt-1 text-amber-600">⚠ {{ health.backup_status }}</div>
-    </div>
-    <div class="px-3 py-2.5 rounded-md bg-slate-50 border border-slate-100">
-      <div class="text-[10px] uppercase text-slate-400 font-semibold">Active Sessions</div>
-      <div class="text-sm font-semibold mt-1 text-ink">{{ health.active_sessions }}</div>
-    </div>
-    <div class="px-3 py-2.5 rounded-md bg-slate-50 border border-slate-100">
-      <div class="text-[10px] uppercase text-slate-400 font-semibold">Locked Accounts</div>
-      <div class="text-sm font-semibold mt-1 {{ 'text-alert' if health.locked_accounts else 'text-ink' }}">{{ health.locked_accounts }}</div>
-    </div>
-    <div class="px-3 py-2.5 rounded-md bg-slate-50 border border-slate-100">
-      <div class="text-[10px] uppercase text-slate-400 font-semibold">Failed Login Attempts</div>
-      <div class="text-sm font-semibold mt-1 {{ 'text-alert' if health.failed_logins else 'text-ink' }}">{{ health.failed_logins }}</div>
-    </div>
-    <div class="px-3 py-2.5 rounded-md bg-slate-50 border border-slate-100">
-      <div class="text-[10px] uppercase text-slate-400 font-semibold">SQL Injection Attempts Blocked</div>
-      <div class="text-sm font-semibold mt-1 {{ 'text-alert' if health.sql_injection_blocked else 'text-ink' }}">{{ health.sql_injection_blocked }}</div>
-    </div>
-    <a href="{{ url_for('suspicious_activity', status='Open') }}"
-       class="px-3 py-2.5 rounded-md bg-slate-50 border border-slate-100 hover:border-signal transition block">
-      <div class="text-[10px] uppercase text-slate-400 font-semibold">Suspicious Activities Detected</div>
-      <div class="text-sm font-semibold mt-1 {{ 'text-alert' if health.suspicious_activities else 'text-ink' }}">{{ health.suspicious_activities }} <span class="text-[10px] font-normal text-slate-400">open</span></div>
-    </a>
-  </div>
-</div>
-{% endif %}
-
-<!-- Low attendance summary — FACULTY ONLY. Attendance is a Faculty concern;
-     Super Admin now sees System Health & Security above instead, and
-     Access Manager doesn't manage academic data (IAM vs academic-ops split). -->
-{% if low_att and user.role == 'faculty' %}
-<div class="mt-4 px-4 py-3 bg-red-50 border border-red-200 rounded-md">
-  <div class="flex items-center justify-between mb-2">
-    <p class="text-sm font-semibold text-red-700">📉 Students Below 75% Attendance (top 10)</p>
-    <a href="{{ url_for('low_attendance_report') }}" class="text-xs text-red-600 underline hover:text-red-800">View full report →</a>
-  </div>
-  <table class="w-full text-xs text-red-800">
-    <thead><tr class="border-b border-red-200">
-      <th class="text-left py-1">Student</th>
-      <th class="text-left py-1">Roll No.</th>
-      <th class="text-left py-1">Subject</th>
-      <th class="text-right py-1">Attendance %</th>
-    </tr></thead>
-    <tbody>
-      {% for r in low_att %}
-      <tr class="border-b border-red-100">
-        <td class="py-1">{{ r.full_name }}</td>
-        <td class="py-1 font-mono">{{ r.roll_number }}</td>
-        <td class="py-1">{{ r.subject }}</td>
-        <td class="py-1 text-right font-bold">{{ r.pct }}%</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %}
-
-<!-- Quick-links row -->
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
-  {% if user.role == 'admin' %}
-    {# Super Admin: system administration + academic configuration.
-       No User Accounts / Role Management / Password Reset / Student
-       Information / Bulk Upload / Pending Approvals here -- those are
-       Access Manager territory (separation of duties). #}
-    <a href="{{ url_for('courses') }}"       class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
-      <span class="text-2xl">📚</span><div><div class="text-xs text-slate-400">Courses</div><div class="font-semibold text-ink text-sm">Manage Courses</div></div>
-    </a>
-    <a href="{{ url_for('syllabus.admin_index') }}" class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
-      <span class="text-2xl">🏛️</span><div><div class="text-xs text-slate-400">Academic Structure</div><div class="font-semibold text-ink text-sm">Manage Departments</div></div>
-    </a>
-    <a href="{{ url_for('syllabus.admin_index') }}" class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
-      <span class="text-2xl">📖</span><div><div class="text-xs text-slate-400">Scheme &amp; Syllabus</div><div class="font-semibold text-ink text-sm">Manage Syllabus</div></div>
-    </a>
-    <a href="{{ url_for('files') }}"         class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
-      <span class="text-2xl">🗂️</span><div><div class="text-xs text-slate-400">Files</div><div class="font-semibold text-ink text-sm">File Manager</div></div>
-    </a>
-  {% elif user.role in ('faculty',) %}
-    <a href="{{ url_for('notices') }}"      class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
-      <span class="text-2xl">📢</span><div><div class="text-xs text-slate-400">Notices</div><div class="font-semibold text-ink text-sm">Post / View</div></div>
-    </a>
-    <a href="{{ url_for('exam_schedule') }}" class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
-      <span class="text-2xl">🗓️</span><div><div class="text-xs text-slate-400">Exams</div><div class="font-semibold text-ink text-sm">Manage Schedule</div></div>
-    </a>
-    <a href="{{ url_for('grievances') }}"   class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition {{ 'ring-1 ring-amber-300 border-amber-200' if open_grievances > 0 else '' }}">
-      <span class="text-2xl">📨</span><div><div class="text-xs text-slate-400">Grievances</div>
-      <div class="font-semibold text-ink text-sm">
-        {% if open_grievances > 0 %}<span class="text-amber-600">{{ open_grievances }} open</span>{% else %}All clear{% endif %}
-      </div></div>
-    </a>
-    <a href="{{ url_for('results') }}"      class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
-      <span class="text-2xl">📊</span><div><div class="text-xs text-slate-400">Results</div><div class="font-semibold text-ink text-sm">Post Marks</div></div>
-    </a>
-  {% elif user.role == 'access_manager' %}
-    {# IAM-only quick links — no academic data (attendance/results/marks) #}
-    <a href="{{ url_for('users_list') }}"   class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
-      <span class="text-2xl">🛡️</span><div><div class="text-xs text-slate-400">Users</div><div class="font-semibold text-ink text-sm">Manage Accounts</div></div>
-    </a>
-    {% if has_endpoint('pending_users') %}
-    <a href="{{ url_for('pending_users') }}" class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition {{ 'ring-1 ring-amber-300 border-amber-200' if stats.pending > 0 else '' }}">
-      <span class="text-2xl">⏳</span><div><div class="text-xs text-slate-400">Approvals</div>
-      <div class="font-semibold text-ink text-sm">
-        {% if stats.pending > 0 %}<span class="text-amber-600">{{ stats.pending }} pending</span>{% else %}All clear{% endif %}
-      </div></div>
-    </a>
-    {% endif %}
-    <a href="{{ url_for('bulk_upload_students') }}" class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
-      <span class="text-2xl">📥</span><div><div class="text-xs text-slate-400">Bulk Upload</div><div class="font-semibold text-ink text-sm">Add Students</div></div>
-    </a>
-    <a href="{{ url_for('students') }}"     class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
-      <span class="text-2xl">👥</span><div><div class="text-xs text-slate-400">Directory</div><div class="font-semibold text-ink text-sm">Student Information</div></div>
-    </a>
-  {% else %}
-    <a href="{{ url_for('results') }}"      class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
-      <span class="text-2xl">📊</span><div><div class="text-xs text-slate-400">Results</div><div class="font-semibold text-ink text-sm">My Marksheet</div></div>
-    </a>
-    <a href="{{ url_for('fee_status') }}"   class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
-      <span class="text-2xl">💰</span><div><div class="text-xs text-slate-400">Fees</div><div class="font-semibold text-ink text-sm">My Fee Status</div></div>
-    </a>
-    <a href="{{ url_for('exam_schedule') }}" class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
-      <span class="text-2xl">🗓️</span><div><div class="text-xs text-slate-400">Exams</div><div class="font-semibold text-ink text-sm">Upcoming</div></div>
-    </a>
-    <a href="{{ url_for('grievances') }}"   class="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-3 hover:border-signal transition">
-      <span class="text-2xl">📨</span><div><div class="text-xs text-slate-400">Grievances</div><div class="font-semibold text-ink text-sm">Raise Query</div></div>
-    </a>
-  {% endif %}
-</div>
-
-<!-- Pinned notices + upcoming exams -->
-{% if pinned_notices or upcoming_exams %}
-<div class="grid lg:grid-cols-2 gap-4 mt-4">
-  {% if pinned_notices %}
-  <div class="bg-white rounded-lg border border-signal/30 p-4">
-    <h3 class="text-xs font-semibold text-signal eyebrow uppercase mb-3">📌 Pinned Notices</h3>
-    <div class="space-y-2">
-      {% for n in pinned_notices %}
-      <a href="{{ url_for('notices') }}" class="block hover:bg-slate-50 rounded px-2 py-1.5 -mx-2 transition">
-        <p class="text-sm font-medium text-ink">{{ n.title }}</p>
-        <p class="text-xs text-slate-400">{{ n.category | capitalize }} · {{ n.created_at[:10] }}</p>
-      </a>
-      {% endfor %}
+    <h2 style="margin-top:20px;">Supported Signs</h2>
+    <div class="legend" id="legend"></div>
+    <div class="tip-card gold">
+      <b>For Deaf signers</b>
+      Sign clearly to the camera and hold each sign for about a second. The detected sign is spoken aloud and added to the transcript automatically.
     </div>
   </div>
-  {% endif %}
-  {% if upcoming_exams %}
-  <div class="bg-white rounded-lg border border-purple-200 p-4">
-    <h3 class="text-xs font-semibold text-purple-600 eyebrow uppercase mb-3">🗓 Upcoming Exams</h3>
-    <div class="space-y-2">
-      {% for e in upcoming_exams %}
-      <div class="flex items-center justify-between text-sm">
-        <span class="font-medium text-ink">{{ e.subject }}</span>
-        <span class="text-xs text-slate-500 font-mono">{{ e.exam_date }} · {{ e.exam_time }}</span>
-      </div>
-      {% endfor %}
+
+  <div class="card">
+    <h2>Voice Recognition <b>· Speech → Text</b></h2>
+    <div class="mic-btn" id="micBtn">🎤 Tap to start listening (hearing person speaks here)</div>
+    <div class="quick-phrases" id="quickPhrases">
+      <button type="button" class="chip" data-text="Hello, how are you?">Hello, how are you?</button>
+      <button type="button" class="chip" data-text="Thank you">Thank you</button>
+      <button type="button" class="chip" data-text="I need help, please">I need help, please</button>
+      <button type="button" class="chip" data-text="Nice to meet you">Nice to meet you</button>
     </div>
-    <a href="{{ url_for('exam_schedule') }}" class="text-xs text-purple-600 hover:underline mt-2 block">View full schedule →</a>
-  </div>
-  {% endif %}
-</div>
-{% endif %}
-
-<div class="grid lg:grid-cols-2 gap-5 mt-6">
-  <!-- Chart -->
-  <div class="bg-white rounded-lg border border-slate-200 p-5">
-    <h2 class="text-sm font-semibold text-ink mb-4">Students by Department</h2>
-    {% if by_dept %}
-    <canvas id="deptChart" height="180"></canvas>
-    {% else %}
-    <p class="text-sm text-slate-400">No students yet.</p>
-    {% endif %}
-  </div>
-
-  <!-- Recent activity — ADMIN sees full system log; ACCESS MANAGER sees full
-       system log too (IAM needs visibility into all user activity, same
-       query the backend already sends for this role); FACULTY sees only
-       their own actions. -->
-  <div class="bg-white rounded-lg border border-slate-200 p-5">
-    <h2 class="text-sm font-semibold text-ink mb-4">
-      {% if user.role in ('admin', 'access_manager') %}Recent system activity{% else %}My recent activity{% endif %}
-    </h2>
-    <div class="table-scroll">
-<table class="w-full text-sm evidence">
-      <tbody class="divide-y divide-slate-100">
-        {% for r in recent %}
-          <tr>
-            <td class="py-2 font-mono text-xs text-slate-400 whitespace-nowrap pr-3">{{ r.timestamp }}</td>
-            <td class="py-2 pr-3 font-medium text-steel">{{ r.username }}</td>
-            <td class="py-2 pr-3"><span class="px-2 py-0.5 rounded bg-slate-100 text-xs">{{ r.action }}</span></td>
-            <td class="py-2 text-slate-500 text-xs">{{ r.module }}</td>
-          </tr>
-        {% else %}
-          <tr><td class="py-3 text-slate-400">No activity recorded.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-</div>
+    <div class="type-row">
+      <input type="text" id="typeInput" placeholder="Or type what you want to say…" />
+      <button type="button" class="btn btn-primary" id="typeSendBtn">Send</button>
+    </div>
+    <div class="transcript" id="transcript">
+      <div class="empty">Conversation will appear here…</div>
+    </div>
+    <div class="row">
+      <button class="btn btn-outline" id="newConvo">New conversation</button>
+      <button class="btn btn-danger" id="clearChat">Clear this conversation</button>
+    </div>
+    <div class="tip-card">
+      <b>For hearing partners</b>
+      Speak into the mic, or type and hit Send if you'd rather not talk out loud — either way it appears instantly in the transcript.
+    </div>
   </div>
 </div>
 
-{% if user.role == 'admin' and today_summary %}
-<!-- Today's Summary — SUPER ADMIN ONLY, below the Students by Department chart.
-     Replaces the old Role Distribution section. Every figure is a live
-     COUNT(*) from the DB for "today"; clicking a row jumps to that module. -->
-<div class="bg-white rounded-lg border border-slate-200 p-5 mt-5">
-  <h2 class="text-sm font-semibold text-ink mb-4">Today's Summary</h2>
-  <div class="divide-y divide-slate-100">
-    <a href="{{ url_for('students') }}" class="flex items-center justify-between py-2.5 hover:bg-slate-50 -mx-2 px-2 rounded transition">
-      <span class="text-sm text-slate-600">✓ New Student Registrations</span>
-      <span class="text-sm font-semibold text-ink">{{ today_summary.students_today }}</span>
-    </a>
-    <div class="flex items-center justify-between py-2.5 -mx-2 px-2">
-      <span class="text-sm text-slate-600">✓ Faculty Approved</span>
-      <span class="text-sm font-semibold text-ink">{{ today_summary.faculty_approved_today }}</span>
-    </div>
-    <a href="{{ url_for('notices') }}" class="flex items-center justify-between py-2.5 hover:bg-slate-50 -mx-2 px-2 rounded transition">
-      <span class="text-sm text-slate-600">✓ Notices Published</span>
-      <span class="text-sm font-semibold text-ink">{{ today_summary.notices_today }}</span>
-    </a>
-    <a href="{{ url_for('leaves') }}" class="flex items-center justify-between py-2.5 hover:bg-slate-50 -mx-2 px-2 rounded transition">
-      <span class="text-sm text-slate-600">✓ Leaves Pending</span>
-      <span class="text-sm font-semibold {{ 'text-alert' if today_summary.leaves_pending else 'text-ink' }}">{{ today_summary.leaves_pending }}</span>
-    </a>
-    <a href="{{ url_for('suspicious_activity') }}" class="flex items-center justify-between py-2.5 hover:bg-slate-50 -mx-2 px-2 rounded transition">
-      <span class="text-sm text-slate-600">✓ Security Breaches</span>
-      <span class="text-sm font-semibold {{ 'text-alert' if today_summary.breaches_today else 'text-ink' }}">{{ today_summary.breaches_today }}</span>
-    </a>
-  </div>
-</div>
-{% endif %}
+{% endblock %}
 
-<!-- Failed logins — ADMIN & ACCESS MANAGER (both need visibility into
-     failed sign-in attempts for IAM/security purposes; backend already
-     populates `failed` for both roles) -->
-{% if user.role in ('admin', 'access_manager') and failed %}
-<div class="bg-white rounded-lg border border-alert/30 p-5 mt-5">
-  <h2 class="text-sm font-semibold text-alert mb-3">Recent failed sign-ins</h2>
-  <div class="table-scroll">
-<table class="w-full text-sm evidence">
-    <tbody class="divide-y divide-slate-100">
-      {% for f in failed %}
-        <tr>
-          <td class="py-2 font-mono text-xs text-slate-400 pr-3">{{ f.timestamp }}</td>
-          <td class="py-2 pr-3 font-medium text-steel">{{ f.username }}</td>
-          <td class="py-2 font-mono text-xs text-slate-500">{{ f.ip_address }}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-</div>
-{% endif %}
-
-{% if by_dept %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script>
-  const ctx = document.getElementById('deptChart').getContext('2d');
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9';
-  const tickColor = isDark ? '#93a1b8' : '#64748b';
-  new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: {{ by_dept | map(attribute='department') | list | tojson }},
-      datasets: [{
-        label: 'Students',
-        data: {{ by_dept | map(attribute='c') | list | tojson }},
-        backgroundColor: '#0d9488cc',
-        borderColor: '#0d9488',
-        borderWidth: 1,
-        borderRadius: 4,
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 }, color: tickColor }, grid: { color: gridColor } },
-        x: { ticks: { font: { size: 11 }, color: tickColor }, grid: { display: false } }
-      }
-    }
-  });
-</script>
-{% endif %}
-
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
 {% endblock %}

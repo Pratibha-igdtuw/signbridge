@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SignBridge — A live bridge between sign and speech</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}">
+</head>
+<body class="lp">
+
+  <!-- logo mark, reused via <use> -->
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <linearGradient id="lpGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#9B87E0"/>
+        <stop offset="100%" stop-color="#5F4BB0"/>
+      </linearGradient>
+      <symbol id="lpMark" viewBox="0 0 40 40">
+        <rect width="40" height="40" rx="11" fill="url(#lpGrad)"/>
+        <circle cx="12" cy="20" r="4" fill="#fff"/>
+        <circle cx="28" cy="20" r="4" fill="#fff"/>
+        <path d="M16 20 Q20 12 24 20" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+        <path d="M16 20 Q20 28 24 20" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" opacity="0.55"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <!-- Nav -->
+  <div class="lp-nav">
+    <a href="#top" class="lp-brand"><svg class="lp-mark"><use href="#lpMark"/></svg>SignBridge</a>
+    <div class="lp-nav-links">
+      <a href="#why">Why it matters</a>
+      <a href="#how-you-use-it">How you use it</a>
+      <a href="#how-it-works">How it works</a>
+      <a href="#features">Features</a>
+    </div>
+    <a href="{{ url_for('auth.login_page') }}" class="lp-nav-cta">Open SignBridge</a>
+  </div>
+
+  <!-- Hero -->
+  <div class="lp-hero" id="top">
+    <div class="lp-callout lp-callout-left">
+      <div class="who hearing">Hearing types</div>
+      <div class="msg">"How are you feeling today?"</div>
+    </div>
+    <div class="lp-callout lp-callout-right">
+      <div class="who deaf">Deaf signs</div>
+      <div class="msg">"I feel good — thank you"</div>
+    </div>
+
+    <svg class="lp-mark-hero"><use href="#lpMark"/></svg>
+    <div class="lp-badge">✦ Inclusive communication for Deaf &amp; hearing people</div>
+    <h1 class="serif">A live bridge between<br><span class="accent">sign and speech</span></h1>
+    <p class="lead">SignBridge lets Deaf and hearing people talk, collaborate, and learn together. Speak or type and a live transcript appears. Sign to the camera and it's read back out loud — in real time, right in your browser.</p>
+    <div class="lp-cta-row">
+      <a href="{{ url_for('auth.register_page') }}" class="lp-btn lp-btn-primary">Start communicating →</a>
+      <a href="#how-it-works" class="lp-btn lp-btn-outline">See how it works</a>
+    </div>
+    <div class="lp-meta-row">
+      <span class="dot live"></span> Real-time
+      <span class="dot"></span> Runs in your browser
+      <span class="dot"></span> Your own sign vocabulary
+    </div>
+  </div>
+
+  <!-- Why it matters -->
+  <div class="lp-section" id="why">
+    <div class="lp-section-head">
+      <div class="eyebrow">Why it matters</div>
+      <h2 class="serif">Built around how Deaf people actually communicate</h2>
+    </div>
+    <div class="lp-stats">
+      <div class="lp-stat-card">
+        <div class="num serif">70M+</div>
+        <div class="desc">Deaf people use sign language worldwide</div>
+        <div class="src">World Federation of the Deaf</div>
+      </div>
+      <div class="lp-stat-card">
+        <div class="num serif">300+</div>
+        <div class="desc">Distinct sign languages in active use across the globe</div>
+        <div class="src">World Federation of the Deaf</div>
+      </div>
+      <div class="lp-stat-card">
+        <div class="num serif">Full</div>
+        <div class="desc">Natural language — sign has its own grammar; it is not signed English</div>
+        <div class="src">Linguistic consensus</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- How you use it -->
+  <div class="lp-section" id="how-you-use-it">
+    <div class="lp-section-head">
+      <div class="eyebrow">How you use it</div>
+      <h2 class="serif">Two people, one conversation</h2>
+    </div>
+    <div class="lp-paths">
+      <div class="lp-path-card">
+        <div class="icon">🔊</div>
+        <h3 class="serif">If you're hearing</h3>
+        <p>Speak into the mic or type — SignBridge transcribes it instantly so the conversation is never one-sided.</p>
+      </div>
+      <div class="lp-path-link">⇄</div>
+      <div class="lp-path-card">
+        <div class="icon">🤟</div>
+        <h3 class="serif">If you sign</h3>
+        <p>Sign to your camera — hand-landmark recognition detects each sign and speaks it aloud, no typing needed.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <div class="lp-section" id="how-it-works">
+    <div class="lp-section-head">
+      <div class="eyebrow">How it works</div>
+      <h2 class="serif">From gesture to voice in four steps</h2>
+    </div>
+    <div class="lp-steps">
+      <div class="lp-step">
+        <div class="n serif">01</div>
+        <h4>Camera opens</h4>
+        <p>Grant camera access and MediaPipe tracks your hand landmarks live, entirely in your browser.</p>
+      </div>
+      <div class="lp-step">
+        <div class="n serif">02</div>
+        <h4>Sign is matched</h4>
+        <p>Finger and joint positions are compared against your gesture vocabulary to identify the sign.</p>
+      </div>
+      <div class="lp-step">
+        <div class="n serif">03</div>
+        <h4>Voice replies</h4>
+        <p>The matched word is spoken aloud instantly using your browser's built-in text-to-speech.</p>
+      </div>
+      <div class="lp-step">
+        <div class="n serif">04</div>
+        <h4>It's logged</h4>
+        <p>Every exchange is saved to your conversation history so nothing is lost after you close the tab.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Signature bridge visual -->
+  <div class="lp-section">
+    <div class="lp-bridge-wrap">
+      <div class="lp-bridge">
+        <div class="lp-node">🤟</div>
+        <div class="lp-span"></div>
+        <div class="lp-node">🔊</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Features (real product capabilities, beyond the reference site) -->
+  <div class="lp-section" id="features">
+    <div class="lp-section-head">
+      <div class="eyebrow">Under the hood</div>
+      <h2 class="serif">More than a translator</h2>
+    </div>
+    <div class="lp-features">
+      <div class="lp-feature">
+        <div class="icon">✋</div>
+        <h4>Build your own sign vocabulary</h4>
+        <p>Add custom sign → word mappings on top of the built-in gesture set, so SignBridge speaks your signs, not just the defaults.</p>
+      </div>
+      <div class="lp-feature">
+        <div class="icon">🗂️</div>
+        <h4>Conversation history</h4>
+        <p>Every translated sign and every transcribed line is saved, so a conversation survives a refresh or a lost connection.</p>
+      </div>
+      <div class="lp-feature">
+        <div class="icon">📊</div>
+        <h4>Usage analytics</h4>
+        <p>See your most-used signs, your sign-vs-voice split, and total translations — computed live from your own history.</p>
+      </div>
+      <div class="lp-feature">
+        <div class="icon">🔒</div>
+        <h4>Private by account</h4>
+        <p>Rate-limited login, session-based auth, and password strength checks keep every account and its history protected.</p>
+      </div>
+      <div class="lp-feature">
+        <div class="icon">⚡</div>
+        <h4>No install, no upload</h4>
+        <p>Hand tracking and speech both run client-side in your browser — no video is ever uploaded to a server.</p>
+      </div>
+      <div class="lp-feature">
+        <div class="icon">🆓</div>
+        <h4>Free to start</h4>
+        <p>Create an account and start signing or speaking in under a minute — no downloads, no hardware.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Final CTA -->
+  <div class="lp-section">
+    <div class="lp-final">
+      <h2>Ready to bridge the conversation?</h2>
+      <p>Create a free account and start translating between sign and speech in real time.</p>
+      <a href="{{ url_for('auth.register_page') }}" class="lp-btn lp-btn-primary">Start communicating →</a>
+    </div>
+  </div>
+
+  <div class="lp-foot">
+    <a href="#top" class="lp-brand"><svg class="lp-mark" style="width:26px;height:26px;"><use href="#lpMark"/></svg>SignBridge</a>
+    <span>SignBridge · Tech-Expo Social Impact &amp; Inclusion Project</span>
+  </div>
+
+</body>
+</html>

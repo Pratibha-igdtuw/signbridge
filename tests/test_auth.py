@@ -1,67 +1,56 @@
-"""Tests for authentication: login, register, lockout, approval workflow."""
-import pytest
+def test_register_success(client):
+    res = client.post('/api/auth/register', json={
+        'name': 'Alice', 'email': 'alice@example.com', 'password': 'Password1'
+    })
+    assert res.status_code == 201
+    assert res.get_json()['user']['email'] == 'alice@example.com'
 
 
-def test_login_valid_admin(admin_client):
-    r = admin_client.get("/dashboard", follow_redirects=True)
-    assert r.status_code == 200
-    assert b"Dashboard" in r.data or b"IDon" in r.data
+def test_register_weak_password(client):
+    res = client.post('/api/auth/register', json={
+        'name': 'Alice', 'email': 'alice@example.com', 'password': 'weak'
+    })
+    assert res.status_code == 400
 
 
-def test_login_valid_faculty(faculty_client):
-    r = faculty_client.get("/dashboard", follow_redirects=True)
-    assert r.status_code == 200
+def test_register_duplicate_email(client):
+    client.post('/api/auth/register', json={
+        'name': 'Alice', 'email': 'alice@example.com', 'password': 'Password1'
+    })
+    res = client.post('/api/auth/register', json={
+        'name': 'Bob', 'email': 'alice@example.com', 'password': 'Password1'
+    })
+    assert res.status_code == 409
 
 
-def test_login_valid_student(student_client):
-    r = student_client.get("/attendance", follow_redirects=True)
-    assert r.status_code == 200
+def test_login_success(client):
+    client.post('/api/auth/register', json={
+        'name': 'Alice', 'email': 'alice@example.com', 'password': 'Password1'
+    })
+    client.post('/api/auth/logout')
+    res = client.post('/api/auth/login', json={
+        'email': 'alice@example.com', 'password': 'Password1'
+    })
+    assert res.status_code == 200
 
 
-def test_login_invalid_password(client):
-    r = client.post("/login",
-                    data={"username": "admin", "password": "wrongpassword"},
-                    follow_redirects=True)
-    assert r.status_code == 200
-    assert b"Invalid" in r.data or b"credentials" in r.data
+def test_login_wrong_password(client):
+    client.post('/api/auth/register', json={
+        'name': 'Alice', 'email': 'alice@example.com', 'password': 'Password1'
+    })
+    client.post('/api/auth/logout')
+    res = client.post('/api/auth/login', json={
+        'email': 'alice@example.com', 'password': 'WrongPass1'
+    })
+    assert res.status_code == 401
 
 
-def test_login_wrong_user(client):
-    r = client.post("/login",
-                    data={"username": "nobody", "password": "whatever"},
-                    follow_redirects=True)
-    assert r.status_code == 200
-    assert b"Invalid" in r.data or b"credentials" in r.data
+def test_me_requires_login(client):
+    res = client.get('/api/auth/me')
+    assert res.get_json()['user'] is None
 
 
-def test_login_lockout_after_5_fails(client):
-    """After 5 failed logins the account should be locked."""
-    for _ in range(5):
-        client.post("/login",
-                    data={"username": "student", "password": "badpass"})
-    r = client.post("/login",
-                    data={"username": "student", "password": "badpass"},
-                    follow_redirects=True)
-    assert r.status_code == 200
-    assert b"locked" in r.data.lower() or b"too many" in r.data.lower()
-
-
-def test_register_pending_status(client, app):
-    r = client.post("/register", data={
-        "username": "newstu",
-        "email": "newstu@igdtuw.ac.in",
-        "password": "NewPass1",
-        "full_name": "New Student",
-        "role": "student",
-    }, follow_redirects=True)
-    assert r.status_code == 200
-    # Login should be blocked (pending)
-    r2 = client.post("/login",
-                     data={"username": "newstu", "password": "NewPass1"},
-                     follow_redirects=True)
-    assert b"pending" in r2.data.lower() or b"approval" in r2.data.lower()
-
-
-def test_logout(admin_client):
-    r = admin_client.get("/logout", follow_redirects=True)
-    assert r.status_code == 200
+def test_logout_clears_session(registered_client):
+    registered_client.post('/api/auth/logout')
+    res = registered_client.get('/api/translate', json={})
+    assert res.status_code in (401, 405)

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}History — SignBridge{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>Conversation History <b>· All logged translations</b></h2>
+  <table class="simple" id="historyTable">
+    <thead>
+      <tr><th>When</th><th>Source</th><th>Content</th></tr>
+    </thead>
+    <tbody id="historyBody">
+      <tr><td colspan="3" class="empty">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadHistory(){
+  const body = document.getElementById('historyBody');
+  try{
+    const res = await fetch('/api/history?limit=200');
+    const rows = await res.json();
+    if(!rows.length){
+      body.innerHTML = '<tr><td colspan="3" class="empty">No translations logged yet.</td></tr>';
+      return;
+    }
+    body.innerHTML = rows.map(r => `
+      <tr>
+        <td>${new Date(r.created_at).toLocaleString()}</td>
+        <td>${r.source === 'sign' ? '🤟 Sign' : '🎤 Voice'}</td>
+        <td>${r.text}</td>
+      </tr>
+    `).join('');
+  }catch(e){
+    body.innerHTML = '<tr><td colspan="3" class="empty">Could not load history.</td></tr>';
+  }
+}
+loadHistory();
+</script>
+{% endblock %}
