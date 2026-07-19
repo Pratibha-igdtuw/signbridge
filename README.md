@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # SignBridge — Backend
 
 A full-stack accessibility app that bridges sign language and speech in real time.
@@ -55,3 +56,7 @@ python -m pytest tests/ -v
   dependency-light, and is easy to explain to judges without needing a big dataset.
 - For a real deployment, set `SECRET_KEY` as an environment variable and swap the
   in-memory rate-limiter storage for Redis.
+=======
+# signbridge
+Real-time sign language ↔ speech translator built with Flask, MediaPipe hand tracking, and the Web Speech API — with custom gesture vocab, conversation history, and usage analytics.
+>>>>>>> 37a9e79e12fe2f818742b52a42f47a70b7958363
