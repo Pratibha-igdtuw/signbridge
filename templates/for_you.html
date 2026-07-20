@@ -17,10 +17,17 @@
 <div class="grid">
   <div class="card">
     <h2>Sign Recognition <b>· Sign → Speech</b></h2>
+    <div class="row" style="margin-top:0;">
+      <div class="cam-lang-seg" id="camLangSeg">
+        <button type="button" class="cam-lang-btn active" data-lang="ASL">🇺🇸 ASL</button>
+        <button type="button" class="cam-lang-btn" data-lang="BSL">🇬🇧 BSL</button>
+        <button type="button" class="cam-lang-btn" data-lang="ISL">🇮🇳 ISL</button>
+      </div>
+    </div>
     <div class="cam-box" id="camBox">
       <video id="video" playsinline autoplay muted></video>
       <canvas id="overlay"></canvas>
-      <div class="cam-off" id="camOff">Camera is off. Click "Start Camera" and allow access to begin recognizing hand signs.</div>
+      <div class="cam-off" id="camOff">Camera is off. Choose a language above, then click "Start Camera" and allow access to begin recognizing hand signs.</div>
     </div>
     <div class="row">
       <button class="btn btn-primary" id="startCam">Start Camera</button>
@@ -33,11 +40,11 @@
       </div>
       <button class="btn btn-outline" id="muteBtn">🔊 Speak: On</button>
     </div>
-    <h2 style="margin-top:20px;">Supported Signs</h2>
-    <div class="legend" id="legend"></div>
+    <h2 style="margin-top:20px;">Supported Signs <b id="legendLangLabel">· ASL</b></h2>
+    <select class="legend-select" id="legend" size="1"></select>
     <div class="tip-card gold">
       <b>For Deaf signers</b>
-      Sign clearly to the camera and hold each sign for about a second. The detected sign is spoken aloud and added to the transcript automatically.
+      Sign clearly to the camera and hold each sign for about a second. The detected sign is spoken aloud and added to the transcript automatically. Words marked 🎥 in the dropdown are live camera-detectable; 📖 words are reference vocabulary for this language.
     </div>
   </div>
 

@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 
-from database import db, Gesture
+from database import db, Gesture, SUPPORTED_LANGUAGES
 from auth import login_required, current_user
 
 gesture_bp = Blueprint('gesture', __name__)
@@ -10,8 +10,11 @@ gesture_bp = Blueprint('gesture', __name__)
 @login_required
 def list_gestures():
     user = current_user()
-    defaults = Gesture.query.filter_by(user_id=None).all()
-    custom = Gesture.query.filter_by(user_id=user.id).all()
+    language = (request.args.get('language') or 'ASL').strip().upper()
+    if language not in SUPPORTED_LANGUAGES:
+        language = 'ASL'
+    defaults = Gesture.query.filter_by(user_id=None, language=language).all()
+    custom = Gesture.query.filter_by(user_id=user.id, language=language).all()
     return jsonify([g.to_dict() for g in defaults + custom])
 
 
@@ -23,6 +26,9 @@ def add_gesture():
     key = (data.get('gesture_key') or '').strip().upper().replace(' ', '_')
     word = (data.get('word') or '').strip()
     emoji = (data.get('emoji') or '\U0001f590').strip()
+    language = (data.get('language') or 'ASL').strip().upper()
+    if language not in SUPPORTED_LANGUAGES:
+        language = 'ASL'
 
     if not key or not word:
         return jsonify({'error': 'gesture_key and word are required'}), 400
@@ -33,7 +39,8 @@ def add_gesture():
     if exists:
         return jsonify({'error': 'You already have a custom gesture with this key'}), 409
 
-    g = Gesture(gesture_key=key, word=word, emoji=emoji, is_custom=True, user_id=user.id)
+    g = Gesture(gesture_key=key, word=word, emoji=emoji, is_custom=True, user_id=user.id,
+                language=language, shape_key=None, detectable=False)
     db.session.add(g)
     db.session.commit()
     return jsonify({'message': 'Gesture added', 'gesture': g.to_dict()}), 201

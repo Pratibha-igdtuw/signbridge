@@ -1,9 +1,13 @@
 /* ===================== SignBridge frontend logic ===================== */
 
-let GESTURES = {}; // loaded from backend: { KEY: {word, emoji} }
+let GESTURES = {};       // gesture_key -> {word, emoji} for the currently loaded language (all, incl. reference-only)
+let SHAPE_MAP = {};      // shape_key -> {gesture_key, word, emoji} — only the camera-detectable ones
+let currentLanguage = 'ASL';
 let activeConversationId = null;
 
 const legendEl = document.getElementById('legend');
+const legendLangLabelEl = document.getElementById('legendLangLabel');
+const camLangSeg = document.getElementById('camLangSeg');
 const video = document.getElementById('video');
 const overlay = document.getElementById('overlay');
 const ctx = overlay.getContext('2d');
@@ -21,24 +25,71 @@ let stableCount = 0;
 let camera = null;
 let hands = null;
 
-/* ---------- Load gesture vocabulary from backend ---------- */
-async function loadGestureVocabulary(){
+/* ---------- Load gesture vocabulary from backend for a given language ---------- */
+async function loadGestureVocabulary(language){
+  currentLanguage = language || currentLanguage;
   try{
-    const res = await fetch('/api/gestures');
+    const res = await fetch(`/api/gestures?language=${encodeURIComponent(currentLanguage)}`);
     const list = await res.json();
     GESTURES = {};
-    legendEl.innerHTML = '';
+    SHAPE_MAP = {};
+
+    const detectableOpts = [];
+    const referenceOpts = [];
+
     list.forEach(g => {
       GESTURES[g.gesture_key] = { word: g.word, emoji: g.emoji };
-      const span = document.createElement('span');
-      span.textContent = `${g.emoji} ${g.word}`;
-      legendEl.appendChild(span);
+      if(g.detectable && g.shape_key){
+        SHAPE_MAP[g.shape_key] = { gesture_key: g.gesture_key, word: g.word, emoji: g.emoji };
+        detectableOpts.push(g);
+      } else {
+        referenceOpts.push(g);
+      }
     });
+
+    legendEl.innerHTML = '';
+    if(detectableOpts.length){
+      const grp = document.createElement('optgroup');
+      grp.label = '🎥 Live camera detection';
+      detectableOpts.forEach(g => {
+        const opt = document.createElement('option');
+        opt.textContent = `${g.emoji} ${g.word}`;
+        grp.appendChild(opt);
+      });
+      legendEl.appendChild(grp);
+    }
+    if(referenceOpts.length){
+      const grp = document.createElement('optgroup');
+      grp.label = '📖 Full vocabulary (reference)';
+      referenceOpts.forEach(g => {
+        const opt = document.createElement('option');
+        opt.textContent = `${g.emoji} ${g.word}`;
+        grp.appendChild(opt);
+      });
+      legendEl.appendChild(grp);
+    }
+    if(legendLangLabelEl) legendLangLabelEl.textContent = `· ${currentLanguage} (${list.length} signs)`;
+
+    // reset live-tracking state so a stale shape from the old language doesn't fire
+    stableGesture = null;
+    stableCount = 0;
+    lastSpokenGesture = null;
+    if(gestureLabelEl) gestureLabelEl.textContent = '—';
   }catch(e){
     console.warn('Could not load gesture vocabulary', e);
   }
 }
-loadGestureVocabulary();
+loadGestureVocabulary(currentLanguage);
+
+if(camLangSeg){
+  camLangSeg.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.cam-lang-btn');
+    if(!btn) return;
+    camLangSeg.querySelectorAll('.cam-lang-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    loadGestureVocabulary(btn.dataset.lang);
+  });
+}
 
 /* ---------- Persist a translation to the backend ---------- */
 async function logTranslation(source, text, gestureKey){
@@ -86,6 +137,23 @@ function addTranscriptLine(who, text, cls){
 
 /* ===================== Feature 1: Hand sign recognition ===================== */
 
+// Every possible sign is reduced to which of the 5 fingers are extended.
+// This table is what actually determines what the camera CAN tell apart —
+// 11 distinguishable static hand shapes, shared across all 3 languages.
+const SHAPE_TABLE = {
+  '00000': 'FIST',
+  '11111': 'OPEN_HAND',
+  '01000': 'ONE',
+  '01100': 'TWO',
+  '01110': 'THREE',
+  '01111': 'FOUR',
+  '10000': 'THUMB',
+  '00001': 'PINKY',
+  '11001': 'ILY',
+  '01001': 'ROCK',
+  '00111': 'OK',
+};
+
 function classifyGesture(lm){
   const wrist = lm[0];
   function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
@@ -106,15 +174,10 @@ function classifyGesture(lm){
   const thumbExtended = dist(fingers.thumb.tip, lm[17]) > dist(fingers.thumb.mcp, lm[17]) * 1.1;
   extended.thumb = thumbExtended;
 
-  const count = Object.values(extended).filter(Boolean).length;
+  const key = [extended.thumb, extended.index, extended.middle, extended.ring, extended.pinky]
+    .map(b => b ? '1' : '0').join('');
 
-  if(extended.thumb && extended.index && !extended.middle && !extended.ring && extended.pinky) return 'ILY';
-  if(count >= 4) return 'OPEN_HAND';
-  if(count === 0) return 'FIST';
-  if(extended.index && extended.middle && !extended.ring && !extended.pinky) return 'PEACE';
-  if(extended.index && !extended.middle && !extended.ring && !extended.pinky && !extended.thumb) return 'ONE';
-  if(extended.thumb && !extended.index && !extended.middle && !extended.ring && !extended.pinky) return 'THUMB';
-  return null;
+  return SHAPE_TABLE[key] || null;
 }
 
 function onResults(results){
@@ -131,22 +194,22 @@ function onResults(results){
       drawLandmarks(ctx, lm, {color:'#F2A33E', lineWidth:1, radius:3});
     }
 
-    const g = classifyGesture(lm);
-    if(g && g === stableGesture){ stableCount++; }
-    else { stableGesture = g; stableCount = 0; }
+    const shapeKey = classifyGesture(lm);
+    if(shapeKey && shapeKey === stableGesture){ stableCount++; }
+    else { stableGesture = shapeKey; stableCount = 0; }
 
-    if(g && stableCount === 6 && GESTURES[g]){
-      const info = GESTURES[g];
+    if(shapeKey && stableCount === 6 && SHAPE_MAP[shapeKey]){
+      const info = SHAPE_MAP[shapeKey];
       gestureLabelEl.textContent = `${info.emoji} ${info.word}`;
-      if(lastSpokenGesture !== g){
+      if(lastSpokenGesture !== shapeKey){
         speak(info.word);
         addTranscriptLine('Sign', info.word, 'them');
         flashNode(nodeHearing);
-        logTranslation('sign', info.word, g);
-        lastSpokenGesture = g;
+        logTranslation('sign', info.word, info.gesture_key);
+        lastSpokenGesture = shapeKey;
       }
     }
-    if(!g){ gestureLabelEl.textContent = '—'; lastSpokenGesture = null; }
+    if(!shapeKey){ gestureLabelEl.textContent = '—'; lastSpokenGesture = null; }
   } else {
     gestureLabelEl.textContent = '—';
     lastSpokenGesture = null;

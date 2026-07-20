@@ -70,6 +70,9 @@ class Gesture(db.Model):
     word = db.Column(db.String(120), nullable=False)
     emoji = db.Column(db.String(10), default='\U0001f590')
     is_custom = db.Column(db.Boolean, default=False)
+    language = db.Column(db.String(10), default='ASL')       # ASL | BSL | ISL
+    shape_key = db.Column(db.String(30), nullable=True)       # maps to a camera-detectable hand shape, or NULL
+    detectable = db.Column(db.Boolean, default=False)         # True = live camera can recognize this one
 
     __table_args__ = (db.UniqueConstraint('user_id', 'gesture_key', name='uq_user_gesture'),)
 
@@ -79,6 +82,9 @@ class Gesture(db.Model):
             'word': self.word,
             'emoji': self.emoji,
             'is_custom': self.is_custom,
+            'language': self.language,
+            'shape_key': self.shape_key,
+            'detectable': self.detectable,
         }
 
 
@@ -94,19 +100,117 @@ class LoginEvent(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
-DEFAULT_GESTURES = [
-    ('OPEN_HAND', 'Hello', '\U0001f44b'),
-    ('FIST', 'Yes', '\u270a'),
-    ('ONE', 'Wait, one moment', '\u261d\ufe0f'),
-    ('PEACE', 'Peace', '\u270c\ufe0f'),
-    ('THUMB', 'Thank you', '\U0001f44d'),
-    ('ILY', 'I love you', '\U0001f91f'),
+SUPPORTED_LANGUAGES = ['ASL', 'BSL', 'ISL']
+
+# The 11 hand shapes classifyGesture() in app.js can actually tell apart via
+# MediaPipe landmarks (finger-extension pattern). Every language maps its most
+# essential words onto these same 11 shapes so the camera can recognize them live.
+CORE_SHAPES = [
+    ('FIST',      'Yes',        '\u270a'),
+    ('OPEN_HAND', 'Hello',      '\U0001f44b'),
+    ('ONE',       'Wait',       '\u261d\ufe0f'),
+    ('TWO',       'Peace',      '\u270c\ufe0f'),
+    ('THREE',     'Three',      '3\ufe0f\u20e3'),
+    ('FOUR',      'Four',       '4\ufe0f\u20e3'),
+    ('THUMB',     'Thank you',  '\U0001f44d'),
+    ('PINKY',     'Promise',    '\U0001f919'),
+    ('ILY',       'I love you', '\U0001f91f'),
+    ('ROCK',      'Rock on',    '\U0001f918'),
+    ('OK',        'OK',         '\U0001f44c'),
 ]
+
+# The remaining ~39 words per language: reference vocabulary shown in the
+# Supported Signs dropdown for learning, not yet mapped to a detectable shape.
+REFERENCE_WORDS = {
+    'ASL': [
+        ('Good morning', '\u2600\ufe0f'), ('Good afternoon', '\U0001f324\ufe0f'), ('Good evening', '\U0001f306'),
+        ('Good night', '\U0001f319'), ('Goodbye', '\U0001f44b'), ('Please', '\U0001f64f'), ('Sorry', '\U0001f614'),
+        ('Excuse me', '\U0001f647'), ('Name', '\U0001faaa'), ('Friend', '\U0001f91d'), ('Family', '\U0001f46a'),
+        ('Mother', '\U0001f469'), ('Father', '\U0001f468'), ('Sister', '\U0001f467'), ('Brother', '\U0001f466'),
+        ('Baby', '\U0001f476'), ('Help', '\U0001f6a8'), ('Stop', '\u270b'), ('Go', '\U0001f6b6'),
+        ('Eat', '\U0001f37d\ufe0f'), ('Drink', '\U0001f965'), ('Water', '\U0001f4a7'), ('More', '\u2795'),
+        ('Finish', '\u2705'), ('Want', '\U0001f64b'), ('Love', '\u2764\ufe0f'), ('Happy', '\U0001f60a'),
+        ('Sad', '\U0001f622'), ('Angry', '\U0001f620'), ('Tired', '\U0001f634'), ('Hot', '\U0001f525'),
+        ('Cold', '\u2744\ufe0f'), ('School', '\U0001f3eb'), ('Work', '\U0001f4bc'), ('Home', '\U0001f3e0'),
+        ('Bathroom', '\U0001f6bb'), ('Doctor', '\U0001fa7a'), ('Red', '\U0001f534'), ('Blue', '\U0001f535'),
+    ],
+    'BSL': [
+        ('Good morning', '\u2600\ufe0f'), ('Good afternoon', '\U0001f324\ufe0f'), ('Good evening', '\U0001f306'),
+        ('Good night', '\U0001f319'), ('Goodbye', '\U0001f44b'), ('Please', '\U0001f64f'), ('Sorry', '\U0001f614'),
+        ('Excuse me', '\U0001f647'), ('Name', '\U0001faaa'), ('Friend', '\U0001f91d'), ('Family', '\U0001f46a'),
+        ('Mum', '\U0001f469'), ('Dad', '\U0001f468'), ('Sister', '\U0001f467'), ('Brother', '\U0001f466'),
+        ('Baby', '\U0001f476'), ('Help', '\U0001f6a8'), ('Stop', '\u270b'), ('Go', '\U0001f6b6'),
+        ('Eat', '\U0001f37d\ufe0f'), ('Drink', '\U0001f965'), ('Water', '\U0001f4a7'), ('More', '\u2795'),
+        ('Finished', '\u2705'), ('Want', '\U0001f64b'), ('Love', '\u2764\ufe0f'), ('Happy', '\U0001f60a'),
+        ('Sad', '\U0001f622'), ('Angry', '\U0001f620'), ('Tired', '\U0001f634'), ('Hot', '\U0001f525'),
+        ('Cold', '\u2744\ufe0f'), ('School', '\U0001f3eb'), ('Work', '\U0001f4bc'), ('Home', '\U0001f3e0'),
+        ('Toilet', '\U0001f6bb'), ('Doctor', '\U0001fa7a'), ('Red', '\U0001f534'), ('Blue', '\U0001f535'),
+    ],
+    'ISL': [
+        ('Good morning', '\u2600\ufe0f'), ('Good afternoon', '\U0001f324\ufe0f'), ('Good evening', '\U0001f306'),
+        ('Good night', '\U0001f319'), ('Goodbye', '\U0001f44b'), ('Please', '\U0001f64f'), ('Sorry', '\U0001f614'),
+        ('Excuse me', '\U0001f647'), ('Name', '\U0001faaa'), ('Friend', '\U0001f91d'), ('Family', '\U0001f46a'),
+        ('Mother', '\U0001f469'), ('Father', '\U0001f468'), ('Sister', '\U0001f467'), ('Brother', '\U0001f466'),
+        ('Baby', '\U0001f476'), ('Help', '\U0001f6a8'), ('Stop', '\u270b'), ('Go', '\U0001f6b6'),
+        ('Eat', '\U0001f37d\ufe0f'), ('Drink', '\U0001f965'), ('Water', '\U0001f4a7'), ('More', '\u2795'),
+        ('Finish', '\u2705'), ('Want', '\U0001f64b'), ('Love', '\u2764\ufe0f'), ('Happy', '\U0001f60a'),
+        ('Sad', '\U0001f622'), ('Angry', '\U0001f620'), ('Tired', '\U0001f634'), ('Hot', '\U0001f525'),
+        ('Cold', '\u2744\ufe0f'), ('School', '\U0001f3eb'), ('Work', '\U0001f4bc'), ('Home', '\U0001f3e0'),
+        ('Bathroom', '\U0001f6bb'), ('Doctor', '\U0001fa7a'), ('Guest', '\U0001f64c'), ('Respect', '\U0001f64f'),
+    ],
+}
+
+
+def _slug(word):
+    return word.upper().replace(' ', '_').replace(',', '').replace("'", '')
+
+
+def _ensure_gesture_columns():
+    """Safe, additive-only migration: ADD COLUMN never touches existing data
+    or foreign keys, unlike ALTER TABLE RENAME (which is what caused the
+    IDon Portal corruption cascade) — so this is fine to run on every boot."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(db.engine)
+    if 'gestures' not in inspector.get_table_names():
+        return
+    existing_cols = {c['name'] for c in inspector.get_columns('gestures')}
+    with db.engine.connect() as conn:
+        if 'language' not in existing_cols:
+            conn.execute(text("ALTER TABLE gestures ADD COLUMN language VARCHAR(10) DEFAULT 'ASL'"))
+        if 'shape_key' not in existing_cols:
+            conn.execute(text("ALTER TABLE gestures ADD COLUMN shape_key VARCHAR(30)"))
+        if 'detectable' not in existing_cols:
+            conn.execute(text("ALTER TABLE gestures ADD COLUMN detectable BOOLEAN DEFAULT 0"))
+        conn.commit()
 
 
 def seed_default_gestures():
-    for key, word, emoji in DEFAULT_GESTURES:
-        exists = Gesture.query.filter_by(gesture_key=key, user_id=None).first()
-        if not exists:
-            db.session.add(Gesture(gesture_key=key, word=word, emoji=emoji, is_custom=False, user_id=None))
+    _ensure_gesture_columns()
+
+    # Drop the old pre-language default set (OPEN_HAND/FIST/... with no
+    # language tag) so it doesn't show up as a duplicate alongside the new
+    # ASL_OPEN_HAND etc. Only touches user_id=None (global defaults), never
+    # a learner's own custom gestures.
+    legacy_keys = ['OPEN_HAND', 'FIST', 'ONE', 'PEACE', 'THUMB', 'ILY']
+    Gesture.query.filter(Gesture.user_id.is_(None), Gesture.gesture_key.in_(legacy_keys)).delete(
+        synchronize_session=False
+    )
+
+    for lang in SUPPORTED_LANGUAGES:
+        for shape_key, word, emoji in CORE_SHAPES:
+            key = f'{lang}_{shape_key}'
+            exists = Gesture.query.filter_by(gesture_key=key, user_id=None).first()
+            if not exists:
+                db.session.add(Gesture(
+                    gesture_key=key, word=word, emoji=emoji, is_custom=False, user_id=None,
+                    language=lang, shape_key=shape_key, detectable=True,
+                ))
+        for word, emoji in REFERENCE_WORDS.get(lang, []):
+            key = f'{lang}_{_slug(word)}'
+            exists = Gesture.query.filter_by(gesture_key=key, user_id=None).first()
+            if not exists:
+                db.session.add(Gesture(
+                    gesture_key=key, word=word, emoji=emoji, is_custom=False, user_id=None,
+                    language=lang, shape_key=None, detectable=False,
+                ))
     db.session.commit()
