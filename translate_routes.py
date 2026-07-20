@@ -46,8 +46,8 @@ def log_translation():
     gesture_key = data.get('gesture_key')
     conversation_id = data.get('conversation_id')
 
-    if source not in ('sign', 'voice') or not text:
-        return jsonify({'error': "source must be 'sign' or 'voice', and text is required"}), 400
+    if source not in ('sign', 'voice', 'text') or not text:
+        return jsonify({'error': "source must be 'sign', 'voice', or 'text', and text is required"}), 400
 
     if conversation_id:
         conv = Conversation.query.filter_by(id=conversation_id, user_id=user.id).first()

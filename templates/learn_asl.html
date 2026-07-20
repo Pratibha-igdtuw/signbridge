@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Learn ASL — SignBridge{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <a href="{{ url_for('analytics.dashboard_page') }}#learn-with-us" class="back-link">&larr; Back to Learn with Us</a>
+  <h1 class="display page-title">American Sign Language</h1>
+  <p class="page-sub">ASL is a full, independent language with its own grammar — used mainly across the United States and English-speaking Canada. Start with the alphabet, then numbers, then everyday phrases.</p>
+</div>
+
+<div class="card">
+  <h2>Fingerspelling Alphabet</h2>
+  <p style="color:var(--muted); font-size:13.5px; margin:-4px 0 4px;">Every letter has its own one-handed shape. Fingerspelling is used for names, places, and any word that doesn't have its own dedicated sign.</p>
+  <div class="lesson-grid">
+    {% for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" %}
+    <div class="lesson-tile"><div class="glyph">{{ letter }}</div><div class="cap">Letter {{ letter }}</div></div>
+    {% endfor %}
+  </div>
+  <div class="tip-card" style="margin-top:16px;">
+    <b>Fingerspelling tips</b>
+    Go for clarity over speed — it's fine to be slow while you're learning. As you spell, silently shape the word's sounds with your mouth rather than naming each letter, and pause briefly between separate words so they don't blur together.
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2>Numbers 0–10</h2>
+  <p style="color:var(--muted); font-size:13.5px; margin:-4px 0 4px;">Numbers in ASL each get their own handshape, separate from the alphabet.</p>
+  <div class="lesson-grid">
+    {% for n in range(0, 11) %}
+    <div class="lesson-tile"><div class="glyph">{{ n }}</div><div class="cap">Number {{ n }}</div></div>
+    {% endfor %}
+  </div>
+  <div class="tip-card" style="margin-top:16px;">
+    <b>Two things worth knowing</b>
+    Numbers 1–5 are typically signed palm-in, while 6–10 flip to palm-out. And to show a plural, ASL signs the item first and the quantity second (e.g. BOOK then TWO) — there's no separate "-s" ending like in English.
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2>Question Words</h2>
+  <p style="color:var(--muted); font-size:13.5px; margin:-4px 0 4px;">The six W's, plus How — the backbone of everyday small talk.</p>
+  <div class="lesson-grid">
+    {% for w in ["Who","What","Where","When","Why","Which","How"] %}
+    <div class="lesson-tile"><div class="glyph" style="font-size:16px;">{{ w }}</div><div class="cap">Question word</div></div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2>Everyday Categories</h2>
+  <p style="color:var(--muted); font-size:13.5px; margin:-4px 0 4px;">Common words grouped by theme — a good next step after the alphabet and numbers.</p>
+  <div class="category-list">
+    <div class="category-item">
+      <h4>Greetings &amp; Small Talk</h4>
+      <ul><li>Hello</li><li>Goodbye</li><li>Please</li><li>Thank you</li><li>Sorry</li><li>Nice to meet you</li></ul>
+    </div>
+    <div class="category-item">
+      <h4>Family &amp; Friends</h4>
+      <ul><li>Mother</li><li>Father</li><li>Sister</li><li>Brother</li><li>Friend</li><li>Family</li></ul>
+    </div>
+    <div class="category-item">
+      <h4>Feelings</h4>
+      <ul><li>Happy</li><li>Sad</li><li>Tired</li><li>Excited</li><li>Scared</li><li>Love</li></ul>
+    </div>
+    <div class="category-item">
+      <h4>Everyday Needs</h4>
+      <ul><li>Help</li><li>Yes</li><li>No</li><li>Water</li><li>Food</li><li>Bathroom</li></ul>
+    </div>
+    <div class="category-item">
+      <h4>Home &amp; Places</h4>
+      <ul><li>Home</li><li>School</li><li>Work</li><li>Store</li><li>Hospital</li><li>Bathroom</li></ul>
+    </div>
+    <div class="category-item">
+      <h4>Food &amp; Dining</h4>
+      <ul><li>Eat</li><li>Drink</li><li>Breakfast</li><li>Restaurant</li><li>Hungry</li><li>Water</li></ul>
+    </div>
+    <div class="category-item">
+      <h4>Work &amp; Daily Life</h4>
+      <ul><li>Work</li><li>Meeting</li><li>Computer</li><li>Phone</li><li>Money</li><li>Busy</li></ul>
+    </div>
+    <div class="category-item">
+      <h4>Health &amp; Body</h4>
+      <ul><li>Doctor</li><li>Sick</li><li>Pain</li><li>Medicine</li><li>Head</li><li>Emergency</li></ul>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2>Deaf Culture, in Brief</h2>
+  <p style="color:var(--muted); font-size:14px; line-height:1.7;">
+    ASL isn't just a manual code for English — it's a full language with its own grammar, carried by Deaf culture and history. A useful convention: <b>Deaf</b> (capitalized) refers to people who share Deaf language and culture, while <b>deaf</b> (lowercase) simply describes audiological hearing loss. When you're learning, practicing with fluent and Deaf signers — not just a screen — is the fastest way to actually get good.
+  </p>
+  <div class="tip-card gold" style="margin-top:16px;">
+    <b>Practice tip</b>
+    Once you're comfortable, head over to the <a href="{{ url_for('analytics.for_you_page') }}">For You</a> tools and try signing to the camera — SignBridge will read your signs back in real time.
+  </div>
+</div>
+
+{% endblock %}

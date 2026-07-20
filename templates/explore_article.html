@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ article.title }} — SignBridge{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <a href="{{ url_for('analytics.dashboard_page') }}#explore-accessibility" class="back-link">&larr; Back to accessibility content</a>
+</div>
+
+<div class="article-hero {{ article.thumb_class }}">
+  <span class="article-hero-icon">{{ article.icon }}</span>
+</div>
+
+<h1 class="display article-title">{{ article.title }}</h1>
+<p class="article-teaser">{{ article.teaser }}</p>
+
+<div class="article-body">
+  {% for section in article.sections %}
+  <div class="article-section">
+    <h2>{{ section.heading }}</h2>
+    <p>{{ section.body }}</p>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="tip-card" style="margin-top:24px;">
+  <b>A note on this summary</b>
+  This is an original SignBridge summary written for this app, not a reproduction of any outside article.
+</div>
+
+{% endblock %}

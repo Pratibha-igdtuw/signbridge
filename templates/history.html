@@ -29,7 +29,7 @@ async function loadHistory(){
     body.innerHTML = rows.map(r => `
       <tr>
         <td>${new Date(r.created_at).toLocaleString()}</td>
-        <td>${r.source === 'sign' ? '🤟 Sign' : '🎤 Voice'}</td>
+        <td>${r.source === 'sign' ? '🤟 Sign' : r.source === 'text' ? '📝 Typed' : '🎤 Voice'}</td>
         <td>${r.text}</td>
       </tr>
     `).join('');

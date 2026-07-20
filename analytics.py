@@ -1,8 +1,9 @@
-from flask import Blueprint, jsonify, render_template
+from flask import Blueprint, jsonify, render_template, abort
 from sqlalchemy import func
 
 from database import db, Translation, Conversation, LoginEvent
 from auth import login_required, current_user
+from explore_content import ARTICLES
 
 analytics_bp = Blueprint('analytics', __name__)
 
@@ -12,7 +13,34 @@ analytics_bp = Blueprint('analytics', __name__)
 @analytics_bp.route('/dashboard')
 @login_required
 def dashboard_page():
-    return render_template('dashboard.html', user=current_user())
+    return render_template('dashboard.html', user=current_user(), articles=ARTICLES)
+
+
+@analytics_bp.route('/for-you')
+@login_required
+def for_you_page():
+    return render_template('for_you.html', user=current_user())
+
+
+@analytics_bp.route('/learn/asl')
+@login_required
+def learn_asl_page():
+    return render_template('learn_asl.html', user=current_user())
+
+
+@analytics_bp.route('/learn/bsl')
+@login_required
+def learn_bsl_page():
+    return render_template('learn_bsl.html', user=current_user())
+
+
+@analytics_bp.route('/explore/<slug>')
+@login_required
+def explore_article_page(slug):
+    article = ARTICLES.get(slug)
+    if not article:
+        abort(404)
+    return render_template('explore_article.html', user=current_user(), article=article, slug=slug)
 
 
 @analytics_bp.route('/history')
@@ -31,6 +59,12 @@ def gestures_page():
 @login_required
 def analytics_page():
     return render_template('analytics.html', user=current_user())
+
+
+@analytics_bp.route('/about')
+@login_required
+def about_page():
+    return render_template('about.html', user=current_user(), active='about')
 
 
 # ---------- API ----------

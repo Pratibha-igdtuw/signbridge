@@ -1,72 +1,185 @@
-{% extends "base.html" %}
-{% block title %}Translate — SignBridge{% endblock %}
-{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignBridge - Home</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+</head>
+<body>
+    <!-- Logo mark (ASL "I Love You" hand sign), reused via <use> -->
+    <svg width="0" height="0" style="position:absolute">
+      <defs>
+        <linearGradient id="markGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#9B87E0"/>
+          <stop offset="100%" stop-color="#5F4BB0"/>
+        </linearGradient>
+        <symbol id="markIcon" viewBox="0 0 40 40">
+          <rect width="40" height="40" rx="11" fill="url(#markGrad)"/>
+          <rect x="13.5" y="21" width="13" height="10.5" rx="4" fill="#fff"/>
+          <line x1="16.5" y1="21.5" x2="16.5" y2="9.5" stroke="#fff" stroke-width="3.1" stroke-linecap="round"/>
+          <line x1="23.5" y1="21.5" x2="23.5" y2="12" stroke="#fff" stroke-width="3.1" stroke-linecap="round"/>
+          <line x1="14" y1="24.5" x2="7.3" y2="19.3" stroke="#fff" stroke-width="3.1" stroke-linecap="round"/>
+        </symbol>
+        <!-- white-only variant for use on solid purple backgrounds (navbar/footer) -->
+        <symbol id="markIconMono" viewBox="0 0 40 40">
+          <rect x="13.5" y="21" width="13" height="10.5" rx="4" fill="#fff"/>
+          <line x1="16.5" y1="21.5" x2="16.5" y2="9.5" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>
+          <line x1="23.5" y1="21.5" x2="23.5" y2="12" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>
+          <line x1="14" y1="24.5" x2="7.3" y2="19.3" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>
+        </symbol>
+      </defs>
+    </svg>
 
-<div class="bridge">
-  <div class="node" id="nodeDeaf">🤟</div>
-  <div class="span-line"></div>
-  <div class="node" id="nodeHearing">🔊</div>
-</div>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-logo">
+                <svg class="logo-icon-svg"><use href="#markIconMono"/></svg>
+                <span class="logo-text">SignBridge</span>
+            </div>
+            <ul class="navbar-menu">
+                <li><a href="#home" class="nav-link active">Home</a></li>
+                <li><a href="{{ url_for('analytics.for_you_page') }}" class="nav-link">For You</a></li>
+                <li><a href="{{ url_for('analytics.analytics_page') }}" class="nav-link">Analytics</a></li>
+                <li><a href="{{ url_for('analytics.history_page') }}" class="nav-link">History</a></li>
+                <li><a href="{{ url_for('analytics.about_page') }}" class="nav-link">About Us</a></li>
+                <li><button id="logoutBtn" class="nav-logout">Log out</button></li>
+            </ul>
+        </div>
+    </nav>
 
-<div class="grid">
-  <div class="card">
-    <h2>Sign Recognition <b>· Sign → Speech</b></h2>
-    <div class="cam-box" id="camBox">
-      <video id="video" playsinline autoplay muted></video>
-      <canvas id="overlay"></canvas>
-      <div class="cam-off" id="camOff">Camera is off. Click "Start Camera" and allow access to begin recognizing hand signs.</div>
-    </div>
-    <div class="row">
-      <button class="btn btn-primary" id="startCam">Start Camera</button>
-      <button class="btn btn-outline" id="stopCam" disabled>Stop Camera</button>
-    </div>
-    <div class="gesture-readout">
-      <div>
-        <div class="label">Detected Sign</div>
-        <div class="value" id="gestureLabel">—</div>
-      </div>
-      <button class="btn btn-outline" id="muteBtn">🔊 Speak: On</button>
-    </div>
-    <h2 style="margin-top:20px;">Supported Signs</h2>
-    <div class="legend" id="legend"></div>
-    <div class="tip-card gold">
-      <b>For Deaf signers</b>
-      Sign clearly to the camera and hold each sign for about a second. The detected sign is spoken aloud and added to the transcript automatically.
-    </div>
-  </div>
+    <!-- Hero Section -->
+    <section class="hero" id="home">
+        <div class="hero-image-full">
+            <img src="{{ url_for('static', filename='images/hero.png') }}" alt="Breaking Communication Barriers Through Technology" class="hero-img-full">
+        </div>
+    </section>
 
-  <div class="card">
-    <h2>Voice Recognition <b>· Speech → Text</b></h2>
-    <div class="mic-btn" id="micBtn">🎤 Tap to start listening (hearing person speaks here)</div>
-    <div class="quick-phrases" id="quickPhrases">
-      <button type="button" class="chip" data-text="Hello, how are you?">Hello, how are you?</button>
-      <button type="button" class="chip" data-text="Thank you">Thank you</button>
-      <button type="button" class="chip" data-text="I need help, please">I need help, please</button>
-      <button type="button" class="chip" data-text="Nice to meet you">Nice to meet you</button>
-    </div>
-    <div class="type-row">
-      <input type="text" id="typeInput" placeholder="Or type what you want to say…" />
-      <button type="button" class="btn btn-primary" id="typeSendBtn">Send</button>
-    </div>
-    <div class="transcript" id="transcript">
-      <div class="empty">Conversation will appear here…</div>
-    </div>
-    <div class="row">
-      <button class="btn btn-outline" id="newConvo">New conversation</button>
-      <button class="btn btn-danger" id="clearChat">Clear this conversation</button>
-    </div>
-    <div class="tip-card">
-      <b>For hearing partners</b>
-      Speak into the mic, or type and hit Send if you'd rather not talk out loud — either way it appears instantly in the transcript.
-    </div>
-  </div>
-</div>
+    <!-- Learn From Our Content Section -->
+    <section class="learn-content">
+        <div class="section-container">
+            <h2 class="section-title">Learn From Our Content</h2>
+            <p class="section-sub" style="text-align:center; margin-top:-2rem; margin-bottom:2.5rem;">Short reads on Deaf culture, disability inclusion, and building accessible products.</p>
+            <div class="carousel-wrapper">
+                <div class="carousel-container">
+                    <div class="carousel" id="contentCarousel">
+                        {% for slug, article in articles.items() %}
+                        <a href="{{ url_for('analytics.explore_article_page', slug=slug) }}" class="content-card">
+                            <div class="card-image"><span>{{ article.icon }}</span></div>
+                            <h3>{{ article.title }}</h3>
+                            <p>{{ article.teaser }}</p>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                <button class="carousel-btn prev" id="prevBtn">❮</button>
+                <button class="carousel-btn next" id="nextBtn">❯</button>
+            </div>
+        </div>
+    </section>
 
-{% endblock %}
+    <!-- Why Choose SignBridge Section -->
+    <section class="why-choose">
+        <div class="section-container">
+            <h2 class="section-title">Why Choose SignBridge?</h2>
+            <div class="features-grid">
+                <div class="feature-box">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Real-Time Translation</h3>
+                    <p>Instant sign-to-speech and speech-to-sign conversion powered by AI</p>
+                </div>
+                <div class="feature-box">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Privacy First</h3>
+                    <p>Your data stays private. No recordings, no tracking, just communication</p>
+                </div>
+                <div class="feature-box">
+                    <div class="feature-icon">📱</div>
+                    <h3>Easy to Use</h3>
+                    <p>Intuitive interface that works on any device, no setup required</p>
+                </div>
+                <div class="feature-box">
+                    <div class="feature-icon">🌐</div>
+                    <h3>Inclusive Design</h3>
+                    <p>Built by and for the Deaf community with accessibility at its core</p>
+                </div>
+                <div class="feature-box">
+                    <div class="feature-icon">📊</div>
+                    <h3>Track Progress</h3>
+                    <p>Monitor your learning journey with detailed analytics and insights</p>
+                </div>
+                <div class="feature-box">
+                    <div class="feature-icon">🎓</div>
+                    <h3>Learn at Your Pace</h3>
+                    <p>Structured lessons and resources tailored to your learning style</p>
+                </div>
+            </div>
+        </div>
+    </section>
 
-{% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-<script src="{{ url_for('static', filename='js/app.js') }}"></script>
-{% endblock %}
+    <!-- Learn With Us Section -->
+    <section class="learn-with-us" id="learn-with-us">
+        <div class="section-container">
+            <h2 class="section-title">Learn With Us</h2>
+            <p class="section-sub">Pick a language to open its full lesson page — fingerspelling, numbers, everyday vocabulary, and Deaf culture notes.</p>
+            <div class="lang-cards">
+                <a href="{{ url_for('analytics.learn_asl_page') }}" class="lang-card">
+                    <div class="lang-card-icon">🤟</div>
+                    <h3>American Sign Language (ASL)</h3>
+                    <p>Used across the US and English-speaking Canada. A complete, natural language with its own grammar — start with the fingerspelling alphabet, numbers, and everyday categories.</p>
+                    <span class="lang-card-cta">Explore ASL lessons →</span>
+                </a>
+                <a href="{{ url_for('analytics.learn_bsl_page') }}" class="lang-card">
+                    <div class="lang-card-icon">🙌</div>
+                    <h3>British Sign Language (BSL)</h3>
+                    <p>The sign language of the Deaf community in the UK. Two-handed fingerspelling and its own grammar, distinct from both English and ASL.</p>
+                    <span class="lang-card-cta">Explore BSL lessons →</span>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <svg class="footer-logo-svg"><use href="#markIconMono"/></svg>
+                <span>SignBridge</span>
+            </div>
+            <p>SignBridge · Making communication accessible to everyone</p>
+        </div>
+    </footer>
+
+    <script>
+        // Logout functionality
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/login';
+        });
+
+        // Carousel functionality
+        const carousel = document.getElementById('contentCarousel');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        let scrollPosition = 0;
+
+        prevBtn.addEventListener('click', () => {
+            scrollPosition = Math.max(0, scrollPosition - 320);
+            carousel.style.transform = `translateX(-${scrollPosition}px)`;
+        });
+
+        nextBtn.addEventListener('click', () => {
+            const maxScroll = carousel.scrollWidth - carousel.parentElement.offsetWidth;
+            scrollPosition = Math.min(maxScroll, scrollPosition + 320);
+            carousel.style.transform = `translateX(-${scrollPosition}px)`;
+        });
+
+        // Load hero image from uploaded file
+        window.addEventListener('load', () => {
+            // If you want to load a specific image, replace the src
+            // For now, we're using a placeholder
+        });
+    </script>
+</body>
+</html>

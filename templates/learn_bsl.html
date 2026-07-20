@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Learn BSL — SignBridge{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <a href="{{ url_for('analytics.dashboard_page') }}#learn-with-us" class="back-link">&larr; Back to Learn with Us</a>
+  <h1 class="display page-title">British Sign Language</h1>
+  <p class="page-sub">BSL is the sign language of the Deaf community in the United Kingdom. Unlike ASL, BSL fingerspelling uses <b>two hands</b>, and its grammar and vocabulary are entirely different from English and ASL.</p>
+</div>
+
+<div class="card">
+  <h2>Two-Handed Fingerspelling</h2>
+  <p style="color:var(--muted); font-size:13.5px; margin:-4px 0 4px;">Each letter is formed using both hands together, rather than a single handshape — one hand often acts as a "base" while the other traces or points to it.</p>
+  <div class="lesson-grid">
+    {% for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" %}
+    <div class="lesson-tile"><div class="glyph">{{ letter }}</div><div class="cap">Letter {{ letter }}</div></div>
+    {% endfor %}
+  </div>
+  <div class="tip-card" style="margin-top:16px;">
+    <b>Fingerspelling tips</b>
+    Keep both hands visible and at a steady, comfortable height — since BSL fingerspelling needs two hands working together, it's easy to lose clarity if one hand drops out of view. As with any fingerspelling, favor accuracy over speed while you're still learning.
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2>Numbers 0–10</h2>
+  <p style="color:var(--muted); font-size:13.5px; margin:-4px 0 4px;">BSL numbers have their own distinct handshapes, separate from fingerspelling — and some regions of the UK sign numbers slightly differently.</p>
+  <div class="lesson-grid">
+    {% for n in range(0, 11) %}
+    <div class="lesson-tile"><div class="glyph">{{ n }}</div><div class="cap">Number {{ n }}</div></div>
+    {% endfor %}
+  </div>
+  <div class="tip-card" style="margin-top:16px;">
+    <b>Worth knowing</b>
+    Like ASL, BSL generally signs the item before the quantity to show a plural, and doesn't use a separate word ending the way English uses "-s". BSL grammar follows its own topic-comment word order, which often differs from English sentence structure.
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2>Question Words</h2>
+  <p style="color:var(--muted); font-size:13.5px; margin:-4px 0 4px;">The core question words used to start everyday conversation.</p>
+  <div class="lesson-grid">
+    {% for w in ["Who","What","Where","When","Why","Which","How"] %}
+    <div class="lesson-tile"><div class="glyph" style="font-size:16px;">{{ w }}</div><div class="cap">Question word</div></div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2>Everyday Categories</h2>
+  <p style="color:var(--muted); font-size:13.5px; margin:-4px 0 4px;">Common words grouped by theme — a good next step after the alphabet and numbers.</p>
+  <div class="category-list">
+    <div class="category-item">
+      <h4>Greetings &amp; Small Talk</h4>
+      <ul><li>Hello</li><li>Goodbye</li><li>Please</li><li>Thank you</li><li>Sorry</li><li>Nice to meet you</li></ul>
+    </div>
+    <div class="category-item">
+      <h4>Family &amp; Friends</h4>
+      <ul><li>Mother</li><li>Father</li><li>Sister</li><li>Brother</li><li>Friend</li><li>Family</li></ul>
+    </div>
+    <div class="category-item">
+      <h4>Feelings</h4>
+      <ul><li>Happy</li><li>Sad</li><li>Tired</li><li>Excited</li><li>Scared</li><li>Love</li></ul>
+    </div>
+    <div class="category-item">
+      <h4>Everyday Needs</h4>
+      <ul><li>Help</li><li>Yes</li><li>No</li><li>Water</li><li>Food</li><li>Toilet</li></ul>
+    </div>
+    <div class="category-item">
+      <h4>Home &amp; Places</h4>
+      <ul><li>Home</li><li>School</li><li>Work</li><li>Shop</li><li>Hospital</li><li>Toilet</li></ul>
+    </div>
+    <div class="category-item">
+      <h4>Food &amp; Dining</h4>
+      <ul><li>Eat</li><li>Drink</li><li>Breakfast</li><li>Restaurant</li><li>Hungry</li><li>Water</li></ul>
+    </div>
+    <div class="category-item">
+      <h4>Work &amp; Daily Life</h4>
+      <ul><li>Work</li><li>Meeting</li><li>Computer</li><li>Phone</li><li>Money</li><li>Busy</li></ul>
+    </div>
+    <div class="category-item">
+      <h4>Health &amp; Body</h4>
+      <ul><li>Doctor</li><li>Sick</li><li>Pain</li><li>Medicine</li><li>Head</li><li>Emergency</li></ul>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2>Deaf Culture, in Brief</h2>
+  <p style="color:var(--muted); font-size:14px; line-height:1.7;">
+    BSL is a complete, independent language — not a signed version of English — with its own grammar, facial grammar (raised eyebrows for questions, for example), and regional variation across the UK. As with ASL, <b>Deaf</b> (capitalized) refers to people who share Deaf language and culture, while <b>deaf</b> (lowercase) describes audiological hearing loss. Practicing with fluent and Deaf signers is the fastest way to build real fluency.
+  </p>
+  <div class="tip-card gold" style="margin-top:16px;">
+    <b>Good to know</b>
+    BSL, ASL, and other sign languages are not mutually intelligible — a signer fluent in one usually can't automatically understand the other, just like spoken English and French. Once you're comfortable, try the <a href="{{ url_for('analytics.for_you_page') }}">For You</a> tools and sign to the camera in real time.
+  </div>
+</div>
+
+{% endblock %}

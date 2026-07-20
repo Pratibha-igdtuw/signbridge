@@ -15,10 +15,10 @@
       </linearGradient>
       <symbol id="markIcon" viewBox="0 0 40 40">
         <rect width="40" height="40" rx="11" fill="url(#markGrad)"/>
-        <circle cx="12" cy="20" r="4" fill="#fff"/>
-        <circle cx="28" cy="20" r="4" fill="#fff"/>
-        <path d="M16 20 Q20 12 24 20" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-        <path d="M16 20 Q20 28 24 20" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" opacity="0.55"/>
+        <rect x="13.5" y="21" width="13" height="10.5" rx="4" fill="#fff"/>
+        <line x1="16.5" y1="21.5" x2="16.5" y2="9.5" stroke="#fff" stroke-width="3.1" stroke-linecap="round"/>
+        <line x1="23.5" y1="21.5" x2="23.5" y2="12" stroke="#fff" stroke-width="3.1" stroke-linecap="round"/>
+        <line x1="14" y1="24.5" x2="7.3" y2="19.3" stroke="#fff" stroke-width="3.1" stroke-linecap="round"/>
       </symbol>
     </defs>
   </svg>
@@ -29,10 +29,13 @@
       <div class="brand display"><svg class="mark"><use href="#markIcon"/></svg>Sign<span>Bridge</span></div>
     </div>
     <div class="nav-links">
-      <a href="{{ url_for('analytics.dashboard_page') }}" class="{{ 'active' if active=='dashboard' }}">Translate</a>
+      <a href="{{ url_for('analytics.dashboard_page') }}" class="{{ 'active' if active=='dashboard' }}">Home</a>
+      <a href="{{ url_for('analytics.dashboard_page') }}#learn-with-us" class="{{ 'active' if active=='learn' }}">Learn with Us</a>
+      <a href="{{ url_for('analytics.for_you_page') }}" class="{{ 'active' if active=='foryou' }}">For You</a>
       <a href="{{ url_for('analytics.history_page') }}" class="{{ 'active' if active=='history' }}">History</a>
       <a href="{{ url_for('analytics.gestures_page') }}" class="{{ 'active' if active=='gestures' }}">Gestures</a>
       <a href="{{ url_for('analytics.analytics_page') }}" class="{{ 'active' if active=='analytics' }}">Analytics</a>
+      <a href="{{ url_for('analytics.about_page') }}" class="{{ 'active' if active=='about' }}">About Us</a>
       <form id="logoutForm"><button type="button" class="btn btn-outline" id="logoutBtn">Log out</button></form>
     </div>
   </div>

@@ -1,43 +1,115 @@
-{% extends "base.html" %}
-{% block title %}Analytics — SignBridge{% endblock %}
-{% block content %}
+from flask import Blueprint, jsonify, render_template, abort
+from sqlalchemy import func
 
-<div class="stats-grid" id="statsGrid"></div>
+from database import db, Translation, Conversation, LoginEvent
+from auth import login_required, current_user
+from explore_content import ARTICLES
 
-<div class="card">
-  <h2>Most Used Signs</h2>
-  <div id="topGestures"><div class="empty">Loading…</div></div>
-</div>
+analytics_bp = Blueprint('analytics', __name__)
 
-{% endblock %}
-{% block scripts %}
-<script>
-async function loadStats(){
-  const res = await fetch('/api/stats');
-  const s = await res.json();
 
-  document.getElementById('statsGrid').innerHTML = `
-    <div class="stat-tile"><div class="num">${s.total_translations}</div><div class="lbl">Total Translations</div></div>
-    <div class="stat-tile"><div class="num">${s.total_conversations}</div><div class="lbl">Conversations</div></div>
-    <div class="stat-tile"><div class="num">${s.by_source.sign || 0}</div><div class="lbl">Signs Detected</div></div>
-    <div class="stat-tile"><div class="num">${s.by_source.voice || 0}</div><div class="lbl">Voice Messages</div></div>
-    <div class="stat-tile"><div class="num">${s.total_logins}</div><div class="lbl">Total Logins</div></div>
-  `;
+# ---------- Pages ----------
 
-  const top = document.getElementById('topGestures');
-  if(!s.top_gestures.length){
-    top.innerHTML = '<div class="empty">No signs used yet — go translate something!</div>';
-    return;
-  }
-  const max = Math.max(...s.top_gestures.map(g => g.count));
-  top.innerHTML = s.top_gestures.map(g => `
-    <div class="bar-row">
-      <div class="name">${g.gesture_key}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${(g.count/max*100).toFixed(0)}%"></div></div>
-      <div class="count">${g.count}</div>
-    </div>
-  `).join('');
-}
-loadStats();
-</script>
-{% endblock %}
+@analytics_bp.route('/dashboard')
+@login_required
+def dashboard_page():
+    return render_template('dashboard.html', user=current_user())
+
+
+@analytics_bp.route('/for-you')
+@login_required
+def for_you_page():
+    return render_template('for_you.html', user=current_user())
+
+
+@analytics_bp.route('/learn/asl')
+@login_required
+def learn_asl_page():
+    return render_template('learn_asl.html', user=current_user())
+
+
+@analytics_bp.route('/learn/bsl')
+@login_required
+def learn_bsl_page():
+    return render_template('learn_bsl.html', user=current_user())
+
+
+@analytics_bp.route('/explore/<slug>')
+@login_required
+def explore_article_page(slug):
+    article = ARTICLES.get(slug)
+    if not article:
+        abort(404)
+    return render_template('explore_article.html', user=current_user(), article=article, slug=slug)
+
+
+@analytics_bp.route('/history')
+@login_required
+def history_page():
+    return render_template('history.html', user=current_user())
+
+
+@analytics_bp.route('/gestures-page')
+@login_required
+def gestures_page():
+    return render_template('gestures.html', user=current_user())
+
+
+@analytics_bp.route('/analytics-page')
+@login_required
+def analytics_page():
+    return render_template('analytics.html', user=current_user())
+
+
+@analytics_bp.route('/about')
+@login_required
+def about_page():
+    return render_template('about.html', user=current_user(), active='about')
+
+
+# ---------- API ----------
+
+@analytics_bp.route('/api/stats', methods=['GET'])
+@login_required
+def stats():
+    user = current_user()
+
+    total = (
+        db.session.query(func.count(Translation.id))
+        .join(Conversation)
+        .filter(Conversation.user_id == user.id)
+        .scalar()
+    ) or 0
+
+    by_source = (
+        db.session.query(Translation.source, func.count(Translation.id))
+        .join(Conversation)
+        .filter(Conversation.user_id == user.id)
+        .group_by(Translation.source)
+        .all()
+    )
+
+    top_gestures = (
+        db.session.query(Translation.gesture_key, func.count(Translation.id).label('c'))
+        .join(Conversation)
+        .filter(
+            Conversation.user_id == user.id,
+            Translation.source == 'sign',
+            Translation.gesture_key.isnot(None),
+        )
+        .group_by(Translation.gesture_key)
+        .order_by(func.count(Translation.id).desc())
+        .limit(5)
+        .all()
+    )
+
+    total_logins = LoginEvent.query.filter_by(user_id=user.id, success=True).count()
+    total_conversations = Conversation.query.filter_by(user_id=user.id).count()
+
+    return jsonify({
+        'total_translations': total,
+        'by_source': {s: c for s, c in by_source},
+        'top_gestures': [{'gesture_key': g, 'count': c} for g, c in top_gestures],
+        'total_logins': total_logins,
+        'total_conversations': total_conversations,
+    })
