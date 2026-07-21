@@ -45,6 +45,7 @@ def log_translation():
     text = (data.get('text') or '').strip()
     gesture_key = data.get('gesture_key')
     conversation_id = data.get('conversation_id')
+    language = (data.get('language') or 'ASL').strip().upper()
 
     if source not in ('sign', 'voice', 'text') or not text:
         return jsonify({'error': "source must be 'sign', 'voice', or 'text', and text is required"}), 400
@@ -56,7 +57,7 @@ def log_translation():
     else:
         conv = _get_or_create_active_conversation(user.id)
 
-    t = Translation(conversation_id=conv.id, source=source, gesture_key=gesture_key, text=text)
+    t = Translation(conversation_id=conv.id, source=source, gesture_key=gesture_key, text=text, language=language)
     db.session.add(t)
     db.session.commit()
     return jsonify({'message': 'logged', 'translation': t.to_dict(), 'conversation_id': conv.id}), 201

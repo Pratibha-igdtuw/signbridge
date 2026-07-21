@@ -185,8 +185,29 @@ canvas{ transform:scaleX(-1); }
 .tip-card.gold{ background:var(--gold-soft); border-color:rgba(214,163,78,0.35); color:#8A6A2A; }
 .tip-card.gold b{ color:#8A6A2A; }
 
-.legend{ display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
-.legend span{ font-size:12px; padding:6px 12px; border-radius:999px; background:var(--panel-2); border:1px solid var(--line); color:var(--muted); font-weight:500; }
+.legend-select{
+  display:block; width:100%; margin-top:14px; padding:10px 12px; border-radius:10px;
+  border:1px solid var(--line); background:var(--panel-2); color:var(--text); font-size:13px;
+  font-family:inherit; cursor:pointer;
+}
+.legend-select:focus{ outline:2px solid var(--lav-400); outline-offset:1px; }
+
+/* ---------- Shared language segmented control (camera + avatar) ---------- */
+.lang-seg{
+  display:flex; gap:6px; background:var(--panel-2); border:1px solid var(--line);
+  border-radius:12px; padding:4px; width:100%;
+}
+.lang-seg-btn{
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+  padding:8px 6px 7px; border-radius:9px; border:1px solid transparent; background:transparent;
+  color:var(--muted); font-size:13.5px; font-weight:700; font-family:inherit; cursor:pointer;
+  transition:background .15s ease, color .15s ease, border-color .15s ease;
+}
+.lang-seg-btn small{ font-size:10px; font-weight:500; text-transform:uppercase; letter-spacing:.04em; color:inherit; opacity:.7; }
+.lang-seg-btn:hover{ color:var(--text); }
+.lang-seg-btn.active{
+  background:var(--panel); color:var(--lav-700); border-color:var(--lav-100); box-shadow:var(--shadow);
+}
 
 /* ---------- Stat tiles ---------- */
 .stats-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:14px; margin-bottom:20px; }
@@ -243,56 +264,36 @@ table.simple th{ color:var(--muted); font-weight:600; font-size:12px; text-trans
 }
 @keyframes tileIn{ to{ opacity:1; transform:translateY(0) scale(1); } }
 
-/* ---------- Sign-language dropdown picker ---------- */
-.lang-picker{ position:relative; }
-.lang-picker-btn{
-  display:flex; align-items:center; gap:8px; padding:10px 14px; border-radius:10px;
-  border:1px solid var(--line); background:var(--panel); color:var(--text); font-size:13px;
-  font-weight:600; cursor:pointer; font-family:inherit;
-}
-.lang-flag{
-  font-size:10px; font-weight:700; color:var(--danger); background:var(--danger-soft);
-  padding:2px 6px; border-radius:5px; letter-spacing:.03em;
-}
-.lang-caret{ color:var(--muted); font-size:11px; margin-left:2px; }
-.lang-picker-panel{
-  position:absolute; top:calc(100% + 6px); left:0; z-index:20; width:280px; max-height:280px;
-  overflow-y:auto; background:var(--panel); border:1px solid var(--line); border-radius:12px;
-  box-shadow:var(--shadow); padding:6px;
-}
-.lang-option{
-  display:flex; align-items:center; gap:8px; padding:9px 10px; border-radius:8px; font-size:13px;
-  cursor:pointer; color:var(--text);
-}
-.lang-option:hover{ background:var(--panel-2); }
-.lang-option.active{ background:var(--lav-50); font-weight:600; }
-.lang-tag{
-  margin-left:auto; font-size:9px; font-weight:700; letter-spacing:.04em; color:var(--muted);
-  background:var(--panel-2); border:1px solid var(--line); padding:2px 6px; border-radius:5px;
-}
-.lang-tag.active{ color:#2E8B57; background:rgba(46,139,87,0.12); border-color:transparent; }
-.lang-toast{
-  position:absolute; top:calc(100% + 6px); left:0; background:var(--ink); color:#fff; font-size:12px;
-  padding:8px 12px; border-radius:8px; white-space:nowrap; box-shadow:var(--shadow);
-}
+/* (old dropdown-style .lang-picker CSS removed — replaced by shared .lang-seg above) */
 
-/* ---------- Signing avatar figure ---------- */
-.avatar-figure-wrap{
-  margin-top:18px; display:flex; flex-direction:column; align-items:center; gap:10px;
-  background:var(--panel-2); border:1px solid var(--line); border-radius:14px; padding:18px 20px 20px;
+/* ---------- Sign hero card (replaces the old stick-figure SVG avatar) ---------- */
+.sign-hero-wrap{
+  margin-top:18px; display:flex; flex-direction:column; align-items:center; gap:12px;
+  background:var(--panel-2); border:1px solid var(--line); border-radius:16px; padding:22px 20px 20px;
 }
-.avatar-svg{ width:180px; height:auto; overflow:visible; }
-.avatar-svg .av-head, .avatar-svg .av-brow, .avatar-svg .av-mouth{ stroke:#3A2418; }
-.avatar-svg .av-body, .avatar-svg .av-arm, .avatar-svg .av-palm, .avatar-svg .av-finger{
-  stroke:var(--avatar-color, #1E7F7F); transition:stroke .25s ease;
+.sign-hero{
+  --hero-color:#1E7F7F;
+  display:flex; flex-direction:column; align-items:center; gap:12px; width:100%;
 }
-.avatar-svg.avatar-theme-warm{ --avatar-color:#C97B3D; }
-.avatar-svg.avatar-theme-midnight{ --avatar-color:#2B2A55; }
-.avatar-svg.avatar-theme-ocean{ --avatar-color:#1E7F7F; }
-.avatar-svg.avatar-theme-ember{ --avatar-color:#C0392B; }
-.avatar-caption{
-  font-family:'Fraunces',serif; font-weight:600; font-size:20px; color:var(--text); min-height:28px; text-align:center;
+.sign-hero-icon{
+  width:104px; height:104px; border-radius:28px; display:flex; align-items:center; justify-content:center;
+  font-size:48px; line-height:1; background:linear-gradient(155deg, color-mix(in srgb, var(--hero-color) 16%, var(--panel)), color-mix(in srgb, var(--hero-color) 6%, var(--panel)));
+  border:1px solid color-mix(in srgb, var(--hero-color) 30%, var(--line));
+  box-shadow:0 8px 20px -10px color-mix(in srgb, var(--hero-color) 45%, transparent);
+  transition:background .25s ease, border-color .25s ease, box-shadow .25s ease, transform .18s ease;
 }
+.sign-hero-word{
+  font-family:'Fraunces',serif; font-weight:600; font-size:20px; color:var(--text); min-height:26px; text-align:center;
+}
+.sign-hero-lang{
+  font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--hero-color);
+  background:color-mix(in srgb, var(--hero-color) 14%, var(--panel)); padding:3px 10px; border-radius:999px;
+  border:1px solid color-mix(in srgb, var(--hero-color) 28%, var(--line));
+}
+.sign-hero.avatar-theme-warm{ --hero-color:#C97B3D; }
+.sign-hero.avatar-theme-midnight{ --hero-color:#2B2A55; }
+.sign-hero.avatar-theme-ocean{ --hero-color:#1E7F7F; }
+.sign-hero.avatar-theme-ember{ --hero-color:#C0392B; }
 .avatar-style-picker{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
 .style-swatch{
   padding:7px 16px; border-radius:999px; border:1px solid var(--line); background:var(--panel);
@@ -349,32 +350,6 @@ footer.foot{ text-align:center; color:var(--muted); font-size:12px; margin-top:3
 .about-placeholder{
   border:1px dashed var(--line); border-radius:18px; padding:40px 20px; text-align:center;
   color:var(--muted); font-size:14px; background:var(--panel-2);
-}
-
-.about-content{
-  display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px;
-}
-
-.about-card{
-  background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:28px 24px;
-  box-shadow:var(--shadow); transition:transform .15s ease, border-color .15s ease;
-  display:flex; flex-direction:column; gap:12px;
-}
-
-.about-card:hover{
-  transform:translateY(-3px); border-color:var(--lav-400);
-}
-
-.about-icon{
-  font-size:36px; line-height:1;
-}
-
-.about-card h3{
-  font-family:'Fraunces',serif; font-size:18px; font-weight:600; margin:0; color:var(--text);
-}
-
-.about-card p{
-  color:var(--muted); font-size:14px; margin:0; line-height:1.55;
 }
 
 /* ---------- Sub-page header (For You, Learn ASL/BSL) ---------- */

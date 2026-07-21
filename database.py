@@ -46,9 +46,10 @@ class Translation(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     conversation_id = db.Column(db.Integer, db.ForeignKey('conversations.id'), nullable=False)
-    source = db.Column(db.String(10), nullable=False)  # sign | voice
+    source = db.Column(db.String(10), nullable=False)  # sign | voice | text
     gesture_key = db.Column(db.String(50))
     text = db.Column(db.String(500), nullable=False)
+    language = db.Column(db.String(10), default='ASL')  # ASL, BSL, ISL
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -57,6 +58,7 @@ class Translation(db.Model):
             'source': self.source,
             'gesture_key': self.gesture_key,
             'text': self.text,
+            'language': self.language,
             'created_at': self.created_at.isoformat(),
         }
 
@@ -70,11 +72,9 @@ class Gesture(db.Model):
     word = db.Column(db.String(120), nullable=False)
     emoji = db.Column(db.String(10), default='\U0001f590')
     is_custom = db.Column(db.Boolean, default=False)
-    language = db.Column(db.String(10), default='ASL')       # ASL | BSL | ISL
-    shape_key = db.Column(db.String(30), nullable=True)       # maps to a camera-detectable hand shape, or NULL
-    detectable = db.Column(db.Boolean, default=False)         # True = live camera can recognize this one
+    language = db.Column(db.String(10), default='ASL', nullable=False)  # ASL, BSL, ISL
 
-    __table_args__ = (db.UniqueConstraint('user_id', 'gesture_key', name='uq_user_gesture'),)
+    __table_args__ = (db.UniqueConstraint('user_id', 'gesture_key', 'language', name='uq_user_gesture_lang'),)
 
     def to_dict(self):
         return {
@@ -83,8 +83,6 @@ class Gesture(db.Model):
             'emoji': self.emoji,
             'is_custom': self.is_custom,
             'language': self.language,
-            'shape_key': self.shape_key,
-            'detectable': self.detectable,
         }
 
 
@@ -100,117 +98,189 @@ class LoginEvent(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
-SUPPORTED_LANGUAGES = ['ASL', 'BSL', 'ISL']
-
-# The 11 hand shapes classifyGesture() in app.js can actually tell apart via
-# MediaPipe landmarks (finger-extension pattern). Every language maps its most
-# essential words onto these same 11 shapes so the camera can recognize them live.
-CORE_SHAPES = [
-    ('FIST',      'Yes',        '\u270a'),
-    ('OPEN_HAND', 'Hello',      '\U0001f44b'),
-    ('ONE',       'Wait',       '\u261d\ufe0f'),
-    ('TWO',       'Peace',      '\u270c\ufe0f'),
-    ('THREE',     'Three',      '3\ufe0f\u20e3'),
-    ('FOUR',      'Four',       '4\ufe0f\u20e3'),
-    ('THUMB',     'Thank you',  '\U0001f44d'),
-    ('PINKY',     'Promise',    '\U0001f919'),
-    ('ILY',       'I love you', '\U0001f91f'),
-    ('ROCK',      'Rock on',    '\U0001f918'),
-    ('OK',        'OK',         '\U0001f44c'),
+# ASL: American Sign Language (50 gestures)
+ASL_GESTURES = [
+    # Greetings & Basic (5)
+    ('HELLO', 'Hello', '\U0001f44b', 'ASL'),
+    ('GOODBYE', 'Goodbye', '\U0001f44b', 'ASL'),
+    ('NICE_MEET', 'Nice to meet you', '\U0001f91d', 'ASL'),
+    ('HOW_ARE_YOU', 'How are you?', '\U0001f937', 'ASL'),
+    ('GOOD', 'Good', '\U0001f44d', 'ASL'),
+    # Numbers 0-9 (10)
+    ('ZERO', 'Zero', '0', 'ASL'),
+    ('ONE', 'One', '1', 'ASL'),
+    ('TWO', 'Two', '2', 'ASL'),
+    ('THREE', 'Three', '3', 'ASL'),
+    ('FOUR', 'Four', '4', 'ASL'),
+    ('FIVE', 'Five', '5', 'ASL'),
+    ('SIX', 'Six', '6', 'ASL'),
+    ('SEVEN', 'Seven', '7', 'ASL'),
+    ('EIGHT', 'Eight', '8', 'ASL'),
+    ('NINE', 'Nine', '9', 'ASL'),
+    # Emotions (8)
+    ('HAPPY', 'Happy', '\U0001f60a', 'ASL'),
+    ('SAD', 'Sad', '\U0001f622', 'ASL'),
+    ('ANGRY', 'Angry', '\U0001f60c', 'ASL'),
+    ('EXCITED', 'Excited', '\U0001f929', 'ASL'),
+    ('TIRED', 'Tired', '\U0001f62a', 'ASL'),
+    ('LOVE', 'Love', '\u2764\ufe0f', 'ASL'),
+    ('SCARED', 'Scared', '\U0001f628', 'ASL'),
+    ('CONFUSED', 'Confused', '\U0001f615', 'ASL'),
+    # Common Words (15)
+    ('PLEASE', 'Please', '\U0001f64f', 'ASL'),
+    ('THANK_YOU', 'Thank you', '\U0001f44f', 'ASL'),
+    ('YES', 'Yes', '\u270a', 'ASL'),
+    ('NO', 'No', '\u274c', 'ASL'),
+    ('WAIT', 'Wait', '\u270b', 'ASL'),
+    ('STOP', 'Stop', '\U0001f6d1', 'ASL'),
+    ('HELP', 'Help', '\U0001f198', 'ASL'),
+    ('WATER', 'Water', '\U0001f4a7', 'ASL'),
+    ('FOOD', 'Food', '\U0001f37d', 'ASL'),
+    ('SLEEP', 'Sleep', '\U0001f62a', 'ASL'),
+    ('WORK', 'Work', '\U0001f4bc', 'ASL'),
+    ('SCHOOL', 'School', '\U0001f3eb', 'ASL'),
+    ('DOCTOR', 'Doctor', '\u2695', 'ASL'),
+    ('MOTHER', 'Mother', '\U0001f469', 'ASL'),
+    ('FATHER', 'Father', '\U0001f468', 'ASL'),
+    # Advanced (12)
+    ('MONEY', 'Money', '\U0001f4b0', 'ASL'),
+    ('TIME', 'Time', '\u23f0', 'ASL'),
+    ('PERSON', 'Person', '\U0001f64b', 'ASL'),
+    ('HOUSE', 'House', '\U0001f3e0', 'ASL'),
+    ('CAR', 'Car', '\U0001f697', 'ASL'),
+    ('COMPUTER', 'Computer', '\U0001f4bb', 'ASL'),
+    ('PHONE', 'Phone', '\U0001f4f1', 'ASL'),
+    ('BOOK', 'Book', '\U0001f4d6', 'ASL'),
+    ('UNDERSTAND', 'I understand', '\U0001f9e0', 'ASL'),
+    ('LEARN', 'Learn', '\U0001f4da', 'ASL'),
+    ('SHOW', 'Show me', '\U0001f440', 'ASL'),
+    ('NAME', 'What is your name?', '\U0001f524', 'ASL'),
 ]
 
-# The remaining ~39 words per language: reference vocabulary shown in the
-# Supported Signs dropdown for learning, not yet mapped to a detectable shape.
-REFERENCE_WORDS = {
-    'ASL': [
-        ('Good morning', '\u2600\ufe0f'), ('Good afternoon', '\U0001f324\ufe0f'), ('Good evening', '\U0001f306'),
-        ('Good night', '\U0001f319'), ('Goodbye', '\U0001f44b'), ('Please', '\U0001f64f'), ('Sorry', '\U0001f614'),
-        ('Excuse me', '\U0001f647'), ('Name', '\U0001faaa'), ('Friend', '\U0001f91d'), ('Family', '\U0001f46a'),
-        ('Mother', '\U0001f469'), ('Father', '\U0001f468'), ('Sister', '\U0001f467'), ('Brother', '\U0001f466'),
-        ('Baby', '\U0001f476'), ('Help', '\U0001f6a8'), ('Stop', '\u270b'), ('Go', '\U0001f6b6'),
-        ('Eat', '\U0001f37d\ufe0f'), ('Drink', '\U0001f965'), ('Water', '\U0001f4a7'), ('More', '\u2795'),
-        ('Finish', '\u2705'), ('Want', '\U0001f64b'), ('Love', '\u2764\ufe0f'), ('Happy', '\U0001f60a'),
-        ('Sad', '\U0001f622'), ('Angry', '\U0001f620'), ('Tired', '\U0001f634'), ('Hot', '\U0001f525'),
-        ('Cold', '\u2744\ufe0f'), ('School', '\U0001f3eb'), ('Work', '\U0001f4bc'), ('Home', '\U0001f3e0'),
-        ('Bathroom', '\U0001f6bb'), ('Doctor', '\U0001fa7a'), ('Red', '\U0001f534'), ('Blue', '\U0001f535'),
-    ],
-    'BSL': [
-        ('Good morning', '\u2600\ufe0f'), ('Good afternoon', '\U0001f324\ufe0f'), ('Good evening', '\U0001f306'),
-        ('Good night', '\U0001f319'), ('Goodbye', '\U0001f44b'), ('Please', '\U0001f64f'), ('Sorry', '\U0001f614'),
-        ('Excuse me', '\U0001f647'), ('Name', '\U0001faaa'), ('Friend', '\U0001f91d'), ('Family', '\U0001f46a'),
-        ('Mum', '\U0001f469'), ('Dad', '\U0001f468'), ('Sister', '\U0001f467'), ('Brother', '\U0001f466'),
-        ('Baby', '\U0001f476'), ('Help', '\U0001f6a8'), ('Stop', '\u270b'), ('Go', '\U0001f6b6'),
-        ('Eat', '\U0001f37d\ufe0f'), ('Drink', '\U0001f965'), ('Water', '\U0001f4a7'), ('More', '\u2795'),
-        ('Finished', '\u2705'), ('Want', '\U0001f64b'), ('Love', '\u2764\ufe0f'), ('Happy', '\U0001f60a'),
-        ('Sad', '\U0001f622'), ('Angry', '\U0001f620'), ('Tired', '\U0001f634'), ('Hot', '\U0001f525'),
-        ('Cold', '\u2744\ufe0f'), ('School', '\U0001f3eb'), ('Work', '\U0001f4bc'), ('Home', '\U0001f3e0'),
-        ('Toilet', '\U0001f6bb'), ('Doctor', '\U0001fa7a'), ('Red', '\U0001f534'), ('Blue', '\U0001f535'),
-    ],
-    'ISL': [
-        ('Good morning', '\u2600\ufe0f'), ('Good afternoon', '\U0001f324\ufe0f'), ('Good evening', '\U0001f306'),
-        ('Good night', '\U0001f319'), ('Goodbye', '\U0001f44b'), ('Please', '\U0001f64f'), ('Sorry', '\U0001f614'),
-        ('Excuse me', '\U0001f647'), ('Name', '\U0001faaa'), ('Friend', '\U0001f91d'), ('Family', '\U0001f46a'),
-        ('Mother', '\U0001f469'), ('Father', '\U0001f468'), ('Sister', '\U0001f467'), ('Brother', '\U0001f466'),
-        ('Baby', '\U0001f476'), ('Help', '\U0001f6a8'), ('Stop', '\u270b'), ('Go', '\U0001f6b6'),
-        ('Eat', '\U0001f37d\ufe0f'), ('Drink', '\U0001f965'), ('Water', '\U0001f4a7'), ('More', '\u2795'),
-        ('Finish', '\u2705'), ('Want', '\U0001f64b'), ('Love', '\u2764\ufe0f'), ('Happy', '\U0001f60a'),
-        ('Sad', '\U0001f622'), ('Angry', '\U0001f620'), ('Tired', '\U0001f634'), ('Hot', '\U0001f525'),
-        ('Cold', '\u2744\ufe0f'), ('School', '\U0001f3eb'), ('Work', '\U0001f4bc'), ('Home', '\U0001f3e0'),
-        ('Bathroom', '\U0001f6bb'), ('Doctor', '\U0001fa7a'), ('Guest', '\U0001f64c'), ('Respect', '\U0001f64f'),
-    ],
-}
+# BSL: British Sign Language (50 gestures)
+BSL_GESTURES = [
+    # Greetings & Basic (5)
+    ('HELLO', 'Hello', '\U0001f44b', 'BSL'),
+    ('CHEERS', 'Cheers', '\U0001f37b', 'BSL'),
+    ('HOW_DO', 'How do you do?', '\U0001f91d', 'BSL'),
+    ('ALRIGHT', 'Alright?', '\U0001f44d', 'BSL'),
+    ('GOOD', 'Good', '\U0001f44c', 'BSL'),
+    # Numbers 0-9 (10)
+    ('ZERO', 'Zero', '0', 'BSL'),
+    ('ONE', 'One', '1', 'BSL'),
+    ('TWO', 'Two', '2', 'BSL'),
+    ('THREE', 'Three', '3', 'BSL'),
+    ('FOUR', 'Four', '4', 'BSL'),
+    ('FIVE', 'Five', '5', 'BSL'),
+    ('SIX', 'Six', '6', 'BSL'),
+    ('SEVEN', 'Seven', '7', 'BSL'),
+    ('EIGHT', 'Eight', '8', 'BSL'),
+    ('NINE', 'Nine', '9', 'BSL'),
+    # Emotions (8)
+    ('HAPPY', 'Happy', '\U0001f60a', 'BSL'),
+    ('UNHAPPY', 'Unhappy', '\U0001f61e', 'BSL'),
+    ('CROSS', 'Cross', '\U0001f624', 'BSL'),
+    ('DELIGHTED', 'Delighted', '\U0001f917', 'BSL'),
+    ('POORLY', 'Poorly', '\U0001f912', 'BSL'),
+    ('LOVELY', 'Lovely', '\U0001f495', 'BSL'),
+    ('FEAR', 'Fear', '\U0001f631', 'BSL'),
+    ('PUZZLED', 'Puzzled', '\U0001f914', 'BSL'),
+    # Common Words (15)
+    ('PLEASE', 'Please', '\U0001f64f', 'BSL'),
+    ('THANK', 'Thank you', '\U0001f44f', 'BSL'),
+    ('YES', 'Yes', '\u270a', 'BSL'),
+    ('NO', 'No', '\u274c', 'BSL'),
+    ('WAIT', 'Wait a minute', '\u23f0', 'BSL'),
+    ('FINISH', 'Finish', '\U0001f3c1', 'BSL'),
+    ('WANT', 'Do you want?', '\U0001f64b', 'BSL'),
+    ('DRINK', 'Drink', '\U0001f95b', 'BSL'),
+    ('EAT', 'Eat', '\U0001f37d', 'BSL'),
+    ('REST', 'Rest', '\U0001f6cb', 'BSL'),
+    ('JOB', 'Job', '\U0001f454', 'BSL'),
+    ('COLLEGE', 'College', '\U0001f393', 'BSL'),
+    ('HOSPITAL', 'Hospital', '\U0001f3e5', 'BSL'),
+    ('MUM', 'Mum', '\U0001f469', 'BSL'),
+    ('DAD', 'Dad', '\U0001f468', 'BSL'),
+    # Advanced (12)
+    ('PAY', 'Pay', '\U0001f4b3', 'BSL'),
+    ('CLOCK', 'Clock', '\U0001f550', 'BSL'),
+    ('MAN', 'Man', '\U0001f468', 'BSL'),
+    ('FLAT', 'Flat', '\U0001f3d8', 'BSL'),
+    ('TAXI', 'Taxi', '\U0001f695', 'BSL'),
+    ('LAPTOP', 'Laptop', '\U0001f4bb', 'BSL'),
+    ('MOBILE', 'Mobile', '\U0001f4f1', 'BSL'),
+    ('NEWSPAPER', 'Newspaper', '\U0001f4f0', 'BSL'),
+    ('KNOW', 'I know', '\u2728', 'BSL'),
+    ('TRAIN', 'Train', '\U0001f682', 'BSL'),
+    ('LOOK', 'Look', '\U0001f441', 'BSL'),
+    ('TELL', 'Tell me', '\U0001f4ac', 'BSL'),
+]
 
+# ISL: Indian Sign Language (50 gestures)
+ISL_GESTURES = [
+    # Greetings & Basic (5)
+    ('NAMASTE', 'Namaste', '\U0001f64f', 'ISL'),
+    ('HELLO', 'Hello', '\U0001f44b', 'ISL'),
+    ('SWAGAT', 'Welcome', '\U0001f917', 'ISL'),
+    ('AAPKA_SWAAGAT', 'Your welcome', '\U0001f44f', 'ISL'),
+    ('THEEK', 'Okay', '\u2705', 'ISL'),
+    # Numbers 0-9 (10)
+    ('ZERO', 'Zero', '0', 'ISL'),
+    ('EK', 'One', '1', 'ISL'),
+    ('DO', 'Two', '2', 'ISL'),
+    ('TEEN', 'Three', '3', 'ISL'),
+    ('CHAR', 'Four', '4', 'ISL'),
+    ('PAANCH', 'Five', '5', 'ISL'),
+    ('CHEH', 'Six', '6', 'ISL'),
+    ('SAAT', 'Seven', '7', 'ISL'),
+    ('AATH', 'Eight', '8', 'ISL'),
+    ('NAU', 'Nine', '9', 'ISL'),
+    # Emotions (8)
+    ('KHUSHI', 'Happy', '\U0001f60a', 'ISL'),
+    ('DUKH', 'Sad', '\U0001f622', 'ISL'),
+    ('GUSSA', 'Anger', '\U0001f60c', 'ISL'),
+    ('KHUSHNUMA', 'Excited', '\U0001f929', 'ISL'),
+    ('THAKAVAT', 'Tired', '\U0001f62a', 'ISL'),
+    ('PYAR', 'Love', '\u2764\ufe0f', 'ISL'),
+    ('DARR', 'Fear', '\U0001f628', 'ISL'),
+    ('PARESHANI', 'Worry', '\U0001f630', 'ISL'),
+    # Common Words (15)
+    ('KRIPA', 'Please', '\U0001f64f', 'ISL'),
+    ('SHUKRIYA', 'Thank you', '\U0001f64f', 'ISL'),
+    ('HAA', 'Yes', '\u270a', 'ISL'),
+    ('NAHIN', 'No', '\u274c', 'ISL'),
+    ('RUKHO', 'Wait', '\u270b', 'ISL'),
+    ('BANDH', 'Close/Stop', '\U0001f6d1', 'ISL'),
+    ('MADAD', 'Help', '\U0001f198', 'ISL'),
+    ('PANI', 'Water', '\U0001f4a7', 'ISL'),
+    ('KHANA', 'Food', '\U0001f37d', 'ISL'),
+    ('NEEND', 'Sleep', '\U0001f62a', 'ISL'),
+    ('KAM', 'Work', '\U0001f4bc', 'ISL'),
+    ('VIDYALAYA', 'School', '\U0001f3eb', 'ISL'),
+    ('VAIDYA', 'Doctor', '\u2695', 'ISL'),
+    ('MATA', 'Mother', '\U0001f469', 'ISL'),
+    ('PITA', 'Father', '\U0001f468', 'ISL'),
+    # Advanced (12)
+    ('PAISA', 'Money', '\U0001f4b0', 'ISL'),
+    ('SAMAY', 'Time', '\u23f0', 'ISL'),
+    ('VYAKTI', 'Person', '\U0001f64b', 'ISL'),
+    ('GHAR', 'House', '\U0001f3e0', 'ISL'),
+    ('GAADI', 'Car', '\U0001f697', 'ISL'),
+    ('KOMPYOOTAR', 'Computer', '\U0001f4bb', 'ISL'),
+    ('PHONE', 'Phone', '\U0001f4f1', 'ISL'),
+    ('KITAAB', 'Book', '\U0001f4d6', 'ISL'),
+    ('SAMAJH', 'I understand', '\U0001f9e0', 'ISL'),
+    ('SIKHNA', 'Learn', '\U0001f4da', 'ISL'),
+    ('DIKHANA', 'Show me', '\U0001f440', 'ISL'),
+    ('NAAM', 'Name', '\U0001f524', 'ISL'),
+]
 
-def _slug(word):
-    return word.upper().replace(' ', '_').replace(',', '').replace("'", '')
-
-
-def _ensure_gesture_columns():
-    """Safe, additive-only migration: ADD COLUMN never touches existing data
-    or foreign keys, unlike ALTER TABLE RENAME (which is what caused the
-    IDon Portal corruption cascade) — so this is fine to run on every boot."""
-    from sqlalchemy import inspect, text
-    inspector = inspect(db.engine)
-    if 'gestures' not in inspector.get_table_names():
-        return
-    existing_cols = {c['name'] for c in inspector.get_columns('gestures')}
-    with db.engine.connect() as conn:
-        if 'language' not in existing_cols:
-            conn.execute(text("ALTER TABLE gestures ADD COLUMN language VARCHAR(10) DEFAULT 'ASL'"))
-        if 'shape_key' not in existing_cols:
-            conn.execute(text("ALTER TABLE gestures ADD COLUMN shape_key VARCHAR(30)"))
-        if 'detectable' not in existing_cols:
-            conn.execute(text("ALTER TABLE gestures ADD COLUMN detectable BOOLEAN DEFAULT 0"))
-        conn.commit()
+DEFAULT_GESTURES = ASL_GESTURES + BSL_GESTURES + ISL_GESTURES
 
 
 def seed_default_gestures():
-    _ensure_gesture_columns()
-
-    # Drop the old pre-language default set (OPEN_HAND/FIST/... with no
-    # language tag) so it doesn't show up as a duplicate alongside the new
-    # ASL_OPEN_HAND etc. Only touches user_id=None (global defaults), never
-    # a learner's own custom gestures.
-    legacy_keys = ['OPEN_HAND', 'FIST', 'ONE', 'PEACE', 'THUMB', 'ILY']
-    Gesture.query.filter(Gesture.user_id.is_(None), Gesture.gesture_key.in_(legacy_keys)).delete(
-        synchronize_session=False
-    )
-
-    for lang in SUPPORTED_LANGUAGES:
-        for shape_key, word, emoji in CORE_SHAPES:
-            key = f'{lang}_{shape_key}'
-            exists = Gesture.query.filter_by(gesture_key=key, user_id=None).first()
-            if not exists:
-                db.session.add(Gesture(
-                    gesture_key=key, word=word, emoji=emoji, is_custom=False, user_id=None,
-                    language=lang, shape_key=shape_key, detectable=True,
-                ))
-        for word, emoji in REFERENCE_WORDS.get(lang, []):
-            key = f'{lang}_{_slug(word)}'
-            exists = Gesture.query.filter_by(gesture_key=key, user_id=None).first()
-            if not exists:
-                db.session.add(Gesture(
-                    gesture_key=key, word=word, emoji=emoji, is_custom=False, user_id=None,
-                    language=lang, shape_key=None, detectable=False,
-                ))
+    for key, word, emoji, language in DEFAULT_GESTURES:
+        exists = Gesture.query.filter_by(gesture_key=key, user_id=None, language=language).first()
+        if not exists:
+            db.session.add(Gesture(gesture_key=key, word=word, emoji=emoji, is_custom=False, user_id=None, language=language))
     db.session.commit()

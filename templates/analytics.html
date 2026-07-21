@@ -1,115 +1,178 @@
-from flask import Blueprint, jsonify, render_template, abort
-from sqlalchemy import func
+{% extends "base.html" %}
 
-from database import db, Translation, Conversation, LoginEvent
-from auth import login_required, current_user
-from explore_content import ARTICLES
+{% block title %}Analytics{% endblock %}
 
-analytics_bp = Blueprint('analytics', __name__)
+{% block content %}
+<div class="analytics-container">
+    <h1>Your Analytics</h1>
+    <p class="subtitle">Overview of your translations, logins, and top gestures.</p>
 
+    <!-- ---------- Summary Cards ---------- -->
+    <div class="stats-cards">
+        <div class="stat-card">
+            <h3>Total Translations</h3>
+            <p id="total-translations" class="stat-number">--</p>
+        </div>
+        <div class="stat-card">
+            <h3>Total Conversations</h3>
+            <p id="total-conversations" class="stat-number">--</p>
+        </div>
+        <div class="stat-card">
+            <h3>Total Logins</h3>
+            <p id="total-logins" class="stat-number">--</p>
+        </div>
+    </div>
 
-# ---------- Pages ----------
+    <!-- ---------- Charts ---------- -->
+    <div class="charts-grid">
+        <div class="chart-box">
+            <h3>Translations by Source</h3>
+            <canvas id="bySourceChart"></canvas>
+        </div>
+        <div class="chart-box">
+            <h3>Top 5 Gestures</h3>
+            <canvas id="topGesturesChart"></canvas>
+        </div>
+    </div>
+</div>
 
-@analytics_bp.route('/dashboard')
-@login_required
-def dashboard_page():
-    return render_template('dashboard.html', user=current_user())
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    fetch("{{ url_for('analytics.stats') }}")
+        .then(function (response) {
+            if (!response.ok) {
+                throw new Error('Failed to load analytics data');
+            }
+            return response.json();
+        })
+        .then(function (data) {
+            document.getElementById('total-translations').textContent = data.total_translations;
+            document.getElementById('total-conversations').textContent = data.total_conversations;
+            document.getElementById('total-logins').textContent = data.total_logins;
 
+            // ---- By Source chart ----
+            var sourceLabels = Object.keys(data.by_source);
+            var sourceValues = Object.values(data.by_source);
 
-@analytics_bp.route('/for-you')
-@login_required
-def for_you_page():
-    return render_template('for_you.html', user=current_user())
+            new Chart(document.getElementById('bySourceChart'), {
+                type: 'pie',
+                data: {
+                    labels: sourceLabels,
+                    datasets: [{
+                        data: sourceValues,
+                        backgroundColor: ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
 
+            // ---- Top Gestures chart ----
+            var gestureLabels = data.top_gestures.map(function (g) { return g.gesture_key; });
+            var gestureCounts = data.top_gestures.map(function (g) { return g.count; });
 
-@analytics_bp.route('/learn/asl')
-@login_required
-def learn_asl_page():
-    return render_template('learn_asl.html', user=current_user())
+            new Chart(document.getElementById('topGesturesChart'), {
+                type: 'bar',
+                data: {
+                    labels: gestureLabels,
+                    datasets: [{
+                        label: 'Count',
+                        data: gestureCounts,
+                        backgroundColor: '#4e79a7'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        })
+        .catch(function (err) {
+            console.error(err);
+            document.querySelector('.analytics-container').insertAdjacentHTML(
+                'beforeend',
+                '<p style="color:red;">Could not load analytics data. Please try again later.</p>'
+            );
+        });
+});
+</script>
 
+<style>
+.analytics-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 24px;
+}
 
-@analytics_bp.route('/learn/bsl')
-@login_required
-def learn_bsl_page():
-    return render_template('learn_bsl.html', user=current_user())
+.subtitle {
+    color: #666;
+    margin-bottom: 24px;
+}
 
+.stats-cards {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+}
 
-@analytics_bp.route('/explore/<slug>')
-@login_required
-def explore_article_page(slug):
-    article = ARTICLES.get(slug)
-    if not article:
-        abort(404)
-    return render_template('explore_article.html', user=current_user(), article=article, slug=slug)
+.stat-card {
+    flex: 1;
+    min-width: 180px;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 16px 20px;
+    text-align: center;
+}
 
+.stat-card h3 {
+    font-size: 14px;
+    color: #555;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
 
-@analytics_bp.route('/history')
-@login_required
-def history_page():
-    return render_template('history.html', user=current_user())
+.stat-number {
+    font-size: 28px;
+    font-weight: 700;
+    color: #222;
+    margin: 0;
+}
 
+.charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
 
-@analytics_bp.route('/gestures-page')
-@login_required
-def gestures_page():
-    return render_template('gestures.html', user=current_user())
+.chart-box {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 16px;
+    position: relative; /* contains the canvas override below */
+}
 
+/* Override the global "video, canvas { position:absolute; top:0; left:0;
+   width:100%; height:100%; }" rule in style.css, which was written for the
+   webcam preview (.cam-box) but has no scoping, so it hijacks every canvas
+   on the page including these Chart.js charts. */
+.chart-box canvas {
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    object-fit: initial !important;
+}
 
-@analytics_bp.route('/analytics-page')
-@login_required
-def analytics_page():
-    return render_template('analytics.html', user=current_user())
-
-
-@analytics_bp.route('/about')
-@login_required
-def about_page():
-    return render_template('about.html', user=current_user(), active='about')
-
-
-# ---------- API ----------
-
-@analytics_bp.route('/api/stats', methods=['GET'])
-@login_required
-def stats():
-    user = current_user()
-
-    total = (
-        db.session.query(func.count(Translation.id))
-        .join(Conversation)
-        .filter(Conversation.user_id == user.id)
-        .scalar()
-    ) or 0
-
-    by_source = (
-        db.session.query(Translation.source, func.count(Translation.id))
-        .join(Conversation)
-        .filter(Conversation.user_id == user.id)
-        .group_by(Translation.source)
-        .all()
-    )
-
-    top_gestures = (
-        db.session.query(Translation.gesture_key, func.count(Translation.id).label('c'))
-        .join(Conversation)
-        .filter(
-            Conversation.user_id == user.id,
-            Translation.source == 'sign',
-            Translation.gesture_key.isnot(None),
-        )
-        .group_by(Translation.gesture_key)
-        .order_by(func.count(Translation.id).desc())
-        .limit(5)
-        .all()
-    )
-
-    total_logins = LoginEvent.query.filter_by(user_id=user.id, success=True).count()
-    total_conversations = Conversation.query.filter_by(user_id=user.id).count()
-
-    return jsonify({
-        'total_translations': total,
-        'by_source': {s: c for s, c in by_source},
-        'top_gestures': [{'gesture_key': g, 'count': c} for g, c in top_gestures],
-        'total_logins': total_logins,
-        'total_conversations': total_conversations,
-    })
+@media (max-width: 700px) {
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}

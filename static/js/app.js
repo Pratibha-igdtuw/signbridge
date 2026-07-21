@@ -83,9 +83,9 @@ loadGestureVocabulary(currentLanguage);
 
 if(camLangSeg){
   camLangSeg.addEventListener('click', (e)=>{
-    const btn = e.target.closest('.cam-lang-btn');
+    const btn = e.target.closest('.lang-seg-btn');
     if(!btn) return;
-    camLangSeg.querySelectorAll('.cam-lang-btn').forEach(b=>b.classList.remove('active'));
+    camLangSeg.querySelectorAll('.lang-seg-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     loadGestureVocabulary(btn.dataset.lang);
   });
@@ -346,164 +346,67 @@ document.querySelectorAll('.chip[data-text]').forEach(btn=>{
   });
 });
 
-/* ===================== Feature 5: Type -> Sign avatar preview ===================== */
+/* ===================== Feature 5: Type -> Sign preview (icon-based, backend vocab) ===================== */
 
 const FINGERSPELL = {
-  A:'🅰️', B:'🅱️', C:'🇨', D:'🇩', E:'🇪', F:'🇫', G:'🇬', H:'🇭', I:'ℹ️', J:'🇯',
-  K:'🇰', L:'🇱', M:'Ⓜ️', N:'🇳', O:'🅾️', P:'🅿️', Q:'🇶', R:'🇷', S:'🇸', T:'🇹',
-  U:'🇺', V:'🇻', W:'🇼', X:'🇽', Y:'🇾', Z:'🇿',
-  0:'0️⃣',1:'1️⃣',2:'2️⃣',3:'3️⃣',4:'4️⃣',5:'5️⃣',6:'6️⃣',7:'7️⃣',8:'8️⃣',9:'9️⃣'
+  A:'A', B:'B', C:'C', D:'D', E:'E', F:'F', G:'G', H:'H', I:'I', J:'J',
+  K:'K', L:'L', M:'M', N:'N', O:'O', P:'P', Q:'Q', R:'R', S:'S', T:'T',
+  U:'U', V:'V', W:'W', X:'X', Y:'Y', Z:'Z',
+  0:'0',1:'1',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9'
 };
 
 const avatarInput = document.getElementById('avatarInput');
 const avatarPlayBtn = document.getElementById('avatarPlayBtn');
 const avatarClearBtn = document.getElementById('avatarClearBtn');
 const avatarStage = document.getElementById('avatarStage');
+const avatarLangSeg = document.getElementById('avatarLangSeg');
+const signHero = document.getElementById('signHero');
+const signHeroIcon = document.getElementById('signHeroIcon');
+const signHeroWord = document.getElementById('signHeroWord');
+const signHeroLang = document.getElementById('signHeroLang');
+
+// This is decoupled from the camera's language/vocabulary on purpose —
+// someone can be reading BSL on camera while typing an ISL phrase to preview.
+let avatarLanguage = 'ASL';
+let avatarVocab = {}; // lowercased word/phrase -> {word, emoji, gesture_key}
+
+async function loadAvatarVocab(language){
+  avatarLanguage = language || avatarLanguage;
+  try{
+    const res = await fetch(`/api/gestures?language=${encodeURIComponent(avatarLanguage)}`);
+    const list = await res.json();
+    avatarVocab = {};
+    list.forEach(g => { avatarVocab[g.word.toLowerCase()] = g; });
+    if(signHeroLang) signHeroLang.textContent = avatarLanguage;
+  }catch(e){
+    console.warn('Could not load avatar vocabulary', e);
+  }
+}
+loadAvatarVocab(avatarLanguage);
+
+if(avatarLangSeg){
+  avatarLangSeg.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.lang-seg-btn');
+    if(!btn) return;
+    avatarLangSeg.querySelectorAll('.lang-seg-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    loadAvatarVocab(btn.dataset.lang);
+  });
+}
 
 function wordToVocabMatch(word){
-  const clean = word.toLowerCase().replace(/[^a-z0-9']/g, '');
-  for(const key in GESTURES){
-    if(GESTURES[key].word.toLowerCase() === clean) return GESTURES[key];
-  }
-  return null;
+  const clean = word.toLowerCase().replace(/[^a-z0-9' ]/g, '').trim();
+  return avatarVocab[clean] || null;
 }
 
-/* ---------- Signing avatar: hand-shape data (stylised, illustrative) ---------- */
-// finger order: [thumb, index, middle, ring, pinky] — 0 curled, 1 half, 2 extended
-const LETTER_POSES = {
-  A:[2,0,0,0,0], B:[0,2,2,2,2], C:[1,1,1,1,1], D:[1,2,0,0,0], E:[0,0,0,0,0],
-  F:[1,0,2,2,2], G:[2,2,0,0,0], H:[0,2,2,0,0], I:[0,0,0,0,2], J:[0,0,0,0,2],
-  K:[1,2,2,0,0], L:[2,2,0,0,0], M:[0,1,1,1,0], N:[0,1,1,0,0], O:[1,1,1,1,1],
-  P:[1,2,2,0,0], Q:[2,2,0,0,0], R:[0,2,2,0,0], S:[1,0,0,0,0], T:[1,0,0,0,0],
-  U:[0,2,2,0,0], V:[0,2,2,0,0], W:[0,2,2,2,0], X:[0,1,0,0,0], Y:[2,0,0,0,2], Z:[0,2,0,0,0],
-  0:[1,1,1,1,1], 1:[0,2,0,0,0], 2:[0,2,2,0,0], 3:[2,2,2,0,0], 4:[0,2,2,2,2],
-  5:[2,2,2,2,2], 6:[2,0,2,2,2], 7:[2,2,0,2,2], 8:[2,2,2,0,2], 9:[2,2,2,2,0]
-};
-const WORD_POSES = {
-  // iconic / closer-to-real signs
-  'hello':[0,2,2,2,2], 'hi':[0,2,2,2,2], 'thank you':[0,2,2,2,2], 'please':[0,2,2,2,2],
-  'good':[0,2,2,2,2], 'bad':[0,2,2,2,2], 'bye':[0,2,2,2,2], 'goodbye':[0,2,2,2,2],
-  'yes':[1,0,0,0,0], 'sorry':[1,0,0,0,0],
-  'i':[0,2,0,0,0], 'me':[0,2,0,0,0], 'you':[0,2,0,0,0],
-  'no':[1,2,2,0,0], 'need':[0,1,0,0,0], 'friend':[0,1,0,0,0],
-  'want':[1,1,1,1,1], 'eat':[1,1,1,1,1], 'more':[1,1,1,1,1],
-  'water':[0,2,2,2,0], 'love':[2,2,0,0,2], 'i love you':[2,2,0,0,2],
-  'like':[2,0,1,0,0], 'help':[0,2,2,2,2]
-};
-// generic fallback palette for other common words — stylised variety, not literal ASL
-const POSE_PALETTE = [
-  [2,0,0,0,0],[0,2,2,2,2],[1,1,1,1,1],[1,2,0,0,0],[0,0,0,0,0],
-  [2,2,0,0,0],[0,2,2,0,0],[0,2,0,0,0],[2,0,0,0,2],[0,2,2,2,0]
-];
-const GENERIC_WORDS = ['we','us','they','he','she','it','my','your','is','are','am','do','does',
-  'can','will','would','should','have','has','go','come','stop','wait','drink','food','home','work',
-  'school','family','mother','father','sister','brother','today','tomorrow','yesterday','now','later',
-  'time','day','night','morning','again','understand','know','learn','teach','read','write','talk',
-  'speak','hear','see','look','feel','think','remember','forget','open','close','give','take','big',
-  'small','hot','cold','fast','slow','right','wrong','happy','sad','name','what','where','when','who','why','how'];
-GENERIC_WORDS.forEach(w=>{
-  let sum = 0;
-  for(let i=0;i<w.length;i++) sum += w.charCodeAt(i);
-  WORD_POSES[w] = POSE_PALETTE[sum % POSE_PALETTE.length];
-});
-const RELAXED_POSE = [1,1,1,1,1];
-
-const FINGER_DEFS = {
-  fThumb:  {x:-19, y:10, angle:200, lens:[6,16,28]},
-  fIndex:  {x:-9,  y:-8, angle:260, lens:[8,18,32]},
-  fMiddle: {x:-2,  y:-8, angle:270, lens:[8,18,34]},
-  fRing:   {x:6,   y:-8, angle:280, lens:[8,18,32]},
-  fPinky:  {x:14,  y:-8, angle:290, lens:[8,16,28]}
-};
-const FINGER_ORDER = ['fThumb','fIndex','fMiddle','fRing','fPinky'];
-
-// current animated length per finger, so we can glide smoothly between poses
-const currentFingerLens = { fThumb:8, fIndex:8, fMiddle:8, fRing:8, fPinky:8 };
-let avatarAnimId = 0;
-
-function drawFingerAt(id, len){
-  const def = FINGER_DEFS[id];
-  const rad = def.angle * Math.PI / 180;
-  const x2 = def.x + len * Math.cos(rad);
-  const y2 = def.y + len * Math.sin(rad);
-  const el = document.getElementById(id);
-  if(!el) return;
-  el.setAttribute('x1', def.x); el.setAttribute('y1', def.y);
-  el.setAttribute('x2', x2); el.setAttribute('y2', y2);
-}
-
-function renderAvatarHand(pose){
-  const myAnim = ++avatarAnimId;
-  const startLens = { ...currentFingerLens };
-  const targetLens = {};
-  FINGER_ORDER.forEach((id, i)=>{
-    targetLens[id] = FINGER_DEFS[id].lens[pose[i]];
-  });
-  const duration = 260; // ms — glide between hand-shapes instead of snapping
-  const t0 = performance.now();
-  function step(now){
-    if(myAnim !== avatarAnimId) return; // a newer pose took over, stop this one
-    const raw = Math.min(1, (now - t0) / duration);
-    const eased = 1 - Math.pow(1 - raw, 2); // ease-out
-    FINGER_ORDER.forEach(id=>{
-      const len = startLens[id] + (targetLens[id] - startLens[id]) * eased;
-      currentFingerLens[id] = len;
-      drawFingerAt(id, len);
-    });
-    if(raw < 1) requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
-}
-
-let avatarTimers = [];
-function clearAvatarTimers(){ avatarTimers.forEach(t=>clearTimeout(t)); avatarTimers = []; }
-
-/* ---------- Sign-language dropdown (ASL live, others coming soon) ---------- */
-const langPickerBtn = document.getElementById('langPickerBtn');
-const langPickerPanel = document.getElementById('langPickerPanel');
-const langPickerLabel = document.getElementById('langPickerLabel');
-const langToast = document.getElementById('langToast');
-let langToastTimer = null;
-
-if(langPickerBtn && langPickerPanel){
-  langPickerBtn.addEventListener('click', (e)=>{
-    e.stopPropagation();
-    langPickerPanel.hidden = !langPickerPanel.hidden;
-  });
-  document.addEventListener('click', (e)=>{
-    if(!langPickerPanel.hidden && !langPickerPanel.contains(e.target) && e.target !== langPickerBtn){
-      langPickerPanel.hidden = true;
-    }
-  });
-  langPickerPanel.querySelectorAll('.lang-option').forEach(opt=>{
-    opt.addEventListener('click', ()=>{
-      langPickerPanel.hidden = true;
-      if(opt.dataset.lang === 'ASL'){
-        langPickerPanel.querySelectorAll('.lang-option').forEach(o=>o.classList.remove('active'));
-        opt.classList.add('active');
-        langPickerLabel.textContent = opt.dataset.name;
-        return;
-      }
-      if(langToast){
-        langToast.textContent = `${opt.dataset.name} support is coming soon — showing American Sign Language for now.`;
-        langToast.hidden = false;
-        clearTimeout(langToastTimer);
-        langToastTimer = setTimeout(()=>{ langToast.hidden = true; }, 2600);
-      }
-    });
-  });
-}
-
-/* ---------- Avatar style picker ---------- */
-const avatarSvg = document.getElementById('avatarSvg');
-const avatarCaption = document.getElementById('avatarCaption');
+/* ---------- Avatar theme picker (colors the sign-hero card) ---------- */
 const stylePicker = document.getElementById('avatarStylePicker');
 const THEMES = ['warm','midnight','ocean','ember'];
 
 function applyAvatarTheme(theme){
-  if(!avatarSvg) return;
-  THEMES.forEach(t => avatarSvg.classList.remove(`avatar-theme-${t}`));
-  avatarSvg.classList.add(`avatar-theme-${theme}`);
+  if(!signHero) return;
+  THEMES.forEach(t => signHero.classList.remove(`avatar-theme-${t}`));
+  signHero.classList.add(`avatar-theme-${theme}`);
   if(stylePicker){
     stylePicker.querySelectorAll('.style-swatch').forEach(btn=>{
       btn.classList.toggle('active', btn.dataset.style === theme);
@@ -521,7 +424,14 @@ if(stylePicker){
 let savedTheme = 'ocean';
 try{ savedTheme = localStorage.getItem('sb_avatar_style') || 'ocean'; }catch(e){}
 applyAvatarTheme(savedTheme);
-if(avatarSvg) renderAvatarHand(RELAXED_POSE);
+
+function updateSignHero(word, emoji){
+  if(signHeroIcon) signHeroIcon.textContent = emoji || '🤟';
+  if(signHeroWord) signHeroWord.textContent = word || 'Sign preview will play here…';
+}
+
+let avatarTimers = [];
+function clearAvatarTimers(){ avatarTimers.forEach(t=>clearTimeout(t)); avatarTimers = []; }
 
 function buildAvatarTiles(text){
   avatarStage.innerHTML = '';
@@ -529,41 +439,36 @@ function buildAvatarTiles(text){
   const words = text.trim().split(/\s+/).filter(Boolean);
   if(!words.length){
     avatarStage.innerHTML = '<div class="avatar-tile empty" id="avatarPlaceholder">Sign preview will play here…</div>';
-    if(avatarCaption) avatarCaption.textContent = 'Sign preview will play here…';
-    renderAvatarHand(RELAXED_POSE);
+    updateSignHero(null, '🤟');
     return;
   }
+
   let delay = 0;
-  const fullClean = words.join(' ').toLowerCase().replace(/[^a-z0-9' ]/g, '').trim();
-  if(WORD_POSES[fullClean]){
-    // whole phrase matches a known sign (e.g. "thank you", "i love you")
+  const fullPhraseMatch = wordToVocabMatch(words.join(' '));
+
+  if(fullPhraseMatch){
+    // whole phrase matches a known sign in this language's vocabulary (e.g. "thank you", "good morning")
     const tile = document.createElement('div');
     tile.className = 'avatar-tile';
     tile.style.animationDelay = '0ms';
-    tile.innerHTML = `<div class="glyph">🤟</div><div class="cap">${text}</div>`;
+    tile.innerHTML = `<div class="glyph">${fullPhraseMatch.emoji}</div><div class="cap">${fullPhraseMatch.word}</div>`;
     avatarStage.appendChild(tile);
     avatarTimers.push(setTimeout(()=>{
-      renderAvatarHand(WORD_POSES[fullClean]);
-      if(avatarCaption) avatarCaption.textContent = text;
+      updateSignHero(fullPhraseMatch.word, fullPhraseMatch.emoji);
     }, 0));
     delay = 900;
   } else {
     words.forEach(word=>{
       const match = wordToVocabMatch(word);
-      const cleanWord = word.toLowerCase().replace(/[^a-z0-9']/g, '');
-      if(match || WORD_POSES[cleanWord]){
+      if(match){
         const tile = document.createElement('div');
         tile.className = 'avatar-tile';
         tile.style.animationDelay = `${delay}ms`;
-        const label = match ? match.word : word;
-        const glyph = match ? match.emoji : '🤟';
-        tile.innerHTML = `<div class="glyph">${glyph}</div><div class="cap">${label}</div>`;
+        tile.innerHTML = `<div class="glyph">${match.emoji}</div><div class="cap">${match.word}</div>`;
         avatarStage.appendChild(tile);
-        const pose = WORD_POSES[cleanWord] || RELAXED_POSE;
         const stepDelay = delay;
         avatarTimers.push(setTimeout(()=>{
-          renderAvatarHand(pose);
-          if(avatarCaption) avatarCaption.textContent = label;
+          updateSignHero(match.word, match.emoji);
         }, stepDelay));
         delay += 750;
       } else {
@@ -574,22 +479,20 @@ function buildAvatarTiles(text){
           const tile = document.createElement('div');
           tile.className = 'avatar-tile letter';
           tile.style.animationDelay = `${delay}ms`;
-          tile.innerHTML = `<div class="glyph">${ch.toUpperCase()}</div><div class="cap">fingerspell</div>`;
+          tile.innerHTML = `<div class="glyph">${glyph}</div><div class="cap">fingerspell</div>`;
           avatarStage.appendChild(tile);
-          const pose = LETTER_POSES[ch.toUpperCase()] || RELAXED_POSE;
           const stepDelay = delay;
           avatarTimers.push(setTimeout(()=>{
-            renderAvatarHand(pose);
-            if(avatarCaption) avatarCaption.textContent = ch.toUpperCase();
+            updateSignHero(ch.toUpperCase(), glyph);
           }, stepDelay));
           delay += 450;
         });
       }
     });
   }
+
   avatarTimers.push(setTimeout(()=>{
-    renderAvatarHand(RELAXED_POSE);
-    if(avatarCaption) avatarCaption.textContent = text;
+    updateSignHero(text, fullPhraseMatch ? fullPhraseMatch.emoji : '🤟');
   }, delay + 500));
 }
 
@@ -603,8 +506,7 @@ if(avatarPlayBtn){
   avatarClearBtn.addEventListener('click', ()=>{
     avatarInput.value = '';
     clearAvatarTimers();
-    renderAvatarHand(RELAXED_POSE);
-    if(avatarCaption) avatarCaption.textContent = 'Sign preview will play here…';
+    updateSignHero(null, '🤟');
     avatarStage.innerHTML = '<div class="avatar-tile empty" id="avatarPlaceholder">Sign preview will play here…</div>';
   });
   document.querySelectorAll('.chip[data-avatar]').forEach(btn=>{

@@ -18,10 +18,10 @@
   <div class="card">
     <h2>Sign Recognition <b>· Sign → Speech</b></h2>
     <div class="row" style="margin-top:0;">
-      <div class="cam-lang-seg" id="camLangSeg">
-        <button type="button" class="cam-lang-btn active" data-lang="ASL">🇺🇸 ASL</button>
-        <button type="button" class="cam-lang-btn" data-lang="BSL">🇬🇧 BSL</button>
-        <button type="button" class="cam-lang-btn" data-lang="ISL">🇮🇳 ISL</button>
+      <div class="lang-seg" id="camLangSeg">
+        <button type="button" class="lang-seg-btn active" data-lang="ASL">ASL <small>American</small></button>
+        <button type="button" class="lang-seg-btn" data-lang="BSL">BSL <small>British</small></button>
+        <button type="button" class="lang-seg-btn" data-lang="ISL">ISL <small>Indian</small></button>
       </div>
     </div>
     <div class="cam-box" id="camBox">
@@ -80,40 +80,18 @@
   <p style="color:var(--muted); font-size:13px; margin:-6px 0 14px;">
     Type a message and SignBridge plays it back as a sequence of signs — matched words use your gesture vocabulary; anything else is fingerspelled letter by letter.
   </p>
+
+  <div class="lang-seg" id="avatarLangSeg">
+    <button type="button" class="lang-seg-btn active" data-lang="ASL">ASL <small>American</small></button>
+    <button type="button" class="lang-seg-btn" data-lang="BSL">BSL <small>British</small></button>
+    <button type="button" class="lang-seg-btn" data-lang="ISL">ISL <small>Indian</small></button>
+  </div>
+
   <textarea id="avatarInput" placeholder="Type what you want to say in sign…" rows="2"
-    style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--line); background:var(--panel-2); color:var(--text); font-size:14px; font-family:inherit; resize:vertical;"></textarea>
-  <div class="row" style="align-items:flex-start; flex-wrap:wrap;">
+    style="width:100%; margin-top:14px; padding:12px 14px; border-radius:10px; border:1px solid var(--line); background:var(--panel-2); color:var(--text); font-size:14px; font-family:inherit; resize:vertical;"></textarea>
+  <div class="row">
     <button class="btn btn-primary" id="avatarPlayBtn">Show in Sign</button>
     <button class="btn btn-outline" id="avatarClearBtn">Clear</button>
-    <div class="lang-picker" id="langPicker">
-      <button type="button" class="lang-picker-btn" id="langPickerBtn">
-        <span class="lang-flag">US</span> <span id="langPickerLabel">American Sign Language</span> <span class="lang-caret">▾</span>
-      </button>
-      <div class="lang-picker-panel" id="langPickerPanel" hidden>
-        <div class="lang-option active" data-lang="ASL" data-name="American Sign Language">
-          <span class="lang-flag">US</span> American Sign Language <span class="lang-tag active">ACTIVE</span>
-        </div>
-        <div class="lang-option" data-lang="BSL" data-name="British Sign Language">
-          <span class="lang-flag">GB</span> British Sign Language (BSL) <span class="lang-tag">COMING SOON</span>
-        </div>
-        <div class="lang-option" data-lang="DGS" data-name="German Sign Language">
-          <span class="lang-flag">DE</span> German Sign Language (DGS) <span class="lang-tag">COMING SOON</span>
-        </div>
-        <div class="lang-option" data-lang="LSF" data-name="French Sign Language">
-          <span class="lang-flag">FR</span> French Sign Language (LSF) <span class="lang-tag">COMING SOON</span>
-        </div>
-        <div class="lang-option" data-lang="ISL" data-name="Indian Sign Language">
-          <span class="lang-flag">IN</span> Indian Sign Language (ISL) <span class="lang-tag">COMING SOON</span>
-        </div>
-        <div class="lang-option" data-lang="JSL" data-name="Japanese Sign Language">
-          <span class="lang-flag">JP</span> Japanese Sign Language (JSL) <span class="lang-tag">COMING SOON</span>
-        </div>
-        <div class="lang-option" data-lang="CSL" data-name="Chinese Sign Language">
-          <span class="lang-flag">CN</span> Chinese Sign Language (CSL) <span class="lang-tag">COMING SOON</span>
-        </div>
-      </div>
-      <div class="lang-toast" id="langToast" hidden></div>
-    </div>
   </div>
 
   <div class="quick-phrases">
@@ -123,31 +101,19 @@
     <button type="button" class="chip" data-avatar="I love you">I love you</button>
   </div>
 
-  <div class="avatar-figure-wrap">
-    <svg id="avatarSvg" class="avatar-svg avatar-theme-ocean" viewBox="0 0 220 260" xmlns="http://www.w3.org/2000/svg">
-      <path class="av-body" d="M55 250 L70 140 L150 140 L165 250 Z" fill="none" stroke-width="4" stroke-linejoin="round"/>
-      <circle class="av-head" cx="110" cy="95" r="34" fill="none" stroke-width="4"/>
-      <path class="av-brow" d="M92 86 q9 -8 18 0" fill="none" stroke-width="3" stroke-linecap="round"/>
-      <path class="av-brow" d="M112 86 q9 -8 18 0" fill="none" stroke-width="3" stroke-linecap="round"/>
-      <path class="av-mouth" d="M96 108 q14 12 28 0" fill="none" stroke-width="3" stroke-linecap="round"/>
-      <line class="av-arm" x1="70" y1="150" x2="108" y2="188" stroke-width="4" stroke-linecap="round"/>
-      <g id="avatarHand" class="av-hand" transform="translate(108,188)">
-        <rect class="av-palm" x="-19" y="-8" width="38" height="42" rx="12" fill="none" stroke-width="4"/>
-        <line id="fThumb" class="av-finger" x1="0" y1="0" x2="0" y2="0" stroke-width="8" stroke-linecap="round"/>
-        <line id="fIndex" class="av-finger" x1="0" y1="0" x2="0" y2="0" stroke-width="8" stroke-linecap="round"/>
-        <line id="fMiddle" class="av-finger" x1="0" y1="0" x2="0" y2="0" stroke-width="8" stroke-linecap="round"/>
-        <line id="fRing" class="av-finger" x1="0" y1="0" x2="0" y2="0" stroke-width="8" stroke-linecap="round"/>
-        <line id="fPinky" class="av-finger" x1="0" y1="0" x2="0" y2="0" stroke-width="8" stroke-linecap="round"/>
-      </g>
-    </svg>
-    <div class="avatar-caption" id="avatarCaption">Sign preview will play here…</div>
+  <div class="sign-hero-wrap">
+    <div class="sign-hero avatar-theme-ocean" id="signHero">
+      <div class="sign-hero-icon" id="signHeroIcon">🤟</div>
+      <div class="sign-hero-word" id="signHeroWord">Sign preview will play here…</div>
+      <div class="sign-hero-lang" id="signHeroLang">ASL</div>
+    </div>
     <div class="avatar-style-picker" id="avatarStylePicker">
       <button type="button" class="style-swatch" data-style="warm">Warm</button>
       <button type="button" class="style-swatch" data-style="midnight">Midnight</button>
       <button type="button" class="style-swatch active" data-style="ocean">Ocean</button>
       <button type="button" class="style-swatch" data-style="ember">Ember</button>
     </div>
-    <p class="avatar-disclaimer">Stylised hand-shapes for a visual preview — not a certified ASL reference.</p>
+    <p class="avatar-disclaimer">Icon-based sign preview, drawn from your gesture vocabulary — not a certified sign-language reference.</p>
   </div>
 
   <div class="avatar-stage" id="avatarStage">

@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 
-from database import db, Gesture, SUPPORTED_LANGUAGES
+from database import db, Gesture
 from auth import login_required, current_user
 
 gesture_bp = Blueprint('gesture', __name__)
@@ -10,9 +10,7 @@ gesture_bp = Blueprint('gesture', __name__)
 @login_required
 def list_gestures():
     user = current_user()
-    language = (request.args.get('language') or 'ASL').strip().upper()
-    if language not in SUPPORTED_LANGUAGES:
-        language = 'ASL'
+    language = request.args.get('language', 'ASL')  # Default to ASL
     defaults = Gesture.query.filter_by(user_id=None, language=language).all()
     custom = Gesture.query.filter_by(user_id=user.id, language=language).all()
     return jsonify([g.to_dict() for g in defaults + custom])
@@ -27,20 +25,17 @@ def add_gesture():
     word = (data.get('word') or '').strip()
     emoji = (data.get('emoji') or '\U0001f590').strip()
     language = (data.get('language') or 'ASL').strip().upper()
-    if language not in SUPPORTED_LANGUAGES:
-        language = 'ASL'
 
     if not key or not word:
         return jsonify({'error': 'gesture_key and word are required'}), 400
     if len(key) > 50 or len(word) > 120:
         return jsonify({'error': 'gesture_key or word is too long'}), 400
 
-    exists = Gesture.query.filter_by(gesture_key=key, user_id=user.id).first()
+    exists = Gesture.query.filter_by(gesture_key=key, user_id=user.id, language=language).first()
     if exists:
-        return jsonify({'error': 'You already have a custom gesture with this key'}), 409
+        return jsonify({'error': 'You already have a custom gesture with this key in this language'}), 409
 
-    g = Gesture(gesture_key=key, word=word, emoji=emoji, is_custom=True, user_id=user.id,
-                language=language, shape_key=None, detectable=False)
+    g = Gesture(gesture_key=key, word=word, emoji=emoji, is_custom=True, user_id=user.id, language=language)
     db.session.add(g)
     db.session.commit()
     return jsonify({'message': 'Gesture added', 'gesture': g.to_dict()}), 201
@@ -50,7 +45,8 @@ def add_gesture():
 @login_required
 def delete_gesture(gesture_key):
     user = current_user()
-    g = Gesture.query.filter_by(gesture_key=gesture_key.upper(), user_id=user.id).first()
+    language = request.args.get('language', 'ASL')
+    g = Gesture.query.filter_by(gesture_key=gesture_key.upper(), user_id=user.id, language=language).first()
     if not g:
         return jsonify({'error': 'Custom gesture not found'}), 404
     db.session.delete(g)
