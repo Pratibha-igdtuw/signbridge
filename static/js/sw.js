@@ -48,8 +48,10 @@ self.addEventListener('fetch', (event) => {
     // Network-first for API data, so logged-in state / fresh stats always win when online.
     event.respondWith(
       fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+        }
         return res;
       }).catch(() => caches.match(req))
     );
@@ -59,8 +61,10 @@ self.addEventListener('fetch', (event) => {
   // Cache-first for the app shell and CDN scripts.
   event.respondWith(
     caches.match(req).then((cached) => cached || fetch(req).then((res) => {
-      const copy = res.clone();
-      caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+      if (res.ok) {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+      }
       return res;
     }).catch(() => cached))
   );
