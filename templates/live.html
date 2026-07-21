@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Live Conversation — SignBridge{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <a href="{{ url_for('analytics.dashboard_page') }}" class="back-link">&larr; Back to Home</a>
+  <h1 class="display page-title">Live Conversation</h1>
+  <p class="page-sub">A shared, messaging-style screen — speech becomes text for the Deaf user, replies are spoken aloud for the hearing person.</p>
+</div>
+
+<div class="live-shell">
+  <div class="live-col">
+    <div class="live-col-head">🔊 Hearing person</div>
+    <div class="live-messages" id="liveMessagesLeft"><div class="empty">Conversation will appear here…</div></div>
+    <div class="live-col-foot">
+      <div class="mic-btn" id="liveMicBtn" style="flex:1;">🎤 Tap to speak</div>
+    </div>
+    <div class="live-col-foot">
+      <input type="text" id="liveHearingInput" placeholder="Or type here…" style="flex:1; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:var(--panel-2); font-family:inherit;" />
+      <button class="btn btn-primary" id="liveHearingSend">Send</button>
+    </div>
+  </div>
+
+  <div class="live-col">
+    <div class="live-col-head">🤟 Deaf user</div>
+    <div class="live-messages" id="liveMessagesRight"><div class="empty">Conversation will appear here…</div></div>
+    <div class="suggestion-row" id="liveReplySuggestions" style="padding:0 16px;"></div>
+    <div class="live-col-foot">
+      <div class="cam-box" id="liveCamBox" style="aspect-ratio:16/9;">
+        <video id="liveVideo" playsinline autoplay muted></video>
+        <canvas id="liveOverlay"></canvas>
+        <div class="cam-off" id="liveCamOff">Camera is off.</div>
+      </div>
+    </div>
+    <div class="live-col-foot">
+      <button class="btn btn-outline" id="liveStartCam">Start Camera</button>
+      <button class="btn btn-outline" id="liveStopCam" disabled>Stop Camera</button>
+    </div>
+    <div class="live-col-foot">
+      <input type="text" id="liveDeafInput" placeholder="Or type a reply…" style="flex:1; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:var(--panel-2); font-family:inherit;" />
+      <button class="btn btn-primary" id="liveDeafSend">Send</button>
+    </div>
+  </div>
+</div>
+
+<div class="live-controls">
+  <button class="btn btn-outline" id="liveClearBtn">Clear conversation</button>
+  <button class="btn btn-outline" id="liveExportBtn">Export conversation</button>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/live.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Practice — {{ lesson.word }} — SignBridge{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <a href="{{ url_for('learn.learn_page') }}" class="back-link">&larr; Back to Learn</a>
+  <h1 class="display page-title">{{ lesson.emoji }} Practice: {{ lesson.word }}</h1>
+  <p class="page-sub">{{ lesson.description }}</p>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>Camera <b>· Perform the sign</b></h2>
+    <div class="cam-box" id="camBox">
+      <video id="pVideo" playsinline autoplay muted></video>
+      <canvas id="pOverlay"></canvas>
+      <div class="cam-off" id="pCamOff">Camera is off. Click "Start Camera" to begin practicing.</div>
+    </div>
+    <div class="row">
+      <button class="btn btn-primary" id="pStartCam">Start Camera</button>
+      <button class="btn btn-outline" id="pStopCam" disabled>Stop Camera</button>
+    </div>
+
+    <div id="practiceResult" class="practice-result">
+      {% if lesson.detectable %}
+      Hold the "{{ lesson.word }}" sign steady in front of the camera…
+      {% else %}
+      This sign isn't scored by the camera yet — practice freely and log your session when ready.
+      {% endif %}
+    </div>
+
+    <div class="practice-metrics">
+      <div class="practice-metric"><div class="num" id="pConfidence">—</div><div class="lbl">Confidence</div></div>
+      <div class="practice-metric"><div class="num" id="pAttempts">0</div><div class="lbl">Attempts</div></div>
+      <div class="practice-metric"><div class="num" id="pSuccessRate">—</div><div class="lbl">Success Rate</div></div>
+    </div>
+
+    {% if not lesson.detectable %}
+    <div class="row">
+      <button class="btn btn-primary" id="pLogFreePractice" disabled>Log practice attempt</button>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Smart Recognition Feedback</h2>
+    <div class="feedback-grid" id="feedbackGrid">
+      <div class="feedback-item"><span class="fi-label"><span class="dot" id="dotDetected"></span>Detected Gesture</span><span class="fi-value" id="fvDetected">—</span></div>
+      <div class="feedback-item"><span class="fi-label"><span class="dot" id="dotConfidence"></span>Recognition Confidence</span><span class="fi-value" id="fvConfidence">—</span></div>
+      <div class="feedback-item"><span class="fi-label"><span class="dot" id="dotVisibility"></span>Hand Visibility</span><span class="fi-value" id="fvVisibility">—</span></div>
+      <div class="feedback-item"><span class="fi-label"><span class="dot" id="dotLighting"></span>Lighting Quality</span><span class="fi-value" id="fvLighting">—</span></div>
+      <div class="feedback-item"><span class="fi-label"><span class="dot" id="dotCamera"></span>Camera Status</span><span class="fi-value" id="fvCamera">Off</span></div>
+      <div class="feedback-item"><span class="fi-label"><span class="dot" id="dotDistance"></span>Distance From Camera</span><span class="fi-value" id="fvDistance">—</span></div>
+      <div class="feedback-item"><span class="fi-label"><span class="dot" id="dotProcessing"></span>Processing Status</span><span class="fi-value" id="fvProcessing">Idle</span></div>
+    </div>
+    <div class="feedback-suggestions" id="feedbackSuggestions">
+      <b>Tips to improve recognition:</b>
+      <ul id="feedbackSuggestionsList"></ul>
+    </div>
+    <div class="tip-card" style="margin-top:16px;">
+      <b>How scoring works</b>
+      SignBridge's camera recognizer reads hand-landmark geometry, not a black box — confidence reflects how
+      cleanly your hand-shape matches the expected sign's finger positions.
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script>
+window.LESSON = {
+  key: {{ lesson.key|tojson }},
+  category: {{ lesson.category|tojson }},
+  gestureKey: {{ lesson.gesture_key|tojson }},
+  word: {{ lesson.word|tojson }},
+  detectable: {{ lesson.detectable|tojson }}
+};
+</script>
+<script src="{{ url_for('static', filename='js/practice.js') }}"></script>
+{% endblock %}

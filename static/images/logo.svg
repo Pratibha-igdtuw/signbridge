@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="sbLogoGrad" x1="6" y1="6" x2="42" y2="38" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#9B87E0"/>
+      <stop offset="100%" stop-color="#5F4BB0"/>
+    </linearGradient>
+  </defs>
+  <path d="M10 27C10 16.5 16.5 8.5 24 8.5C31.5 8.5 38 16.5 38 27"
+        stroke="url(#sbLogoGrad)" stroke-width="6.4" stroke-linecap="round" fill="none"/>
+  <line x1="14.4" y1="27" x2="14.4" y2="37" stroke="url(#sbLogoGrad)" stroke-width="6.4" stroke-linecap="round"/>
+  <line x1="33.6" y1="27" x2="33.6" y2="37" stroke="url(#sbLogoGrad)" stroke-width="6.4" stroke-linecap="round"/>
+</svg>

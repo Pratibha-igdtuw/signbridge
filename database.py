@@ -36,6 +36,10 @@ class Conversation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     title = db.Column(db.String(150), default='Conversation')
+    # 'chat' (default/legacy For You transcript), 'live' (Live Conversation screen),
+    # or 'emergency' (Emergency Mode session). Nullable for backward compatibility with
+    # rows created before this column existed — treat NULL as 'chat'.
+    mode = db.Column(db.String(20), default='chat')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     translations = db.relationship('Translation', backref='conversation', lazy=True, cascade='all, delete-orphan')
@@ -50,6 +54,9 @@ class Translation(db.Model):
     gesture_key = db.Column(db.String(50))
     text = db.Column(db.String(500), nullable=False)
     language = db.Column(db.String(10), default='ASL')  # ASL, BSL, ISL
+    # Who "said" it in a two-way Live Conversation: 'hearing' or 'deaf'. Nullable/unused
+    # for ordinary For You transcript rows.
+    sender = db.Column(db.String(10))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -59,6 +66,7 @@ class Translation(db.Model):
             'gesture_key': self.gesture_key,
             'text': self.text,
             'language': self.language,
+            'sender': self.sender,
             'created_at': self.created_at.isoformat(),
         }
 
@@ -83,6 +91,37 @@ class Gesture(db.Model):
             'emoji': self.emoji,
             'is_custom': self.is_custom,
             'language': self.language,
+        }
+
+
+class PracticeAttempt(db.Model):
+    """One attempt at a Learn-module lesson (Practice Now / Practice Mode)."""
+    __tablename__ = 'practice_attempts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    category = db.Column(db.String(30), nullable=False)
+    lesson_key = db.Column(db.String(50), nullable=False)
+    expected_gesture = db.Column(db.String(50))
+    detected_gesture = db.Column(db.String(50))
+    confidence = db.Column(db.Float)  # 0-100, from the client-side detector
+    # NULL = "unscored" free-practice attempt (lesson has no detectable shape yet).
+    # True/False = a real pass/fail comparison against the expected gesture.
+    correct = db.Column(db.Boolean)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('practice_attempts', lazy=True, cascade='all, delete-orphan'))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'category': self.category,
+            'lesson_key': self.lesson_key,
+            'expected_gesture': self.expected_gesture,
+            'detected_gesture': self.detected_gesture,
+            'confidence': self.confidence,
+            'correct': self.correct,
+            'created_at': self.created_at.isoformat(),
         }
 
 
@@ -276,6 +315,29 @@ ISL_GESTURES = [
 ]
 
 DEFAULT_GESTURES = ASL_GESTURES + BSL_GESTURES + ISL_GESTURES
+
+
+def run_light_migrations():
+    """
+    db.create_all() only creates tables that don't exist yet — it never alters an
+    existing table. Since this project ships a pre-populated signbridge.db, adding a
+    nullable column to Conversation/Translation needs an explicit ALTER TABLE the
+    first time the app boots against an older database file. Safe to call on every
+    startup: it no-ops once the columns are present.
+    """
+    inspector = db.inspect(db.engine)
+    existing_tables = set(inspector.get_table_names())
+
+    def add_column_if_missing(table, column, ddl_type):
+        if table not in existing_tables:
+            return
+        cols = {c['name'] for c in inspector.get_columns(table)}
+        if column not in cols:
+            with db.engine.begin() as conn:
+                conn.exec_driver_sql(f'ALTER TABLE {table} ADD COLUMN {column} {ddl_type}')
+
+    add_column_if_missing('conversations', 'mode', "VARCHAR(20) DEFAULT 'chat'")
+    add_column_if_missing('translations', 'sender', 'VARCHAR(10)')
 
 
 def seed_default_gestures():

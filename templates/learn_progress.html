@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Learn Progress — SignBridge{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <a href="{{ url_for('learn.learn_page') }}" class="back-link">&larr; Back to Learn</a>
+  <h1 class="display page-title">Your Learning Progress</h1>
+  <p class="page-sub">Everything tracked from your Practice Mode sessions.</p>
+</div>
+
+<div class="stats-grid" id="progressGrid"></div>
+
+<div class="card">
+  <h2>Top Categories</h2>
+  <div id="topCategories"><div class="empty">Loading…</div></div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadProgress(){
+  const res = await fetch('/api/learn/progress');
+  const s = await res.json();
+
+  document.getElementById('progressGrid').innerHTML = `
+    <div class="stat-tile"><div class="num">${s.lessons_completed}/${s.total_lessons}</div><div class="lbl">Lessons Completed</div></div>
+    <div class="stat-tile"><div class="num">${s.accuracy}%</div><div class="lbl">Accuracy</div></div>
+    <div class="stat-tile"><div class="num">${s.daily_streak}🔥</div><div class="lbl">Daily Practice Streak</div></div>
+    <div class="stat-tile"><div class="num">${s.total_practice_sessions}</div><div class="lbl">Total Practice Sessions</div></div>
+  `;
+
+  const box = document.getElementById('topCategories');
+  if(!s.top_categories.length){
+    box.innerHTML = '<div class="empty">No practice sessions yet — head to Learn and try a lesson!</div>';
+    return;
+  }
+  const max = Math.max(...s.top_categories.map(c => c.attempts));
+  box.innerHTML = s.top_categories.map(c => `
+    <div class="bar-row">
+      <div class="name">${c.category}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(c.attempts/max*100).toFixed(0)}%"></div></div>
+      <div class="count">${c.attempts}</div>
+    </div>
+  `).join('');
+}
+loadProgress();
+</script>
+{% endblock %}

@@ -91,16 +91,21 @@ if(camLangSeg){
   });
 }
 
-/* ---------- Persist a translation to the backend ---------- */
+/* ---------- Persist a translation to the backend (offline-queued if needed) ---------- */
 async function logTranslation(source, text, gestureKey){
+  const payload = { source, text, gesture_key: gestureKey || null, conversation_id: activeConversationId };
   try{
+    if(window.SignBridgeOffline){
+      const result = await window.SignBridgeOffline.queueOrSend('translation', '/api/translate', payload);
+      if(!result.queued && result.response && !activeConversationId){
+        activeConversationId = result.response.conversation_id;
+      }
+      return;
+    }
     const res = await fetch('/api/translate', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        source, text, gesture_key: gestureKey || null,
-        conversation_id: activeConversationId
-      })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
     if(res.ok && !activeConversationId){
@@ -133,6 +138,61 @@ function addTranscriptLine(who, text, cls){
   div.innerHTML = `<span class="who ${cls==='you'?'you':''}">${who}:</span>${text}`;
   transcriptEl.appendChild(div);
   transcriptEl.scrollTop = transcriptEl.scrollHeight;
+}
+
+/* ===================== AI Sentence Prediction & Auto-Completion ===================== */
+
+let gestureHistory = [];
+const gestureSuggestionsEl = document.getElementById('gestureSuggestions');
+const replySuggestionsEl = document.getElementById('replySuggestions');
+
+function renderChips(container, suggestions, onPick){
+  if(!container) return;
+  container.innerHTML = '';
+  suggestions.forEach((s, i) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'suggestion-chip';
+    chip.style.animationDelay = `${i * 40}ms`;
+    chip.innerHTML = `${s.text}<span class="conf">${s.confidence}%</span>`;
+    chip.addEventListener('click', () => { onPick(s.text); container.innerHTML = ''; });
+    container.appendChild(chip);
+  });
+}
+
+async function fetchGestureSuggestions(){
+  if(!navigator.onLine){ gestureSuggestionsEl.innerHTML = ''; return; } // predictions need the server; skip quietly offline
+  try{
+    const res = await fetch('/api/predict/gesture', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ history: gestureHistory, conversation_id: activeConversationId }),
+    });
+    const data = await res.json();
+    renderChips(gestureSuggestionsEl, data.suggestions || [], (text) => {
+      addTranscriptLine('Sign', text, 'them');
+      flashNode(nodeHearing);
+      speak(text);
+      logTranslation('sign', text, null);
+      gestureHistory = [];
+    });
+  }catch(e){ /* non-fatal — suggestions are a nice-to-have, not required for core translation */ }
+}
+
+async function fetchReplySuggestions(transcript){
+  if(!navigator.onLine){ replySuggestionsEl.innerHTML = ''; return; }
+  try{
+    const res = await fetch('/api/predict/reply', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ transcript, conversation_id: activeConversationId }),
+    });
+    const data = await res.json();
+    renderChips(replySuggestionsEl, data.suggestions || [], (text) => {
+      addTranscriptLine('Sign', text, 'them');
+      flashNode(nodeHearing);
+      speak(text);
+      logTranslation('sign', text, null);
+    });
+  }catch(e){ /* non-fatal */ }
 }
 
 /* ===================== Feature 1: Hand sign recognition ===================== */
@@ -207,6 +267,11 @@ function onResults(results){
         flashNode(nodeHearing);
         logTranslation('sign', info.word, info.gesture_key);
         lastSpokenGesture = shapeKey;
+        logTranslation('sign', info.word, g);
+        lastSpokenGesture = g;
+        gestureHistory.push(info.word);
+        if(gestureHistory.length > 5) gestureHistory.shift();
+        fetchGestureSuggestions();
       }
     }
     if(!shapeKey){ gestureLabelEl.textContent = '—'; lastSpokenGesture = null; }
@@ -270,6 +335,7 @@ if(SR){
     addTranscriptLine('Voice', text, 'you');
     flashNode(nodeDeaf);
     logTranslation('voice', text, null);
+    fetchReplySuggestions(text);
   };
   recognition.onerror = ()=>{ stopListening(); };
   recognition.onend = ()=>{ if(listening){ recognition.start(); } };
@@ -327,6 +393,7 @@ function sendTypedMessage(){
   addTranscriptLine('Voice', text, 'you');
   flashNode(nodeDeaf);
   logTranslation('voice', text, null);
+  fetchReplySuggestions(text);
   typeInput.value = '';
   typeInput.focus();
 }

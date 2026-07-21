@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.svg') }}">
+<title>Emergency Mode — SignBridge</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<script>
+  (function(){
+    try{
+      var theme = localStorage.getItem('sb_theme');
+      var fontsize = localStorage.getItem('sb_fontsize');
+      if(theme && theme !== 'dark') document.documentElement.setAttribute('data-theme', theme); // emergency screen stays dark regardless
+      if(fontsize) document.documentElement.setAttribute('data-fontsize', fontsize);
+    }catch(e){}
+  })();
+</script>
+</head>
+<body class="emergency-body">
+
+<div class="emergency-shell">
+  <div class="emergency-header">
+    <h1 class="emergency-title">🚨 Emergency Mode</h1>
+    <a href="{{ url_for('analytics.dashboard_page') }}" class="emergency-exit">Exit Emergency Mode</a>
+  </div>
+
+  <div class="emergency-grid" id="emergencyGrid">
+    {% for phrase in phrases %}
+    <button type="button" class="emergency-btn" data-phrase="{{ phrase }}">{{ phrase }}</button>
+    {% endfor %}
+  </div>
+
+  <div class="emergency-readout">
+    <div class="big-text" id="emergencyBigText">Tap a phrase — it will be spoken aloud and shown here.</div>
+  </div>
+
+  <div class="emergency-tools">
+    <div class="emergency-panel">
+      <h3>🎤 Speech → Text</h3>
+      <div class="mic-btn" id="emgMicBtn">Tap to start listening</div>
+      <div class="transcript" id="emgTranscript" style="margin-top:12px;"><div class="empty">Nothing yet…</div></div>
+    </div>
+    <div class="emergency-panel">
+      <h3>🤟 Sign → Text</h3>
+      <div class="cam-box" id="emgCamBox" style="aspect-ratio:16/10;">
+        <video id="emgVideo" playsinline autoplay muted></video>
+        <canvas id="emgOverlay"></canvas>
+        <div class="cam-off" id="emgCamOff">Camera is off.</div>
+      </div>
+      <div class="row">
+        <button class="btn btn-outline" id="emgStartCam" style="background:#3A1A1A; color:#F3D9D9; border-color:#5A2A2A;">Start Camera</button>
+        <button class="btn btn-outline" id="emgStopCam" style="background:#3A1A1A; color:#F3D9D9; border-color:#5A2A2A;" disabled>Stop Camera</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="live-controls">
+    <label style="color:#F3D9D9; font-size:13px; display:flex; align-items:center; gap:8px;">
+      <input type="checkbox" id="emgSpeakToggle" checked /> Speak phrases aloud
+    </label>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/offline.js') }}"></script>
+<script src="{{ url_for('static', filename='js/emergency.js') }}"></script>
+</body>
+</html>

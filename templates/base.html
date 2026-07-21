@@ -4,43 +4,102 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>{% block title %}SignBridge{% endblock %}</title>
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.svg') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<script>
+  // Applied before paint so switching pages never flashes the wrong theme.
+  (function(){
+    try{
+      var theme = localStorage.getItem('sb_theme');
+      var fontsize = localStorage.getItem('sb_fontsize');
+      if(theme) document.documentElement.setAttribute('data-theme', theme);
+      if(fontsize) document.documentElement.setAttribute('data-fontsize', fontsize);
+    }catch(e){}
+  })();
+</script>
 </head>
 <body>
+  <a href="#mainContent" class="skip-link">Skip to main content</a>
   <svg width="0" height="0" style="position:absolute">
     <defs>
       <linearGradient id="markGrad" x1="0" y1="0" x2="1" y2="1">
         <stop offset="0%" stop-color="#9B87E0"/>
         <stop offset="100%" stop-color="#5F4BB0"/>
       </linearGradient>
-      <symbol id="markIcon" viewBox="0 0 40 40">
-        <rect width="40" height="40" rx="11" fill="url(#markGrad)"/>
-        <rect x="13.5" y="21" width="13" height="10.5" rx="4" fill="#fff"/>
-        <line x1="16.5" y1="21.5" x2="16.5" y2="9.5" stroke="#fff" stroke-width="3.1" stroke-linecap="round"/>
-        <line x1="23.5" y1="21.5" x2="23.5" y2="12" stroke="#fff" stroke-width="3.1" stroke-linecap="round"/>
-        <line x1="14" y1="24.5" x2="7.3" y2="19.3" stroke="#fff" stroke-width="3.1" stroke-linecap="round"/>
+      <symbol id="markIcon" viewBox="0 0 48 48">
+        <path d="M10 27C10 16.5 16.5 8.5 24 8.5C31.5 8.5 38 16.5 38 27" stroke="url(#markGrad)" stroke-width="6.4" stroke-linecap="round" fill="none"/>
+        <line x1="14.4" y1="27" x2="14.4" y2="37" stroke="url(#markGrad)" stroke-width="6.4" stroke-linecap="round"/>
+        <line x1="33.6" y1="27" x2="33.6" y2="37" stroke="url(#markGrad)" stroke-width="6.4" stroke-linecap="round"/>
       </symbol>
     </defs>
   </svg>
 
-  <div class="nav">
-    <div class="nav-left">
-      <a href="{{ url_for('index') }}" class="nav-home">&larr; Home</a>
-      <div class="brand display"><svg class="mark"><use href="#markIcon"/></svg>Sign<span>Bridge</span></div>
-    </div>
-    <div class="nav-links">
-      <a href="{{ url_for('analytics.dashboard_page') }}" class="{{ 'active' if active=='dashboard' }}">Home</a>
-      <a href="{{ url_for('analytics.dashboard_page') }}#learn-with-us" class="{{ 'active' if active=='learn' }}">Learn with Us</a>
-      <a href="{{ url_for('analytics.for_you_page') }}" class="{{ 'active' if active=='foryou' }}">For You</a>
-      <a href="{{ url_for('analytics.history_page') }}" class="{{ 'active' if active=='history' }}">History</a>
-      <a href="{{ url_for('analytics.gestures_page') }}" class="{{ 'active' if active=='gestures' }}">Gestures</a>
-      <a href="{{ url_for('analytics.analytics_page') }}" class="{{ 'active' if active=='analytics' }}">Analytics</a>
-      <a href="{{ url_for('analytics.about_page') }}" class="{{ 'active' if active=='about' }}">About Us</a>
-      <form id="logoutForm"><button type="button" class="btn btn-outline" id="logoutBtn">Log out</button></form>
-    </div>
-  </div>
+  <header class="nav" id="siteNav">
+    <div class="nav-inner">
+      <a href="{{ url_for('analytics.dashboard_page') }}" class="brand-lockup" aria-label="SignBridge home">
+        <svg class="mark"><use href="#markIcon"/></svg>
+        <span class="brand-text">
+          <span class="brand-name display">Sign<span>Bridge</span></span>
+          <span class="brand-tagline">Bridging Communication Beyond Words</span>
+        </span>
+      </a>
 
-  <div class="wrap">
+      <button type="button" class="nav-burger" id="navBurger" aria-expanded="false" aria-controls="navLinks" aria-label="Toggle navigation menu">
+        <span></span><span></span><span></span>
+      </button>
+
+      <nav class="nav-links" id="navLinks" aria-label="Primary">
+        <a href="{{ url_for('analytics.dashboard_page') }}" class="{{ 'active' if active=='dashboard' }}">Home</a>
+        <a href="{{ url_for('learn.learn_page') }}" class="{{ 'active' if active=='learn' }}">Learn</a>
+        <a href="{{ url_for('analytics.for_you_page') }}" class="{{ 'active' if active=='foryou' }}">For You</a>
+        <a href="{{ url_for('live.live_page') }}" class="{{ 'active' if active=='live' }}">Live Conversation</a>
+        <a href="{{ url_for('analytics.history_page') }}" class="{{ 'active' if active=='history' }}">History</a>
+        <a href="{{ url_for('analytics.gestures_page') }}" class="{{ 'active' if active=='gestures' }}">Gestures</a>
+        <a href="{{ url_for('analytics.analytics_page') }}" class="{{ 'active' if active=='analytics' }}">Analytics</a>
+        <a href="{{ url_for('analytics.about_page') }}" class="{{ 'active' if active=='about' }}">About Us</a>
+      </nav>
+
+      <div class="nav-actions">
+        <a href="{{ url_for('emergency.emergency_page') }}" class="nav-pill nav-pill-emergency {{ 'active' if active=='emergency' }}">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
+          <span>Emergency</span>
+        </a>
+
+        <div class="a11y-menu" id="a11yMenu">
+          <button type="button" class="nav-pill" id="a11yToggle" aria-haspopup="true" aria-expanded="false" aria-label="Accessibility settings">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+            <span>Accessibility</span>
+          </button>
+          <div class="a11y-panel" id="a11yPanel" role="menu">
+            <button type="button" id="a11yContrast" role="menuitemcheckbox" aria-pressed="false">◐ High Contrast</button>
+            <button type="button" id="a11yFont" role="menuitemcheckbox" aria-pressed="false">🔠 Large Font</button>
+          </div>
+        </div>
+
+        <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false" aria-label="Toggle dark mode">
+          <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+        </button>
+
+        <div class="profile-menu" id="profileMenu">
+          <button type="button" class="profile-btn" id="profileToggle" aria-haspopup="true" aria-expanded="false" aria-label="Account menu">
+            <span class="avatar">{{ (nav_user.name[0] | upper) if nav_user and nav_user.name else 'U' }}</span>
+          </button>
+          <div class="profile-panel" id="profilePanel" role="menu">
+            {% if nav_user %}
+            <div class="profile-panel-name">{{ nav_user.name }}</div>
+            {% endif %}
+            <button type="button" class="profile-logout" id="logoutBtn" role="menuitem">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+              Log out
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap" id="mainContent" role="main">
     {% block content %}{% endblock %}
   </div>
 
@@ -51,7 +110,118 @@ document.getElementById('logoutBtn').addEventListener('click', async ()=>{
   await fetch('/api/auth/logout', {method:'POST'});
   window.location.href = '/login';
 });
+
+/* ---------- Mobile nav burger ---------- */
+(function(){
+  const burger = document.getElementById('navBurger');
+  const links = document.getElementById('navLinks');
+  burger.addEventListener('click', () => {
+    const open = links.classList.toggle('open');
+    burger.classList.toggle('open', open);
+    burger.setAttribute('aria-expanded', open);
+  });
+  document.addEventListener('click', (e) => {
+    if(!e.target.closest('.nav-links') && !e.target.closest('.nav-burger')){
+      links.classList.remove('open');
+      burger.classList.remove('open');
+      burger.setAttribute('aria-expanded', 'false');
+    }
+  });
+})();
+
+/* ---------- Navbar shadow on scroll ---------- */
+(function(){
+  const nav = document.getElementById('siteNav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 4);
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true });
+})();
+
+/* ---------- Profile dropdown ---------- */
+(function(){
+  const menu = document.getElementById('profileMenu');
+  const toggleBtn = document.getElementById('profileToggle');
+  const panel = document.getElementById('profilePanel');
+  toggleBtn.addEventListener('click', () => {
+    const open = panel.classList.toggle('open');
+    toggleBtn.setAttribute('aria-expanded', open);
+  });
+  document.addEventListener('click', (e) => {
+    if(!e.target.closest('.profile-menu')){ panel.classList.remove('open'); toggleBtn.setAttribute('aria-expanded', 'false'); }
+  });
+})();
+
+/* ---------- Accessibility menu: High Contrast / Large Font ---------- */
+(function(){
+  const root = document.documentElement;
+  const toggleBtn = document.getElementById('a11yToggle');
+  const panel = document.getElementById('a11yPanel');
+  const contrastBtn = document.getElementById('a11yContrast');
+  const fontBtn = document.getElementById('a11yFont');
+
+  function syncButtons(){
+    const theme = root.getAttribute('data-theme') || 'light';
+    const fontsize = root.getAttribute('data-fontsize') || 'normal';
+    contrastBtn.setAttribute('aria-pressed', theme === 'contrast');
+    fontBtn.setAttribute('aria-pressed', fontsize === 'large');
+  }
+  syncButtons();
+
+  toggleBtn.addEventListener('click', () => {
+    const open = panel.classList.toggle('open');
+    toggleBtn.setAttribute('aria-expanded', open);
+  });
+  document.addEventListener('click', (e) => {
+    if(!e.target.closest('.a11y-menu')) { panel.classList.remove('open'); toggleBtn.setAttribute('aria-expanded', 'false'); }
+  });
+
+  contrastBtn.addEventListener('click', () => {
+    const isContrast = root.getAttribute('data-theme') === 'contrast';
+    root.setAttribute('data-theme', isContrast ? 'light' : 'contrast');
+    localStorage.setItem('sb_theme', isContrast ? 'light' : 'contrast');
+    syncButtons();
+    syncThemeToggle();
+  });
+  fontBtn.addEventListener('click', () => {
+    const isLarge = root.getAttribute('data-fontsize') === 'large';
+    root.setAttribute('data-fontsize', isLarge ? 'normal' : 'large');
+    localStorage.setItem('sb_fontsize', isLarge ? 'normal' : 'large');
+    syncButtons();
+  });
+
+  /* ---------- Theme toggle (dark mode) ---------- */
+  const themeBtn = document.getElementById('themeToggle');
+  function syncThemeToggle(){
+    const theme = root.getAttribute('data-theme') || 'light';
+    themeBtn.setAttribute('aria-pressed', theme === 'dark');
+    themeBtn.classList.toggle('is-dark', theme === 'dark');
+  }
+  syncThemeToggle();
+  themeBtn.addEventListener('click', () => {
+    const isDark = root.getAttribute('data-theme') === 'dark';
+    root.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    localStorage.setItem('sb_theme', isDark ? 'light' : 'dark');
+    syncButtons();
+    syncThemeToggle();
+  });
+})();
+
+/* ---------- Subtle ripple effect on .btn clicks ---------- */
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn');
+  if(!btn) return;
+  const rect = btn.getBoundingClientRect();
+  const ripple = document.createElement('span');
+  const size = Math.max(rect.width, rect.height);
+  ripple.className = 'ripple';
+  ripple.style.width = ripple.style.height = size + 'px';
+  ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+  ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
+  btn.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 500);
+});
 </script>
+<script src="{{ url_for('static', filename='js/offline.js') }}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

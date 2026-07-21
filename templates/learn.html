@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Learn — SignBridge{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <a href="{{ url_for('analytics.dashboard_page') }}" class="back-link">&larr; Back to Home</a>
+  <h1 class="display page-title">Learn Sign Language</h1>
+  <p class="page-sub">Bite-sized lessons with live camera practice. Track your streak and accuracy on the
+    <a href="{{ url_for('learn.learn_progress_page') }}">Progress dashboard</a>.</p>
+</div>
+
+<div id="learnProgressStrip" class="stats-grid" style="margin-bottom:28px;"></div>
+
+{% for cat in categories %}
+<div class="card" style="margin-bottom:20px;">
+  <h2>{{ cat.icon }} {{ cat.label }}</h2>
+  <p style="color:var(--muted); font-size:13.5px; margin:-8px 0 16px;">{{ cat.blurb }}</p>
+  <div class="lesson-cards">
+    {% for lesson in grouped[cat.key] %}
+    <div class="lesson-card">
+      <div class="lesson-card-media">{{ lesson.emoji }}</div>
+      <div class="lesson-card-body">
+        <h4>{{ lesson.word }}</h4>
+        <p class="meaning">{{ lesson.meaning }}</p>
+        <p class="desc">{{ lesson.description }}</p>
+        {% if not lesson.detectable %}
+        <span class="tag" style="margin-bottom:8px; display:inline-block;">Free practice (no camera scoring yet)</span>
+        {% endif %}
+        <a class="btn btn-primary btn-full" href="{{ url_for('learn.practice_page', lesson_key=lesson.key) }}">Practice Now</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadProgressStrip(){
+  try{
+    const res = await fetch('/api/learn/progress');
+    const s = await res.json();
+    document.getElementById('learnProgressStrip').innerHTML = `
+      <div class="stat-tile"><div class="num">${s.lessons_completed}/${s.total_lessons}</div><div class="lbl">Lessons Completed</div></div>
+      <div class="stat-tile"><div class="num">${s.accuracy}%</div><div class="lbl">Practice Accuracy</div></div>
+      <div class="stat-tile"><div class="num">${s.daily_streak}🔥</div><div class="lbl">Daily Streak</div></div>
+      <div class="stat-tile"><div class="num">${s.total_practice_sessions}</div><div class="lbl">Practice Sessions</div></div>
+    `;
+  }catch(e){ console.warn('Could not load progress', e); }
+}
+loadProgressStrip();
+</script>
+{% endblock %}

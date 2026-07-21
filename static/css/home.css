@@ -5,102 +5,20 @@
 }
 
 :root {
-    --primary-purple: #9B87E0;
-    --secondary-purple: #5F4BB0;
-    --light-bg: #F5F3FF;
+    /* Aligned to the site-wide SignBridge brand palette (see style.css) */
+    --primary-purple: #6D5EF5;
+    --secondary-purple: #8B5CF6;
+    --light-bg: #F8F7FF;
     --white: #FFFFFF;
-    --dark-text: #1A1A2E;
+    --dark-text: #1F2937;
     --gray-text: #6B7280;
-    --shadow: 0 2px 12px rgba(155, 135, 224, 0.15);
-    --shadow-lg: 0 8px 32px rgba(155, 135, 224, 0.25);
+    --shadow: 0 2px 12px rgba(109, 94, 245, 0.15);
+    --shadow-lg: 0 8px 32px rgba(109, 94, 245, 0.25);
 }
 
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: var(--light-bg);
-    color: var(--dark-text);
-    line-height: 1.6;
-}
-
-/* Navigation Bar */
-.navbar {
-    background: linear-gradient(135deg, var(--primary-purple), var(--secondary-purple));
-    padding: 1rem 0;
-    box-shadow: var(--shadow-lg);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-}
-
-.navbar-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 2rem;
-}
-
-.navbar-logo {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--white);
-    font-size: 1.5rem;
-    font-weight: bold;
-    text-decoration: none;
-}
-
-.logo-icon-svg {
-    width: 36px;
-    height: 36px;
-    flex-shrink: 0;
-    display: block;
-}
-
-.logo-text {
-    color: var(--white);
-}
-
-.navbar-menu {
-    display: flex;
-    list-style: none;
-    gap: 2rem;
-    align-items: center;
-}
-
-.nav-link {
-    color: rgba(255, 255, 255, 0.9);
-    text-decoration: none;
-    font-size: 1rem;
-    font-weight: 500;
-    transition: color 0.3s ease;
-    cursor: pointer;
-    border: none;
-    background: none;
-    padding: 0;
-}
-
-.nav-link:hover,
-.nav-link.active {
-    color: var(--white);
-}
-
-.nav-logout {
-    background-color: rgba(255, 255, 255, 0.2);
-    color: var(--white);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: all 0.3s ease;
-}
-
-.nav-logout:hover {
-    background-color: rgba(255, 255, 255, 0.3);
-    border-color: rgba(255, 255, 255, 0.5);
-}
+/* Note: the navbar and site-wide body/typography now live in base.html +
+   style.css (single shared navbar across the whole app). This stylesheet
+   only styles the dashboard's own content sections below. */
 
 /* Hero Section */
 .hero {
@@ -376,17 +294,6 @@ body {
 
 /* Responsive Design */
 @media (max-width: 768px) {
-    .navbar-container {
-        flex-direction: column;
-        gap: 1rem;
-    }
-
-    .navbar-menu {
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 1rem;
-    }
-
     .hero-content {
         grid-template-columns: 1fr;
     }
@@ -424,10 +331,6 @@ body {
 }
 
 @media (max-width: 480px) {
-    .navbar-menu {
-        gap: 0.5rem;
-    }
-
     .hero-text h1 {
         font-size: 1.5rem;
     }
@@ -454,4 +357,13 @@ body {
         height: 35px;
         font-size: 1rem;
     }
+}
+
+/* ---------- Emergency nav accent (new) ---------- */
+.nav-link-emergency {
+    color: #FFD9CE !important;
+    font-weight: 700;
+}
+.nav-link-emergency:hover {
+    color: #FFFFFF !important;
 }

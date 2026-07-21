@@ -7,9 +7,9 @@ translate_bp = Blueprint('translate', __name__)
 
 
 def _get_or_create_active_conversation(user_id):
-    conv = Conversation.query.filter_by(user_id=user_id).order_by(Conversation.id.desc()).first()
+    conv = Conversation.query.filter_by(user_id=user_id, mode='chat').order_by(Conversation.id.desc()).first()
     if not conv:
-        conv = Conversation(user_id=user_id, title='Conversation 1')
+        conv = Conversation(user_id=user_id, title='Conversation 1', mode='chat')
         db.session.add(conv)
         db.session.commit()
     return conv
@@ -19,7 +19,7 @@ def _get_or_create_active_conversation(user_id):
 @login_required
 def list_conversations():
     user = current_user()
-    convs = Conversation.query.filter_by(user_id=user.id).order_by(Conversation.id.desc()).all()
+    convs = Conversation.query.filter_by(user_id=user.id, mode='chat').order_by(Conversation.id.desc()).all()
     return jsonify([
         {'id': c.id, 'title': c.title, 'created_at': c.created_at.isoformat()} for c in convs
     ])
@@ -29,8 +29,8 @@ def list_conversations():
 @login_required
 def new_conversation():
     user = current_user()
-    count = Conversation.query.filter_by(user_id=user.id).count()
-    conv = Conversation(user_id=user.id, title=f'Conversation {count + 1}')
+    count = Conversation.query.filter_by(user_id=user.id, mode='chat').count()
+    conv = Conversation(user_id=user.id, title=f'Conversation {count + 1}', mode='chat')
     db.session.add(conv)
     db.session.commit()
     return jsonify({'conversation_id': conv.id, 'title': conv.title}), 201
@@ -51,7 +51,7 @@ def log_translation():
         return jsonify({'error': "source must be 'sign', 'voice', or 'text', and text is required"}), 400
 
     if conversation_id:
-        conv = Conversation.query.filter_by(id=conversation_id, user_id=user.id).first()
+        conv = Conversation.query.filter_by(id=conversation_id, user_id=user.id, mode='chat').first()
         if not conv:
             return jsonify({'error': 'Invalid conversation_id'}), 404
     else:
@@ -70,7 +70,7 @@ def history():
     conv_id = request.args.get('conversation_id', type=int)
     limit = request.args.get('limit', 200, type=int)
 
-    q = Translation.query.join(Conversation).filter(Conversation.user_id == user.id)
+    q = Translation.query.join(Conversation).filter(Conversation.user_id == user.id, Conversation.mode == 'chat')
     if conv_id:
         q = q.filter(Translation.conversation_id == conv_id)
     rows = q.order_by(Translation.id.desc()).limit(limit).all()
@@ -83,7 +83,7 @@ def clear_history():
     user = current_user()
     conv_id = request.args.get('conversation_id', type=int)
 
-    conv_ids = [c.id for c in Conversation.query.filter_by(user_id=user.id).all()]
+    conv_ids = [c.id for c in Conversation.query.filter_by(user_id=user.id, mode='chat').all()]
     if conv_id:
         conv_ids = [conv_id] if conv_id in conv_ids else []
 
