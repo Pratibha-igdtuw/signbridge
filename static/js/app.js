@@ -201,18 +201,26 @@ async function fetchReplySuggestions(transcript){
 // Every possible sign is reduced to which of the 5 fingers are extended.
 // This table is what actually determines what the camera CAN tell apart —
 // 11 distinguishable static hand shapes, shared across all 3 languages.
+// ASL numbers verified against "American Sign Language For Dummies" (Penilla &
+// Taylor): 3 is thumb+index+middle (not just index+middle+ring — that shape is
+// actually 6, distinguished from 3 by the thumb), and 6-9 are the "3/4-fingers up,
+// thumb touches one fingertip" family — which finger the thumb touches is what
+// tells them apart, so each gets its own key here.
 const SHAPE_TABLE = {
   '00000': 'FIST',
   '11111': 'OPEN_HAND',
   '01000': 'ONE',
   '01100': 'TWO',
-  '01110': 'THREE',
+  '11100': 'THREE',   // thumb + index + middle
   '01111': 'FOUR',
+  '01110': 'SIX',      // index+middle+ring up, thumb touches pinky tip
+  '01101': 'SEVEN',    // index+middle+pinky up, thumb touches ring tip
+  '01011': 'EIGHT',    // index+ring+pinky up, thumb touches middle tip
+  '00111': 'NINE',     // middle+ring+pinky up, thumb touches index tip
   '10000': 'THUMB',
   '00001': 'PINKY',
   '11001': 'ILY',
   '01001': 'ROCK',
-  '00111': 'OK',
 };
 
 // ---------- Local geometry classifier (always available, fully offline) ----------
