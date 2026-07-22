@@ -6,60 +6,147 @@
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.svg') }}">
 <title>Emergency Mode — SignBridge</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-<script>
-  (function(){
-    try{
-      var theme = localStorage.getItem('sb_theme');
-      var fontsize = localStorage.getItem('sb_fontsize');
-      if(theme && theme !== 'dark') document.documentElement.setAttribute('data-theme', theme); // emergency screen stays dark regardless
-      if(fontsize) document.documentElement.setAttribute('data-fontsize', fontsize);
-    }catch(e){}
-  })();
-</script>
 </head>
 <body class="emergency-body">
 
 <div class="emergency-shell">
-  <div class="emergency-header">
-    <h1 class="emergency-title">🚨 Emergency Mode</h1>
-    <a href="{{ url_for('analytics.dashboard_page') }}" class="emergency-exit">Exit Emergency Mode</a>
-  </div>
 
-  <div class="emergency-grid" id="emergencyGrid">
-    {% for phrase in phrases %}
-    <button type="button" class="emergency-btn" data-phrase="{{ phrase }}">{{ phrase }}</button>
-    {% endfor %}
-  </div>
-
-  <div class="emergency-readout">
-    <div class="big-text" id="emergencyBigText">Tap a phrase — it will be spoken aloud and shown here.</div>
-  </div>
-
-  <div class="emergency-tools">
-    <div class="emergency-panel">
-      <h3>🎤 Speech → Text</h3>
-      <div class="mic-btn" id="emgMicBtn">Tap to start listening</div>
-      <div class="transcript" id="emgTranscript" style="margin-top:12px;"><div class="empty">Nothing yet…</div></div>
-    </div>
-    <div class="emergency-panel">
-      <h3>🤟 Sign → Text</h3>
-      <div class="cam-box" id="emgCamBox" style="aspect-ratio:16/10;">
-        <video id="emgVideo" playsinline autoplay muted></video>
-        <canvas id="emgOverlay"></canvas>
-        <div class="cam-off" id="emgCamOff">Camera is off.</div>
-      </div>
-      <div class="row">
-        <button class="btn btn-outline" id="emgStartCam" style="background:#3A1A1A; color:#F3D9D9; border-color:#5A2A2A;">Start Camera</button>
-        <button class="btn btn-outline" id="emgStopCam" style="background:#3A1A1A; color:#F3D9D9; border-color:#5A2A2A;" disabled>Stop Camera</button>
+  <!-- ================= Header ================= -->
+  <header class="emg-header">
+    <div class="emg-header-left">
+      <span class="emg-header-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+      </span>
+      <div>
+        <h1 class="emg-title">Emergency Assistance</h1>
+        <p class="emg-subtitle">Quick communication tools for urgent situations.</p>
       </div>
     </div>
-  </div>
+    <div class="emg-header-right">
+      <span class="emg-badge"><span class="emg-badge-dot" aria-hidden="true"></span>Emergency Active</span>
+      <a href="{{ url_for('analytics.dashboard_page') }}" class="emg-exit-btn">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        Exit Emergency Mode
+      </a>
+    </div>
+  </header>
 
-  <div class="live-controls">
-    <label style="color:#F3D9D9; font-size:13px; display:flex; align-items:center; gap:8px;">
-      <input type="checkbox" id="emgSpeakToggle" checked /> Speak phrases aloud
+  <!-- ================= Quick Phrases ================= -->
+  <section class="emg-section" aria-labelledby="quickPhrasesHeading">
+    <h2 class="emg-section-title" id="quickPhrasesHeading">Quick Phrases</h2>
+    <div class="emg-phrase-grid" id="emergencyGrid">
+      {% set icons = {
+        'I Need Help': '<path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="10"/>',
+        'Call an Ambulance': '<path d="M10 10H6"/><path d="M8 8v4"/><path d="M18 18h-2a1 1 0 0 1-1-1v-3.28a1 1 0 0 1 .524-.878L18 11l-2.223-3.334A1 1 0 0 0 14.94 7H12"/><path d="M8 18H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v11"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+        'Call the Police': '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>',
+        'I Am Deaf': '<path d="M6 8a6 6 0 0 1 12 0c0 7-9 6-9 12"/><circle cx="16" cy="9" r="2.5"/>',
+        'Please Speak Slowly': '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>',
+        'Thank You': '<path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/>',
+        'Yes': '<path d="M20 6 9 17l-5-5"/>',
+        'No': '<path d="M18 6 6 18"/><path d="M6 6l12 12"/>',
+        'Water': '<path d="M12 2.69s-5.5 5.53-8.5 10.6C1.75 17.11 5 22 12 22s10.25-4.89 8.5-8.71C17.5 8.22 12 2.69 12 2.69z"/>',
+        'Doctor': '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/>',
+      } %}
+      {% for phrase in phrases %}
+      <button type="button" class="emergency-btn emg-phrase-card" data-phrase="{{ phrase }}">
+        <span class="emg-phrase-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{{ icons.get(phrase, '<circle cx="12" cy="12" r="9"/>') | safe }}</svg>
+        </span>
+        <span class="emg-phrase-text">{{ phrase }}</span>
+        <span class="emg-phrase-hint">Tap to speak</span>
+      </button>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- ================= Current Message ================= -->
+  <section class="emg-section" aria-labelledby="currentMessageHeading">
+    <h2 class="emg-section-title" id="currentMessageHeading">Current Message</h2>
+    <div class="emg-message-card">
+      <div class="emg-message-text" id="emergencyBigText" aria-live="polite">Tap a phrase — it will be spoken aloud and shown here.</div>
+      <div class="emg-message-actions">
+        <button type="button" class="emg-btn emg-btn-primary" id="emgSpeakAgain">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 5.93a9 9 0 0 1 0 12.73"/></svg>
+          Speak Again
+        </button>
+        <button type="button" class="emg-btn emg-btn-outline" id="emgClearMessage">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
+          Clear
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Speech & Sign Panels ================= -->
+  <section class="emg-section" aria-labelledby="recognitionHeading">
+    <h2 class="emg-section-title" id="recognitionHeading">Speech &amp; Sign Recognition</h2>
+    <div class="emg-tools-grid">
+
+      <div class="emg-panel">
+        <div class="emg-panel-head">
+          <span class="emg-panel-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></span>
+          <h3>Speech → Text</h3>
+        </div>
+        <button type="button" class="emg-mic-btn" id="emgMicBtn" aria-label="Tap to start listening">
+          <span class="emg-mic-dot" aria-hidden="true"></span>
+          <span class="emg-mic-label">Tap to start listening</span>
+        </button>
+        <div class="emg-transcript" id="emgTranscript"><div class="empty">Nothing yet…</div></div>
+      </div>
+
+      <div class="emg-panel">
+        <div class="emg-panel-head">
+          <span class="emg-panel-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L6 15"/></svg></span>
+          <h3>Sign → Text</h3>
+        </div>
+        <div class="emg-cam-box" id="emgCamBox">
+          <video id="emgVideo" playsinline autoplay muted></video>
+          <canvas id="emgOverlay"></canvas>
+          <div class="emg-cam-off" id="emgCamOff">Camera is off.</div>
+        </div>
+        <div class="emg-cam-actions">
+          <button type="button" class="emg-btn emg-btn-outline" id="emgStartCam">Start Camera</button>
+          <button type="button" class="emg-btn emg-btn-outline" id="emgStopCam" disabled>Stop Camera</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= Quick Actions ================= -->
+  <section class="emg-section" aria-labelledby="quickActionsHeading">
+    <h2 class="emg-section-title" id="quickActionsHeading">Quick Actions</h2>
+    <div class="emg-actions-grid">
+      <button type="button" class="emg-quick-action" disabled title="Coming soon" aria-label="Share Location — coming soon">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        Share Location <span class="emg-soon">Soon</span>
+      </button>
+      <button type="button" class="emg-quick-action" disabled title="Coming soon" aria-label="Emergency Contact — coming soon">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        Emergency Contact <span class="emg-soon">Soon</span>
+      </button>
+      <button type="button" class="emg-quick-action" disabled title="Coming soon" aria-label="Translate — coming soon">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
+        Translate <span class="emg-soon">Soon</span>
+      </button>
+      <button type="button" class="emg-quick-action" disabled title="Coming soon" aria-label="Increase Volume — coming soon">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 5.93a9 9 0 0 1 0 12.73"/></svg>
+        Increase Volume <span class="emg-soon">Soon</span>
+      </button>
+      <button type="button" class="emg-quick-action" disabled title="Coming soon" aria-label="Flashlight — coming soon">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6c0 2-2 3-2 5v11a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1V11c0-2-2-3-2-5V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1z"/><line x1="6" x2="18" y1="6" y2="6"/><line x1="12" x2="12" y1="12" y2="12"/></svg>
+        Flashlight <span class="emg-soon">Soon</span>
+      </button>
+    </div>
+  </section>
+
+  <div class="emg-footer-toggle">
+    <label class="emg-toggle-label">
+      <input type="checkbox" id="emgSpeakToggle" checked />
+      <span>Speak phrases aloud</span>
     </label>
   </div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>

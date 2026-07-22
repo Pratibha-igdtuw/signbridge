@@ -29,6 +29,22 @@ async function logEmergency(source, text, gestureKey){
 
 function showBig(text){
   bigText.textContent = text;
+  bigText.classList.remove('emg-fade-in');
+  void bigText.offsetWidth; // restart the CSS fade-in animation on each change
+  bigText.classList.add('emg-fade-in');
+}
+
+/* ---------- Current Message panel: Speak Again / Clear (UI-only, no new backend calls) ---------- */
+const DEFAULT_MESSAGE = 'Tap a phrase — it will be spoken aloud and shown here.';
+const emgSpeakAgainBtn = document.getElementById('emgSpeakAgain');
+const emgClearBtn = document.getElementById('emgClearMessage');
+if(emgSpeakAgainBtn){
+  emgSpeakAgainBtn.addEventListener('click', () => {
+    if(bigText.textContent && bigText.textContent !== DEFAULT_MESSAGE) speak(bigText.textContent);
+  });
+}
+if(emgClearBtn){
+  emgClearBtn.addEventListener('click', () => showBig(DEFAULT_MESSAGE));
 }
 
 /* ---------- Quick phrase buttons ---------- */
@@ -66,7 +82,8 @@ if(SR){
   emgRecognition.onerror = () => stopEmgListening();
   emgRecognition.onend = () => { if(emgListening) emgRecognition.start(); };
 } else {
-  emgMicBtn.textContent = 'Speech recognition not supported in this browser.';
+  const label = emgMicBtn.querySelector('.emg-mic-label') || emgMicBtn;
+  label.textContent = 'Speech recognition not supported in this browser.';
 }
 
 function startEmgListening(){
@@ -74,13 +91,15 @@ function startEmgListening(){
   emgListening = true;
   emgRecognition.start();
   emgMicBtn.classList.add('listening');
-  emgMicBtn.textContent = '🔴 Listening… tap to stop';
+  const label = emgMicBtn.querySelector('.emg-mic-label') || emgMicBtn;
+  label.textContent = 'Listening… tap to stop';
 }
 function stopEmgListening(){
   emgListening = false;
   if(emgRecognition) emgRecognition.stop();
   emgMicBtn.classList.remove('listening');
-  emgMicBtn.textContent = 'Tap to start listening';
+  const label = emgMicBtn.querySelector('.emg-mic-label') || emgMicBtn;
+  label.textContent = 'Tap to start listening';
 }
 emgMicBtn.addEventListener('click', () => { emgListening ? stopEmgListening() : startEmgListening(); });
 

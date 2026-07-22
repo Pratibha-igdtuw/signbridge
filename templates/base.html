@@ -31,73 +31,136 @@
         <line x1="14.4" y1="27" x2="14.4" y2="37" stroke="url(#markGrad)" stroke-width="6.4" stroke-linecap="round"/>
         <line x1="33.6" y1="27" x2="33.6" y2="37" stroke="url(#markGrad)" stroke-width="6.4" stroke-linecap="round"/>
       </symbol>
+      <!-- Lucide-style outline icon set (24x24, stroke-based) -->
+      <symbol id="icon-home" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+      <symbol id="icon-book" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+      <symbol id="icon-star" viewBox="0 0 24 24"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 20.88a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></symbol>
+      <symbol id="icon-message" viewBox="0 0 24 24"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></symbol>
+      <symbol id="icon-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+      <symbol id="icon-hand" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></symbol>
+      <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></symbol>
+      <symbol id="icon-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+      <symbol id="icon-more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+      <symbol id="icon-accessibility" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.75"/><path d="M4 8.5c2.5 1 5.2 1.5 8 1.5s5.5-.5 8-1.5"/><path d="M12 10v4"/><path d="M9 21l2-7h2l2 7"/><path d="M8 14l4-1 4 1"/></symbol>
     </defs>
   </svg>
 
-  <header class="nav" id="siteNav">
-    <div class="nav-inner">
-      <a href="{{ url_for('analytics.dashboard_page') }}" class="brand-lockup" aria-label="SignBridge home">
+  <header class="navbar" id="siteNav">
+    <div class="navbar-left">
+      <a href="{{ url_for('analytics.dashboard_page') }}" class="nav-logo" aria-label="SignBridge home">
         <svg class="mark"><use href="#markIcon"/></svg>
-        <span class="brand-text">
-          <span class="brand-name display">Sign<span>Bridge</span></span>
-          <span class="brand-tagline">Bridging Communication Beyond Words</span>
+        <span class="nav-logo-text">
+          <span class="nav-logo-name display">Sign<span>Bridge</span></span>
+          <span class="nav-logo-tagline">Bridging Communication</span>
         </span>
       </a>
+    </div>
 
-      <button type="button" class="nav-burger" id="navBurger" aria-expanded="false" aria-controls="navLinks" aria-label="Toggle navigation menu">
+    <nav class="navbar-center" id="navCenter" aria-label="Primary">
+      <a href="{{ url_for('analytics.dashboard_page') }}" class="nav-item {{ 'active' if active=='dashboard' }}" data-tooltip="Home">
+        <svg class="nav-icon"><use href="#icon-home"/></svg><span class="nav-label">Home</span>
+      </a>
+      <a href="{{ url_for('learn.learn_page') }}" class="nav-item {{ 'active' if active=='learn' }}" data-tooltip="Learn">
+        <svg class="nav-icon"><use href="#icon-book"/></svg><span class="nav-label">Learn</span>
+      </a>
+      <a href="{{ url_for('live.live_page') }}" class="nav-item {{ 'active' if active=='live' }}" data-tooltip="Live Conversation">
+        <svg class="nav-icon"><use href="#icon-message"/></svg><span class="nav-label">Live</span>
+      </a>
+      <a href="{{ url_for('analytics.history_page') }}" class="nav-item {{ 'active' if active=='history' }}" data-tooltip="History">
+        <svg class="nav-icon"><use href="#icon-history"/></svg><span class="nav-label">History</span>
+      </a>
+      <a href="{{ url_for('analytics.for_you_page') }}" class="nav-item {{ 'active' if active=='foryou' }}" data-tooltip="For You">
+        <svg class="nav-icon"><use href="#icon-star"/></svg><span class="nav-label">For You</span>
+      </a>
+      <a href="{{ url_for('analytics.gestures_page') }}" class="nav-item {{ 'active' if active=='gestures' }}" data-tooltip="Gestures">
+        <svg class="nav-icon"><use href="#icon-hand"/></svg><span class="nav-label">Gestures</span>
+      </a>
+      <a href="{{ url_for('analytics.analytics_page') }}" class="nav-item {{ 'active' if active=='analytics' }}" data-tooltip="Analytics">
+        <svg class="nav-icon"><use href="#icon-chart"/></svg><span class="nav-label">Analytics</span>
+      </a>
+      <a href="{{ url_for('analytics.about_page') }}" class="nav-item {{ 'active' if active=='about' }}" data-tooltip="About Us">
+        <svg class="nav-icon"><use href="#icon-info"/></svg><span class="nav-label">About Us</span>
+      </a>
+    </nav>
+
+    <div class="navbar-right">
+      <button type="button" class="nav-hamburger" id="navHamburger" aria-expanded="false" aria-controls="navMobileMenu" aria-label="Open menu">
         <span></span><span></span><span></span>
       </button>
 
-      <nav class="nav-links" id="navLinks" aria-label="Primary">
-        <a href="{{ url_for('analytics.dashboard_page') }}" class="{{ 'active' if active=='dashboard' }}">Home</a>
-        <a href="{{ url_for('learn.learn_page') }}" class="{{ 'active' if active=='learn' }}">Learn</a>
-        <a href="{{ url_for('analytics.for_you_page') }}" class="{{ 'active' if active=='foryou' }}">For You</a>
-        <a href="{{ url_for('live.live_page') }}" class="{{ 'active' if active=='live' }}">Live Conversation</a>
-        <a href="{{ url_for('analytics.history_page') }}" class="{{ 'active' if active=='history' }}">History</a>
-        <a href="{{ url_for('analytics.gestures_page') }}" class="{{ 'active' if active=='gestures' }}">Gestures</a>
-        <a href="{{ url_for('analytics.analytics_page') }}" class="{{ 'active' if active=='analytics' }}">Analytics</a>
-        <a href="{{ url_for('analytics.about_page') }}" class="{{ 'active' if active=='about' }}">About Us</a>
-      </nav>
+      <a href="{{ url_for('emergency.emergency_page') }}" class="btn-emergency {{ 'active' if active=='emergency' }}" data-tooltip="Emergency">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        <span>Emergency</span>
+      </a>
 
-      <div class="nav-actions">
-        <a href="{{ url_for('emergency.emergency_page') }}" class="nav-pill nav-pill-emergency {{ 'active' if active=='emergency' }}">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
-          <span>Emergency</span>
-        </a>
-
-        <div class="a11y-menu" id="a11yMenu">
-          <button type="button" class="nav-pill" id="a11yToggle" aria-haspopup="true" aria-expanded="false" aria-label="Accessibility settings">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
-            <span>Accessibility</span>
-          </button>
-          <div class="a11y-panel" id="a11yPanel" role="menu">
-            <button type="button" id="a11yContrast" role="menuitemcheckbox" aria-pressed="false">◐ High Contrast</button>
-            <button type="button" id="a11yFont" role="menuitemcheckbox" aria-pressed="false">🔠 Large Font</button>
-          </div>
-        </div>
-
-        <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false" aria-label="Toggle dark mode">
-          <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-          <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+      <div class="a11y-menu" id="a11yMenu">
+        <button type="button" class="btn-a11y" id="a11yToggle" aria-haspopup="true" aria-expanded="false" aria-label="Accessibility settings" data-tooltip="Accessibility">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-accessibility"/></svg>
+          <span>Accessibility</span>
         </button>
-
-        <div class="profile-menu" id="profileMenu">
-          <button type="button" class="profile-btn" id="profileToggle" aria-haspopup="true" aria-expanded="false" aria-label="Account menu">
-            <span class="avatar">{{ (nav_user.name[0] | upper) if nav_user and nav_user.name else 'U' }}</span>
+        <div class="a11y-panel" id="a11yPanel" role="menu">
+          <button type="button" id="a11yContrast" role="menuitemcheckbox" aria-pressed="false">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12z" fill="currentColor" stroke="none"/></svg>
+            High Contrast
           </button>
-          <div class="profile-panel" id="profilePanel" role="menu">
-            {% if nav_user %}
-            <div class="profile-panel-name">{{ nav_user.name }}</div>
-            {% endif %}
-            <button type="button" class="profile-logout" id="logoutBtn" role="menuitem">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
-              Log out
-            </button>
-          </div>
+          <button type="button" id="a11yFont" role="menuitemcheckbox" aria-pressed="false">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2"/><path d="M12 4v16"/><path d="M9 20h6"/></svg>
+            Large Font
+          </button>
+        </div>
+      </div>
+
+      <button type="button" class="btn-theme" id="themeToggle" aria-pressed="false" aria-label="Toggle dark mode" data-tooltip="Dark Mode">
+        <svg class="icon-sun" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+      </button>
+
+      <div class="nav-profile" id="profileMenu">
+        <button type="button" class="btn-profile" id="profileToggle" aria-haspopup="true" aria-expanded="false" aria-label="Account menu" data-tooltip="Profile">
+          <span class="avatar">{{ (nav_user.name[0] | upper) if nav_user and nav_user.name else 'U' }}</span>
+        </button>
+        <svg class="profile-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        <div class="profile-panel" id="profilePanel" role="menu">
+          {% if nav_user %}
+          <div class="profile-panel-name">{{ nav_user.name }}</div>
+          {% endif %}
+          <button type="button" class="profile-item profile-item-soon" id="profileProfileBtn" role="menuitem" title="Coming soon" disabled>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20a6 6 0 0 0-12 0"/><circle cx="12" cy="10" r="4"/><circle cx="12" cy="12" r="10"/></svg>
+            Profile <span class="soon-tag">Soon</span>
+          </button>
+          <button type="button" class="profile-item profile-item-soon" id="profileSettingsBtn" role="menuitem" title="Coming soon" disabled>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+            Settings <span class="soon-tag">Soon</span>
+          </button>
+          <button type="button" class="profile-item" id="profileThemeBtn" role="menuitem">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+            Theme
+          </button>
+          <button type="button" class="profile-item" id="profileA11yBtn" role="menuitem">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-accessibility"/></svg>
+            Accessibility
+          </button>
+          <div class="profile-panel-divider"></div>
+          <button type="button" class="profile-item profile-logout" id="logoutBtn" role="menuitem">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+            Log out
+          </button>
         </div>
       </div>
     </div>
   </header>
+
+  <nav class="nav-mobile-menu" id="navMobileMenu" aria-label="Mobile navigation">
+    <a href="{{ url_for('analytics.dashboard_page') }}" class="{{ 'active' if active=='dashboard' }}"><svg class="nav-icon"><use href="#icon-home"/></svg>Home</a>
+    <a href="{{ url_for('learn.learn_page') }}" class="{{ 'active' if active=='learn' }}"><svg class="nav-icon"><use href="#icon-book"/></svg>Learn</a>
+    <a href="{{ url_for('analytics.for_you_page') }}" class="{{ 'active' if active=='foryou' }}"><svg class="nav-icon"><use href="#icon-star"/></svg>For You</a>
+    <a href="{{ url_for('live.live_page') }}" class="{{ 'active' if active=='live' }}"><svg class="nav-icon"><use href="#icon-message"/></svg>Live Conversation</a>
+    <a href="{{ url_for('analytics.history_page') }}" class="{{ 'active' if active=='history' }}"><svg class="nav-icon"><use href="#icon-history"/></svg>History</a>
+    <a href="{{ url_for('analytics.gestures_page') }}" class="{{ 'active' if active=='gestures' }}"><svg class="nav-icon"><use href="#icon-hand"/></svg>Gestures</a>
+    <a href="{{ url_for('analytics.analytics_page') }}" class="{{ 'active' if active=='analytics' }}"><svg class="nav-icon"><use href="#icon-chart"/></svg>Analytics</a>
+    <a href="{{ url_for('analytics.about_page') }}" class="{{ 'active' if active=='about' }}"><svg class="nav-icon"><use href="#icon-info"/></svg>About Us</a>
+  </nav>
+
 
   <div class="wrap" id="mainContent" role="main">
     {% block content %}{% endblock %}
@@ -111,22 +174,46 @@ document.getElementById('logoutBtn').addEventListener('click', async ()=>{
   window.location.href = '/login';
 });
 
-/* ---------- Mobile nav burger ---------- */
+/* ---------- Mobile hamburger -> slide-down menu ---------- */
 (function(){
-  const burger = document.getElementById('navBurger');
-  const links = document.getElementById('navLinks');
-  burger.addEventListener('click', () => {
-    const open = links.classList.toggle('open');
-    burger.classList.toggle('open', open);
-    burger.setAttribute('aria-expanded', open);
-  });
-  document.addEventListener('click', (e) => {
-    if(!e.target.closest('.nav-links') && !e.target.closest('.nav-burger')){
-      links.classList.remove('open');
-      burger.classList.remove('open');
-      burger.setAttribute('aria-expanded', 'false');
+  const burger = document.getElementById('navHamburger');
+  const menu = document.getElementById('navMobileMenu');
+
+  function open(){
+    menu.classList.add('open'); burger.classList.add('open'); burger.setAttribute('aria-expanded', 'true');
+  }
+  function close(){
+    menu.classList.remove('open'); burger.classList.remove('open'); burger.setAttribute('aria-expanded', 'false');
+  }
+  burger.addEventListener('click', (e) => { e.stopPropagation(); menu.classList.contains('open') ? close() : open(); });
+  menu.querySelectorAll('a').forEach((a) => a.addEventListener('click', close));
+  document.addEventListener('click', (e) => { if(!e.target.closest('#navMobileMenu') && !e.target.closest('#navHamburger')) close(); });
+  document.addEventListener('keydown', (e) => { if(e.key === 'Escape') close(); });
+  window.addEventListener('resize', () => { if(window.innerWidth > 900) close(); }, { passive: true });
+})();
+
+/* ---------- Icon-only mode: track available width so tooltips only fire
+   when labels are actually hidden (keeps CSS breakpoints as the single
+   source of truth; this just mirrors that state onto a class for the
+   tooltip selector, since :has() support can't be relied on everywhere). ---------- */
+(function(){
+  const center = document.getElementById('navCenter');
+  function sync(){
+    // Viewport-based default, matching the documented breakpoints.
+    let iconsOnly = window.innerWidth <= 1500;
+    center.classList.toggle('icons-only', iconsOnly);
+    // Content-aware safety net: measure the row after layout. If it still
+    // doesn't actually fit — different fonts loading, OS text scaling,
+    // browser zoom — force icon-only regardless of viewport width. This is
+    // what guarantees the row can never visually overlap navbar-right.
+    if(!iconsOnly && center.scrollWidth > center.clientWidth + 1){
+      center.classList.add('icons-only');
     }
-  });
+  }
+  sync();
+  window.addEventListener('resize', sync, { passive: true });
+  window.addEventListener('load', sync);
+  if(document.fonts && document.fonts.ready){ document.fonts.ready.then(sync); }
 })();
 
 /* ---------- Navbar shadow on scroll ---------- */
@@ -148,6 +235,17 @@ document.getElementById('logoutBtn').addEventListener('click', async ()=>{
   });
   document.addEventListener('click', (e) => {
     if(!e.target.closest('.profile-menu')){ panel.classList.remove('open'); toggleBtn.setAttribute('aria-expanded', 'false'); }
+  });
+
+  // "Theme" re-uses the same dark-mode toggle already wired to themeToggle.
+  document.getElementById('profileThemeBtn').addEventListener('click', () => {
+    panel.classList.remove('open'); toggleBtn.setAttribute('aria-expanded', 'false');
+    document.getElementById('themeToggle').click();
+  });
+  // "Accessibility" opens the existing accessibility panel.
+  document.getElementById('profileA11yBtn').addEventListener('click', () => {
+    panel.classList.remove('open'); toggleBtn.setAttribute('aria-expanded', 'false');
+    document.getElementById('a11yToggle').click();
   });
 })();
 
@@ -195,6 +293,7 @@ document.getElementById('logoutBtn').addEventListener('click', async ()=>{
     const theme = root.getAttribute('data-theme') || 'light';
     themeBtn.setAttribute('aria-pressed', theme === 'dark');
     themeBtn.classList.toggle('is-dark', theme === 'dark');
+    themeBtn.setAttribute('data-tooltip', theme === 'dark' ? 'Light Mode' : 'Dark Mode');
   }
   syncThemeToggle();
   themeBtn.addEventListener('click', () => {
