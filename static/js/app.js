@@ -87,6 +87,7 @@ if(camLangSeg){
     if(!btn) return;
     camLangSeg.querySelectorAll('.lang-seg-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
+    resetIslCapture();
     loadGestureVocabulary(btn.dataset.lang);
   });
 }
@@ -347,6 +348,94 @@ function handleClassification(shapeKey, confidence){
   if(!shapeKey){ gestureLabelEl.textContent = '—'; lastSpokenGesture = null; }
 }
 
+// ---------- ISL word-level detection (external model, quick demo) ----------
+// When the selected language is ISL, we skip the static shape classifier and
+// instead recognize real ISL *words* (not just hand shapes) by streaming short
+// clips of raw camera frames to a hosted model — see isl_predict_routes.py for
+// full details and caveats. This is a demo integration: it depends on a
+// third-party's free Hugging Face Space, so treat it as "nice when it works",
+// not a guaranteed always-on feature. Everything below only ever runs when
+// currentLanguage === 'ISL'; ASL/BSL keep using the fast, fully-offline
+// geometry classifier above, unaffected.
+const ISL_CLIP_LENGTH = 16;
+const ISL_FRAME_INTERVAL_MS = 80; // ~12.5 fps — matches the reference model's training/serving setup
+const ISL_RESIZE_DIM = 224;       // the model expects 224x224 frames
+
+let islFrameBuffer = [];
+let islLastCaptureAt = 0;
+let islRequestInFlight = false;
+let islCaptureCanvas = null;
+
+function resetIslCapture(){
+  islFrameBuffer = [];
+  islLastCaptureAt = 0;
+  islRequestInFlight = false;
+}
+
+function captureIslFrame(){
+  if(!islCaptureCanvas){
+    islCaptureCanvas = document.createElement('canvas');
+    islCaptureCanvas.width = ISL_RESIZE_DIM;
+    islCaptureCanvas.height = ISL_RESIZE_DIM;
+  }
+  islCaptureCanvas.getContext('2d').drawImage(video, 0, 0, ISL_RESIZE_DIM, ISL_RESIZE_DIM);
+  // quality 0.8 keeps payload size reasonable without visibly hurting recognition
+  return islCaptureCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+}
+
+async function submitIslClip(frames){
+  islRequestInFlight = true;
+  if(confidenceEl) confidenceEl.textContent = 'Recognizing…';
+  try{
+    const res = await fetch('/api/isl/predict/frames', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ frames }),
+    });
+    const data = await res.json();
+
+    if(!res.ok || data.error){
+      if(confidenceEl) confidenceEl.textContent = 'ISL model unavailable right now — try again shortly.';
+      return;
+    }
+
+    const word = data.prediction;
+    const conf = typeof data.confidence === 'number' ? data.confidence : 0;
+    if(!word) return;
+
+    gestureLabelEl.textContent = `🤟 ${word}`;
+    if(confidenceEl) confidenceEl.textContent = `${Math.round(conf*100)}% confidence (ISL word model)`;
+
+    if(lastSpokenGesture !== word){
+      speak(word);
+      addTranscriptLine('Sign', word, 'them');
+      flashNode(nodeHearing);
+      logTranslation('sign', word, null);
+      lastSpokenGesture = word;
+      gestureHistory.push(word);
+      if(gestureHistory.length > 5) gestureHistory.shift();
+      fetchGestureSuggestions();
+    }
+  }catch(e){
+    if(confidenceEl) confidenceEl.textContent = 'ISL model unreachable — check your connection.';
+  }finally{
+    islRequestInFlight = false;
+  }
+}
+
+function handleIslFrame(){
+  const now = Date.now();
+  if(now - islLastCaptureAt < ISL_FRAME_INTERVAL_MS) return;
+  islLastCaptureAt = now;
+
+  islFrameBuffer.push(captureIslFrame());
+  if(islFrameBuffer.length >= ISL_CLIP_LENGTH && !islRequestInFlight){
+    const clip = islFrameBuffer.slice(0, ISL_CLIP_LENGTH);
+    islFrameBuffer = [];
+    submitIslClip(clip);
+  }
+}
+
 function onResults(results){
   overlay.width = video.videoWidth || 640;
   overlay.height = video.videoHeight || 480;
@@ -361,8 +450,12 @@ function onResults(results){
       drawLandmarks(ctx, lm, {color:'#F2A33E', lineWidth:1, radius:3});
     }
 
-    classifySign(lm).then(({shapeKey, confidence}) => handleClassification(shapeKey, confidence));
-  } else {
+    if(currentLanguage === 'ISL'){
+      handleIslFrame();
+    } else {
+      classifySign(lm).then(({shapeKey, confidence}) => handleClassification(shapeKey, confidence));
+    }
+  } else if(currentLanguage !== 'ISL'){
     handleClassification(null, 0);
   }
   ctx.restore();
@@ -397,6 +490,7 @@ document.getElementById('stopCam').addEventListener('click', ()=>{
   document.getElementById('startCam').disabled = false;
   document.getElementById('stopCam').disabled = true;
   ctx.clearRect(0,0,overlay.width, overlay.height);
+  resetIslCapture();
 });
 
 document.getElementById('muteBtn').addEventListener('click', (e)=>{
