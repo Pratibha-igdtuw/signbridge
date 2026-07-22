@@ -214,7 +214,12 @@ const SHAPE_TABLE = {
   '00111': 'OK',
 };
 
-function classifyGesture(lm){
+// ---------- Local geometry classifier (always available, fully offline) ----------
+// Returns a confidence alongside the shape, instead of a flat yes/no: each finger's
+// extended/curled reading has a margin (how far its tip/knuckle distance ratio sits
+// from the 1.0 decision boundary). Averaging those margins gives a rough but honest
+// 0..1 confidence — a fist held loosely reads lower than one held tight, for example.
+function classifyGestureLocal(lm){
   const wrist = lm[0];
   function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
 
@@ -226,18 +231,120 @@ function classifyGesture(lm){
     pinky:  { tip: lm[20], pip: lm[18] },
   };
 
-  const extended = {};
+  const ratios = {};
   for(const name of ['index','middle','ring','pinky']){
     const f = fingers[name];
-    extended[name] = dist(f.tip, wrist) > dist(f.pip, wrist) * 1.15;
+    ratios[name] = dist(f.tip, wrist) / (dist(f.pip, wrist) * 1.15);
   }
-  const thumbExtended = dist(fingers.thumb.tip, lm[17]) > dist(fingers.thumb.mcp, lm[17]) * 1.1;
-  extended.thumb = thumbExtended;
+  ratios.thumb = dist(fingers.thumb.tip, lm[17]) / (dist(fingers.thumb.mcp, lm[17]) * 1.1);
 
-  const key = [extended.thumb, extended.index, extended.middle, extended.ring, extended.pinky]
-    .map(b => b ? '1' : '0').join('');
+  const key = ['thumb','index','middle','ring','pinky']
+    .map(name => ratios[name] > 1 ? '1' : '0').join('');
 
-  return SHAPE_TABLE[key] || null;
+  const shapeKey = SHAPE_TABLE[key] || null;
+  if(!shapeKey) return { shapeKey: null, confidence: 0 };
+
+  const margins = Object.values(ratios).map(r => Math.min(Math.abs(r - 1) / 0.6, 1));
+  const confidence = margins.reduce((a,b) => a+b, 0) / margins.length;
+
+  return { shapeKey, confidence };
+}
+
+// ---------- Optional external ML classifier (plug-in point) ----------
+// Leave ML_API_URL empty (default) to run entirely on the local geometry classifier
+// above — no extra hosting needed, works fine on a free PythonAnywhere tier.
+// To upgrade later to a real trained model (e.g. a Random Forest/CNN over hand
+// landmarks, served from a small standalone FastAPI/Flask microservice hosted
+// elsewhere — same idea as SignBridgeV2's separate ML API), just set ML_API_URL
+// below. It must accept POST { landmarks: [{x,y,z}, ...] } (21 MediaPipe hand
+// landmarks) and respond with { sign: "<SHAPE_TABLE key>", confidence: 0..1 }.
+// Everything else — stability tracking, speak-once logic, transcript, suggestions —
+// keeps working unchanged, because both paths return the same {shapeKey, confidence} shape.
+const ML_API_URL = '';
+const ML_CONFIDENCE_THRESHOLD = 0.6;
+const ML_DEBOUNCE_MS = 300;
+
+let mlFetchInFlight = false;
+let lastMlFetchAt = 0;
+let mlApiHealthy = !!ML_API_URL;
+
+async function classifyGestureRemote(lm){
+  if(!ML_API_URL || !mlApiHealthy) return null;
+  const now = Date.now();
+  if(mlFetchInFlight || now - lastMlFetchAt < ML_DEBOUNCE_MS) return null;
+  mlFetchInFlight = true;
+  lastMlFetchAt = now;
+  try{
+    const res = await fetch(ML_API_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ landmarks: lm.map(({x,y,z}) => ({x,y,z})) }),
+    });
+    if(!res.ok) throw new Error(`ML API returned ${res.status}`);
+    const data = await res.json();
+    if(typeof data.confidence !== 'number' || !data.sign) return null;
+    if(data.confidence < ML_CONFIDENCE_THRESHOLD) return { shapeKey: null, confidence: data.confidence };
+    return { shapeKey: data.sign, confidence: data.confidence };
+  }catch(e){
+    // Don't take down sign recognition just because the ML microservice is
+    // unreachable/misconfigured — fall back to the local classifier for the
+    // rest of the session and let the console explain why.
+    mlApiHealthy = false;
+    console.warn('ML classifier unavailable, falling back to local geometry classifier:', e.message);
+    return null;
+  }finally{
+    mlFetchInFlight = false;
+  }
+}
+
+async function classifySign(lm){
+  const remote = await classifyGestureRemote(lm);
+  return remote || classifyGestureLocal(lm);
+}
+
+// ---------- Live confidence readout ----------
+// Injected next to the existing "Detected Sign" value so no template changes
+// are needed. Shows live confidence plus how close the hold is to locking in.
+let confidenceEl = document.getElementById('gestureConfidence');
+if(!confidenceEl && gestureLabelEl){
+  confidenceEl = document.createElement('div');
+  confidenceEl.id = 'gestureConfidence';
+  confidenceEl.className = 'label';
+  confidenceEl.style.cssText = 'margin-top:2px;font-size:0.8em;opacity:0.7;';
+  gestureLabelEl.insertAdjacentElement('afterend', confidenceEl);
+}
+
+const STABLE_FRAMES_REQUIRED = 6;
+
+function updateConfidenceReadout(shapeKey, confidence){
+  if(!confidenceEl) return;
+  if(!shapeKey){ confidenceEl.textContent = ''; return; }
+  const pct = Math.round((confidence || 0) * 100);
+  const holding = stableCount < STABLE_FRAMES_REQUIRED ? ` · holding ${stableCount}/${STABLE_FRAMES_REQUIRED}` : '';
+  confidenceEl.textContent = `${pct}% confidence${holding}`;
+}
+
+function handleClassification(shapeKey, confidence){
+  if(shapeKey && shapeKey === stableGesture){ stableCount++; }
+  else { stableGesture = shapeKey; stableCount = 0; }
+
+  updateConfidenceReadout(shapeKey, confidence);
+
+  if(shapeKey && stableCount === STABLE_FRAMES_REQUIRED && SHAPE_MAP[shapeKey]){
+    const info = SHAPE_MAP[shapeKey];
+    gestureLabelEl.textContent = `${info.emoji} ${info.word}`;
+    if(lastSpokenGesture !== shapeKey){
+      speak(info.word);
+      addTranscriptLine('Sign', info.word, 'them');
+      flashNode(nodeHearing);
+      logTranslation('sign', info.word, info.gesture_key);
+      lastSpokenGesture = shapeKey;
+      gestureHistory.push(info.word);
+      if(gestureHistory.length > 5) gestureHistory.shift();
+      fetchGestureSuggestions();
+    }
+  }
+  if(!shapeKey){ gestureLabelEl.textContent = '—'; lastSpokenGesture = null; }
 }
 
 function onResults(results){
@@ -254,30 +361,9 @@ function onResults(results){
       drawLandmarks(ctx, lm, {color:'#F2A33E', lineWidth:1, radius:3});
     }
 
-    const shapeKey = classifyGesture(lm);
-    if(shapeKey && shapeKey === stableGesture){ stableCount++; }
-    else { stableGesture = shapeKey; stableCount = 0; }
-
-    if(shapeKey && stableCount === 6 && SHAPE_MAP[shapeKey]){
-      const info = SHAPE_MAP[shapeKey];
-      gestureLabelEl.textContent = `${info.emoji} ${info.word}`;
-      if(lastSpokenGesture !== shapeKey){
-        speak(info.word);
-        addTranscriptLine('Sign', info.word, 'them');
-        flashNode(nodeHearing);
-        logTranslation('sign', info.word, info.gesture_key);
-        lastSpokenGesture = shapeKey;
-        logTranslation('sign', info.word, g);
-        lastSpokenGesture = g;
-        gestureHistory.push(info.word);
-        if(gestureHistory.length > 5) gestureHistory.shift();
-        fetchGestureSuggestions();
-      }
-    }
-    if(!shapeKey){ gestureLabelEl.textContent = '—'; lastSpokenGesture = null; }
+    classifySign(lm).then(({shapeKey, confidence}) => handleClassification(shapeKey, confidence));
   } else {
-    gestureLabelEl.textContent = '—';
-    lastSpokenGesture = null;
+    handleClassification(null, 0);
   }
   ctx.restore();
 }
