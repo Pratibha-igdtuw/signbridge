@@ -14,6 +14,7 @@ from emergency_routes import emergency_bp
 from live_routes import live_bp
 from predict_routes import predict_bp
 from sync_routes import sync_bp
+from isl_predict_routes import isl_predict_bp
 
 
 def create_app(config_object=Config):
@@ -33,6 +34,7 @@ def create_app(config_object=Config):
     app.register_blueprint(live_bp)
     app.register_blueprint(predict_bp)
     app.register_blueprint(sync_bp)
+    app.register_blueprint(isl_predict_bp)
 
     @app.context_processor
     def inject_nav_user():
