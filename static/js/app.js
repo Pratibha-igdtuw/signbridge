@@ -339,6 +339,13 @@ function handleClassification(shapeKey, confidence){
 
   updateConfidenceReadout(shapeKey, confidence);
 
+  // Debug aid: open the browser console (F12) while signing to see exactly what
+  // raw shape key the classifier read each frame, and whether it's wired to a word
+  // in SHAPE_MAP yet. Cheap no-op in normal use.
+  if(shapeKey && stableCount === STABLE_FRAMES_REQUIRED && !SHAPE_MAP[shapeKey]){
+    console.debug(`SignBridge: recognized shape "${shapeKey}" but it isn't wired to any word in ${currentLanguage} yet.`);
+  }
+
   if(shapeKey && stableCount === STABLE_FRAMES_REQUIRED && SHAPE_MAP[shapeKey]){
     const info = SHAPE_MAP[shapeKey];
     gestureLabelEl.textContent = `${info.emoji} ${info.word}`;
