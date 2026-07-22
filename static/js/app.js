@@ -436,24 +436,40 @@ function handleIslFrame(){
   }
 }
 
+// Classify every visible hand and keep whichever reading is currently strongest.
+// Most signs in this project's vocabulary are single-handed (numbers, letters,
+// ILY, etc.), so a second hand in frame — a support hand, or just a hand resting
+// in view — shouldn't block detection. This also means signers who favor either
+// hand still get recognized, instead of only ever reading "hand #1".
+async function classifyHands(handsLandmarksList){
+  const results = await Promise.all(handsLandmarksList.map(lm => classifySign(lm)));
+  let best = { shapeKey: null, confidence: 0 };
+  for(const r of results){
+    if(r.shapeKey && r.confidence > best.confidence) best = r;
+  }
+  return best;
+}
+
 function onResults(results){
   overlay.width = video.videoWidth || 640;
   overlay.height = video.videoHeight || 480;
   ctx.save();
   ctx.clearRect(0,0,overlay.width, overlay.height);
 
-  if(results.multiHandLandmarks && results.multiHandLandmarks.length > 0){
-    const lm = results.multiHandLandmarks[0];
+  const handsList = results.multiHandLandmarks || [];
 
+  if(handsList.length > 0){
     if(window.drawConnectors){
-      drawConnectors(ctx, lm, Hands.HAND_CONNECTIONS, {color:'#3FD9C7', lineWidth:3});
-      drawLandmarks(ctx, lm, {color:'#F2A33E', lineWidth:1, radius:3});
+      handsList.forEach(lm => {
+        drawConnectors(ctx, lm, Hands.HAND_CONNECTIONS, {color:'#3FD9C7', lineWidth:3});
+        drawLandmarks(ctx, lm, {color:'#F2A33E', lineWidth:1, radius:3});
+      });
     }
 
     if(currentLanguage === 'ISL'){
       handleIslFrame();
     } else {
-      classifySign(lm).then(({shapeKey, confidence}) => handleClassification(shapeKey, confidence));
+      classifyHands(handsList).then(({shapeKey, confidence}) => handleClassification(shapeKey, confidence));
     }
   } else if(currentLanguage !== 'ISL'){
     handleClassification(null, 0);
@@ -462,7 +478,7 @@ function onResults(results){
 }
 
 hands = new Hands({locateFile:(f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
-hands.setOptions({ maxNumHands:1, modelComplexity:1, minDetectionConfidence:0.6, minTrackingConfidence:0.6 });
+hands.setOptions({ maxNumHands:2, modelComplexity:1, minDetectionConfidence:0.6, minTrackingConfidence:0.6 });
 hands.onResults(onResults);
 
 document.getElementById('startCam').addEventListener('click', async ()=>{
