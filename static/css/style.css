@@ -1076,3 +1076,27 @@ select:focus-visible, [tabindex]:focus-visible{
 }
 .suggestion-chip:hover{ background:var(--lav-100); transform:translateY(-1px); }
 .suggestion-chip .conf{ opacity:.65; font-weight:500; margin-left:4px; font-size:11px; }
+.password-wrapper{
+    position: relative;
+}
+
+.password-wrapper input{
+    width:100%;
+    padding-right:45px;
+    box-sizing:border-box;
+}
+
+.password-wrapper i{
+    position:absolute;
+    right:15px;
+    top:50%;
+    transform:translateY(-50%);
+    cursor:pointer;
+    color:#777;
+    font-size:18px;
+    transition:.2s;
+}
+
+.password-wrapper i:hover{
+    color:#5F4BB0;
+}
