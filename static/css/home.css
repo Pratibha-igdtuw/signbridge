@@ -5,13 +5,15 @@
 }
 
 :root {
-    /* Aligned to the site-wide SignBridge brand palette (see style.css) */
-    --primary-purple: #6D5EF5;
-    --secondary-purple: #8B5CF6;
-    --light-bg: #F8F7FF;
-    --white: #FFFFFF;
-    --dark-text: #1F2937;
-    --gray-text: #6B7280;
+    /* Aliased to the global theme-aware variables (style.css) so dark mode /
+       high-contrast mode automatically cascades into every dashboard section
+       below, with no per-rule duplication. */
+    --primary-purple: var(--primary, #6D5EF5);
+    --secondary-purple: var(--secondary, #8B5CF6);
+    --light-bg: var(--panel-2, #F8F7FF);
+    --white: var(--panel, #FFFFFF);
+    --dark-text: var(--text, #1F2937);
+    --gray-text: var(--muted, #6B7280);
     --shadow: 0 2px 12px rgba(109, 94, 245, 0.15);
     --shadow-lg: 0 8px 32px rgba(109, 94, 245, 0.25);
 }
@@ -26,11 +28,14 @@
     padding: 0;
     text-align: center;
     width: 100%;
+    margin-top: 28px; /* 24-32px breathing room below the navbar */
 }
 
 .hero-image-full {
     width: 100%;
     overflow: hidden;
+    border-radius: 24px;
+    box-shadow: 0 24px 48px -24px rgba(109, 94, 245, 0.35);
 }
 
 .hero-img-full {
@@ -51,7 +56,7 @@
 }
 
 .section-container {
-    max-width: 1200px;
+    max-width: var(--content-max, 1440px);
     margin: 0 auto;
 }
 
@@ -102,7 +107,7 @@
 }
 
 .content-card:hover {
-    transform: translateY(-8px);
+    transform: translateY(-4px) scale(1.01);
     box-shadow: var(--shadow-lg);
 }
 
@@ -182,7 +187,7 @@
 
 .feature-box:hover {
     border-color: var(--primary-purple);
-    transform: translateY(-5px);
+    transform: translateY(-4px) scale(1.01);
 }
 
 .feature-icon {
@@ -228,7 +233,7 @@
 
 .lang-card:hover {
     border-color: var(--primary-purple);
-    transform: translateY(-5px);
+    transform: translateY(-4px) scale(1.01);
     box-shadow: var(--shadow-lg);
 }
 
@@ -265,7 +270,7 @@
 }
 
 .footer-content {
-    max-width: 1200px;
+    max-width: var(--content-max, 1440px);
     margin: 0 auto;
     display: flex;
     flex-direction: column;
